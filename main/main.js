@@ -2,11 +2,13 @@
 // downloads, and routes messages from each window's interface to that window (main/window.js).
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session } = require('electron');
+const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog } = require('electron');
 const Theme = require('../shared/theme');
 const { Store } = require('./store');
 const { Library } = require('./library');
 const { Downloads } = require('./downloads');
+const { Notes } = require('./notes');
+const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
 const { NEWTAB, ENGINES } = require('./url');
@@ -47,7 +49,7 @@ if (SELFTEST) {
   require('fs').mkdirSync(path.join(SELFTEST, 'downloads'), { recursive: true });
 }
 
-let store, library, downloads;
+let store, library, downloads, notes;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -58,9 +60,9 @@ function servePath(url) {
   const u = new URL(url);
   const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
   let base, file;
-  if (u.host === 'newtab') {
-    base = path.join(ROOT, 'ui', 'pages', 'newtab');
-    file = path.join(base, rel || 'newtab.html');
+  if (u.host === 'newtab' || u.host === 'reader') {
+    base = path.join(ROOT, 'ui', 'pages', u.host);
+    file = path.join(base, rel || `${u.host}.html`);
   } else if (u.host === 'app') {
     base = ROOT;
     file = path.join(base, rel);
@@ -138,6 +140,7 @@ function setPrefs(patch) {
   if (['auto', 'top', 'side'].includes(patch?.tabsMode)) store.set('tabsMode', patch.tabsMode);
   if (patch && Object.hasOwn(AI.PROVIDERS, patch.aiProvider)) store.set('aiProvider', patch.aiProvider);
   if (['smart', 'search', 'ai'].includes(patch?.askMode)) store.set('askMode', patch.askMode);
+  if (patch?.aiProvider) everyWindow((w) => w.onAIProviderChange?.());
   broadcastTheme();
   everyWindow((w) => w.sendTabs());
 }
@@ -203,7 +206,7 @@ function registerIpc() {
   const on = (ch, fn) => ipcMain.on(ch, (e, ...a) => { const w = winOfUi(e.sender); if (w) fn(w, ...a); });
   const handle = (ch, fn) => ipcMain.handle(ch, (e, ...a) => { const w = winOfUi(e.sender); return w ? fn(w, ...a) : null; });
 
-  on('ui:ready', (w) => { w.sendTabs(); w.applyTheme(); w.sendBookmarks(); w.send('downloads', w.downloads.state()); });
+  on('ui:ready', (w) => { w.sendTabs(); w.applyTheme(); w.sendBookmarks(); w.send('downloads', w.downloads.state()); w.send('ai-panel', w.aiState()); });
   on('ui:layout', (w, l) => w.setLayout(l));
   on('ui:overlay', (w, open) => w.setOverlay(open));
   on('prefs:set', (_w, patch) => setPrefs(patch));
@@ -239,6 +242,32 @@ function registerIpc() {
   on('nav:stop', (w) => w.tabs.stop());
   on('zoom:step', (w, dir) => w.tabs.stepZoom(Math.sign(Number(dir) || 0)));
   on('find:query', (w, q) => w.find(q));
+  // Split view
+  on('split:with', (w, id) => w.tabs.splitWith(Number(id) || undefined));
+  on('split:off', (w) => w.tabs.unsplit());
+  on('split:swap', (w) => w.tabs.swapSplit());
+  on('split:ratio', (w, r) => w.tabs.setSplitRatio(r));
+  // Reader mode
+  handle('reader:toggle', (w) => w.tabs.toggleReader());
+  // AI side panel
+  on('ai:panel', (w, open) => w.setAI(open === undefined ? undefined : !!open));
+  on('ai:width', (w, px) => w.setAIWidth(px));
+  // Notes (one per website; off in private windows)
+  const hostOk = (h) => typeof h === 'string' && /^[a-z0-9.-]+(:\d+)?$/i.test(h) && h.length < 256;
+  handle('notes:get', (w) => ({ host: w.isPrivate ? '' : w.currentHost(), text: w.isPrivate ? '' : notes.get(w.currentHost()), private: w.isPrivate }));
+  handle('notes:read', (_w, host) => (hostOk(host) ? notes.get(host) : ''));
+  on('notes:set', (w, host, text) => { if (!w.isPrivate && hostOk(host)) notes.set(host, String(text || '')); });
+  handle('notes:all', () => notes.all().map((n) => ({ host: n.host, updated: n.updated, preview: n.text.slice(0, 120) })));
+  handle('notes:export', async (w) => {
+    if (!notes.all().length) return { ok: false, reason: 'empty' };
+    const { canceled, filePath } = await dialog.showSaveDialog(w.win, {
+      title: 'Export notes', defaultPath: path.join(app.getPath('documents'), 'burrow-notes.md'),
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (canceled || !filePath) return { ok: false, reason: 'cancelled' };
+    await notes.exportTo(filePath);
+    return { ok: true, path: filePath };
+  });
   on('find:stop', (w) => w.stopFind());
 
   on('ws:new', (w, name) => { if (!w.isPrivate) { w.tabs.createWorkspace(String(name || '')); broadcastTheme(); } });
@@ -309,6 +338,11 @@ function registerIpc() {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);
     if (w) w.ask(String(text || ''), { pageWc: e.sender });
   });
+  // The reader page asks for the article it should show (by its one-time key).
+  ipcMain.handle('page:reader', (e, key) => {
+    if (!e.sender.getURL().startsWith('burrow://reader') || !winOfPage(e.sender)) return null;
+    return Reader.get(key);
+  });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);
     if (w) w.tabs.navigateFrom(e.sender, String(text || ''));
@@ -337,6 +371,7 @@ app.whenReady().then(() => {
     }),
   });
   // Normal windows share one session, so they share one downloads list.
+  notes = new Notes({ onChange: (host) => everyWindow((w) => w.send('notes-changed', host)) });
   downloads = new Downloads({
     session: session.defaultSession,
     onChange: (list) => normalWindows().forEach((w) => w.send('downloads', list)),
@@ -355,11 +390,11 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session,
+      mainWin, openWindow, windows, session, getNotes: () => notes,
     });
   }
 });
 
-function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); }
+function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); }
 app.on('before-quit', flushAll);
 app.on('window-all-closed', () => { flushAll(); app.quit(); });

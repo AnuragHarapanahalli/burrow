@@ -1,0 +1,46 @@
+/* Reader view: one readable column, Swiss typography. */
+:root { --rsize: 19px; }
+body { background: var(--bg); }
+
+.rbar {
+  position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 14px;
+  height: 44px; padding: 0 24px; background: var(--bg); border-bottom: var(--rule);
+}
+.rlabel { color: var(--accent-ink); }
+.rsite { font-weight: 700; }
+.rtime { color: var(--muted); }
+.rtools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.rtools button {
+  font: inherit; font-weight: 600; color: var(--fg); background: none; border: 1px solid var(--line);
+  height: 28px; min-width: 36px; padding: 0 8px; cursor: pointer; transition: background-color .12s, transform .08s;
+}
+.rtools button:hover { background: var(--hover); }
+.rtools button:active { transform: scale(.94); }
+.rtools button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.rorig { margin-left: 10px; color: var(--fg); font-weight: 500; text-decoration: none; border-bottom: 1px solid currentColor; }
+.rorig:hover { color: var(--accent-ink); }
+
+.rpage { padding: 48px 24px 120px; }
+article { max-width: 680px; margin: 0 auto; font-size: var(--rsize); line-height: 1.68; }
+article h1 { font-size: clamp(30px, 4.4vw, 46px); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; margin: 0 0 14px; }
+.rbyline { color: var(--muted); margin: 0 0 28px; padding-bottom: 18px; border-bottom: var(--rule); font-size: 15px; }
+.rbody h2, .rbody h3, .rbody h4 { line-height: 1.2; letter-spacing: -.02em; margin: 1.8em 0 .5em; }
+.rbody h2 { font-size: 1.45em; font-weight: 800; }
+.rbody h3 { font-size: 1.2em; font-weight: 700; }
+.rbody p { margin: 0 0 1.05em; }
+.rbody a { color: var(--accent-ink); text-underline-offset: 3px; }
+.rbody img, .rbody video { max-width: 100%; height: auto; display: block; margin: 1.4em auto; }
+.rbody figure { margin: 1.6em 0; }
+.rbody figcaption { color: var(--muted); font-size: .8em; margin-top: .4em; }
+.rbody blockquote { margin: 1.4em 0; padding: .2em 0 .2em 1.1em; border-left: 3px solid var(--accent); color: var(--muted); }
+.rbody pre, .rbody code { font-family: ui-monospace, Consolas, monospace; font-size: .86em; }
+.rbody pre { background: var(--surface); border: var(--hair); padding: 12px 14px; overflow-x: auto; }
+.rbody table { border-collapse: collapse; width: 100%; font-size: .9em; }
+.rbody th, .rbody td { border-bottom: var(--hair); padding: 6px 8px; text-align: left; }
+.rbody hr { border: 0; border-top: var(--hair); margin: 2em 0; }
+body.serif article { font-family: Georgia, 'Times New Roman', serif; }
+body.serif article h1, body.serif .rbody h2, body.serif .rbody h3 { font-family: var(--sans); }
+
+.rloading { color: var(--muted); }
+.rmissing { color: var(--muted); }
+.rmissing a { color: var(--accent-ink); }

@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Split view** (Ctrl+\\, toolbar ◫, menu, palette "Split with …"): the current tab on the left, the next tab (or a new one) on the right. The pair stays together — click either tab to see both; any other tab shows alone. Drag the divider to resize, double-click to swap. Clicking into a side makes it the active tab (an accent bar marks it) | Split into a separate window; fixed 50/50 | Feels like one window with two pages; the pair remembers itself |
+| 2026-11-17 | **AI side panel** (Ctrl+Shift+A, toolbar ✦ AI): your chosen AI docked on the right, signed in with your normal session, stays open across tabs. Switch Claude/ChatGPT/Gemini in its header, drag its edge to resize, ↗ opens it in a tab. With the panel open, Ask AI goes to the panel. Off in private windows. Only one right-side panel at a time (AI or Bookmarks/History/…) | A panel per tab | Chat next to what you're reading, without losing it when you switch tabs |
+| 2026-11-17 | **Notes**, one per website (by host, e.g. moodle.college.edu), saved as you type; list of all notes; export everything as one Markdown file (you choose where). Off in private windows | Notes per page address; notes synced online | Per-site is what you usually want ("notes for this course site"); Markdown opens anywhere |
+| 2026-11-17 | **Reader mode** with Mozilla's Readability (Apache-2.0, the engine in Firefox): a book button appears on article pages (F9). Text size, serif option, "Original page" link. The article runs through a sanitiser *and* a page that forbids inline scripts | Write our own article extractor | Readability is battle-tested on millions of pages |
+| 2026-11-17 | Reader safety: the article is extracted in an **isolated world** (the page's scripts can't interfere), then scripts, frames, forms, event handlers and `javascript:` links are removed before display | Show the article HTML as-is | Article HTML comes from websites; it must not be able to run code in a Burrow page |
 | 2026-11-17 | **Ctrl+K command palette** searches actions, every open tab (all workspaces), bookmarks and history, plus Search / Ask AI rows. Matching is "fuzzy" (letters in order, e.g. "nwpr" finds New private window). Results open in the current tab only if you're on a new tab | Separate tab search + command list | One box to remember; shortcuts shown on each row teach you the keys |
 | 2026-11-17 | Ask AI default: **Claude** (changeable in Settings → AI assistant). Claude and ChatGPT get your question in the address; **Gemini can't, so Burrow copies the question and Mochi says "Press Ctrl+V in Gemini"** | Skip Gemini | You wanted Gemini; copy-and-paste is the honest workaround |
 | 2026-11-17 | New tab gets a **Search \| Ask** toggle that flips to Ask by itself when you type a question (in Smart mode); clicking it yourself overrides until you clear the box | Two separate boxes | Same box, clear which way Enter will go |
@@ -166,6 +171,10 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Report a bug (opens a prefilled GitHub issue) | ✅ done (tested) |
 | Ctrl+K command palette | ✅ done (tested) |
 | Ask AI: address bar, new tab toggle, palette, Settings (Claude / ChatGPT / Gemini, Smart default) | ✅ done (tested) |
+| Split view (resize, swap, focus follows click) | ✅ done (tested with real mouse drags) |
+| AI side panel | ✅ done (tested; test never contacts AI sites) |
+| Notes per site + Markdown export | ✅ done (tested) |
+| Reader mode | ✅ done (tested with a local article containing hidden script tricks) |
 | Ctrl+K command palette | planned |
 | Split view, notes (+ .md export), reader mode | planned |
 | Tab sleeping | planned |
@@ -184,7 +193,9 @@ WOAHDAMN/
 ├─ PROJECT_JOURNAL.md     this file
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
-│  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP
+│  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ notes.js            notes, one per website (notes.json); Markdown export
+│  ├─ reader.js           reader mode: runs Mozilla Readability safely and hands the article to the reader page
 │  ├─ tabs.js             tabs + workspaces: create/close/switch, reopen closed, session restore
 │  ├─ library.js          history + bookmarks (history.json / bookmarks.json), address suggestions
 │  ├─ downloads.js        saves downloads to your Downloads folder, tracks progress (downloads.json)
@@ -208,9 +219,11 @@ WOAHDAMN/
    ├─ find.js             the find-in-page bar
    ├─ drag.js             dragging tabs: reorder, pull out into a new window
    ├─ palette.js          the Ctrl+K command palette
+   ├─ panes.js            split-view divider, reader button, AI panel, notes
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
+   └─ pages/reader/       the reader view (reader.html / .css / .js, with its own sanitiser)
 ```
 
 **`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
@@ -225,7 +238,7 @@ WOAHDAMN/
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
 
-**Shortcuts so far:** Ctrl+K command palette · Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
+**Shortcuts so far:** Ctrl+\\ split view · Ctrl+Shift+A AI panel · Ctrl+Shift+E notes · F9 reader view · Ctrl+K command palette · Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
 
 ---
 
@@ -300,6 +313,11 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - The self-test checks the exact addresses Burrow would open for Claude/Gemini **without** actually visiting those sites.
 - Discovered: in Electron 45, *reading* the clipboard is asynchronous (returns a "promise"). Burrow only writes to it, so only the test needed changing.
 
+**2026-11-17 — Phase 5 done (119/119 self-test checks pass)**
+- Split view, AI side panel, notes with Markdown export, reader mode.
+- The self-test starts its own tiny web server with a fake article that hides a script, a booby-trapped image and a `javascript:` link — and checks none of it survives or runs in reader view.
+- Fixed while testing: the panel's section tabs wrapped onto two lines with five sections; a test helper threw away results of self-contained snippets.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
@@ -307,7 +325,9 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 5):** split view + AI side panel, notes, reader mode; then "Ask about this page".
+- **Next (phase 5b):** "Ask AI about this page / selected text". Then tab sleeping (phase 6).
+- Split view isn't remembered after a restart yet (the two tabs come back as normal tabs).
+- One self-test check (downloads) needs the internet (it downloads example.com); it failed once when the site was slow and passed on the re-run.
 - Ask AI relies on Claude's and ChatGPT's "question in the address" links; if they ever change them, the question may stop being filled in (the site still opens).
 
 ### Roadmap at a glance
@@ -315,8 +335,8 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 |---|---|---|
 | 1–3 | Tabs, workspaces, library, theming, find, zoom, private & multiple windows, tab dragging, bug reports | ✅ done |
 | 4 | Ctrl+K command palette + Ask AI in search | ✅ done |
-| 5 | Split view + AI side panel, notes, reader mode | next |
-| 5b | Ask AI about this page / selected text | planned |
+| 5 | Split view + AI side panel, notes, reader mode | ✅ done |
+| 5b | Ask AI about this page / selected text | next |
 | 6 | Tab sleeping | planned |
 | 7 | Mochi animations + reactions | planned |
 | 8 | Focus tools (time limits — Mochi closes the tab, focus sessions) | planned |

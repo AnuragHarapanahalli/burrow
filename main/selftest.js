@@ -6,14 +6,16 @@ const path = require('path');
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
   const note = (s) => { log.push(s); console.log('[selftest]', s); };
   const check = (ok, what) => { if (!ok) failures++; note(`${ok ? 'PASS' : 'FAIL'} ${what}`); };
   const js = async (code) => {
-    const body = code.includes(';') ? `(() => { ${code} })()` : `(${code})`;
+    // Several statements run as a block; a single expression (incl. a "(() => {...})()" snippet) returns its value.
+    const isBlock = code.includes(';') && !code.trim().startsWith('(');
+    const body = isBlock ? `(() => { ${code} })()` : `(${code})`;
     const r = await ui.webContents.executeJavaScript(`(() => { try { return { v: ${body} }; } catch (e) { return { e: e.message }; } })()`);
     if (r.e) throw new Error(`UI script "${code.slice(0, 60)}" threw: ${r.e}`);
     return r.v;
@@ -36,7 +38,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(2500);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     // --- Search engine chooser on the new tab ---
     const page = tabs.active.view.webContents;
@@ -387,7 +389,6 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await paletteKey('Escape');
     await wait(200);
 
-    // ================= Windows + dragging tabs =================
     // Real mouse input, the same path your mouse takes.
     const mouse = async (wc, type, x, y) => {
       const held = type !== 'mouseUp' ? ['leftButtonDown'] : [];
@@ -400,6 +401,115 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       await mouse(wc, 'mouseUp', to.x, to.y);
       await wait(600);
     };
+    // ================= Phase 5: split view, reader, AI panel, notes =================
+    // --- Split view ---
+    while (tabs.visible.length < 2) tabs.create('https://example.com/', { activate: false });
+    tabs.activate(tabs.visible[0].id);
+    await wait(500);
+    mainWin.send('noop');
+    tabs.splitWith();
+    await wait(800);
+    const sp = tabs.state().split;
+    check(sp && sp.shown, 'split view shows two tabs side by side');
+    const [L, R] = tabs.shownTabs.map((t) => t.view.getBounds());
+    check(L && R && R.x > L.x + L.width && Math.abs(L.width - R.width) <= 2, `the two pages sit side by side (${L?.width} | ${R?.width})`);
+    check(await js("!document.getElementById('splitDivider').hidden"), 'a divider appears between them');
+    await shot('13-split');
+    // Drag the divider to the right with the real mouse
+    const dv = await js("(() => { const r = document.getElementById('splitDivider').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 200 }; })()");
+    await dragMouse(ui.webContents, dv, { x: dv.x + 200, y: dv.y }, 10);
+    check(tabs.split && tabs.split.ratio > 0.55, `dragging the divider resizes the split (${tabs.split?.ratio.toFixed(2)})`);
+    // Clicking into the right side makes it the active tab
+    const right = tabs.get(tabs.split.b);
+    right.view.webContents.focus();
+    await wait(400);
+    check(tabs.activeId === right.id, 'clicking into the right side makes it the active tab');
+    tabs.swapSplit();
+    await wait(300);
+    check(tabs.shownTabs[0].id === right.id, 'swap puts the right tab on the left');
+    tabs.unsplit();
+    await wait(400);
+    check(!tabs.split && tabs.shownTabs.length === 1 && tabs.shownTabs[0].view.getBounds().width === tabs.bounds.width, 'closing split view shows one full-width page');
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: '\\', modifiers: ['control'] });
+    await wait(500);
+    check(!!tabs.split, 'Ctrl+\\ turns split view on');
+    const pairB = tabs.split.b;
+    tabs.close(pairB);
+    await wait(400);
+    check(!tabs.split && tabs.shownTabs.length === 1, 'closing one side ends split view');
+
+    // --- Reader view (a local test article with a hidden script and a booby-trapped image) ---
+    const http = require('http');
+    const para = 'Burrow reader test paragraph with enough words to look like a real article about volcanoes, magma chambers, eruptions and the geology of mountains. '.repeat(6);
+    const articleHtml = `<!doctype html><html lang="en"><head><title>Volcanoes explained</title></head><body>
+      <nav>Home | About | Contact</nav>
+      <article><h1>Volcanoes explained</h1><p class="byline">By Test Writer</p>
+      ${Array.from({ length: 8 }, (_, i) => `<p>${para} Part ${i + 1}.</p>`).join('')}
+      <img src="https://invalid.example/x.png" onerror="window.__pwned = 1">
+      <script>window.__pwned = 2</script>
+      <p><a href="javascript:window.__pwned=3">sneaky link</a></p>
+      </article><footer>Footer stuff</footer></body></html>`;
+    const server = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(articleHtml); });
+    await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const articleUrl = `http://127.0.0.1:${server.address().port}/article`;
+    const art = tabs.create(articleUrl);
+    await wait(3000);
+    check(tabs.state().tabs.find((t) => t.id === art.id)?.readerable, 'an article page gets the reader button');
+    check(!(await js("document.getElementById('readerBtn').hidden")), 'the reader button shows in the address bar');
+    const opened = await tabs.toggleReader(art);
+    await wait(2000);
+    check(opened && art.url.startsWith('burrow://reader'), 'reader view opens');
+    const rwc = art.view.webContents;
+    check((await rwc.executeJavaScript("document.querySelector('h1').textContent")) === 'Volcanoes explained', 'reader shows the article title');
+    check(await rwc.executeJavaScript("document.querySelectorAll('.rbody script, .rbody [onerror]').length") === 0, 'scripts and onerror tricks are stripped');
+    check(await rwc.executeJavaScript("!document.querySelector('.rbody a[href^=\"javascript\"]')"), 'javascript: links are stripped');
+    check(await rwc.executeJavaScript('window.__pwned === undefined'), 'nothing from the article ran');
+    check((await js("document.getElementById('address').value")) === articleUrl, 'address bar shows the original page in reader view');
+    await shot('14-reader', true);
+    await tabs.toggleReader(art);
+    await wait(1500);
+    check(art.url === articleUrl, 'leaving reader view goes back to the page');
+
+    // --- Notes ---
+    tabs.activate(art.id);
+    await wait(300);
+    await js("openPanel('notes')");
+    await wait(500);
+    check((await js("document.getElementById('noteHost').textContent")) === '127.0.0.1:' + server.address().port, 'Notes opens for the current site');
+    await js("(() => { const t = document.getElementById('noteText'); t.value = 'Remember: magma is hot'; t.dispatchEvent(new Event('input')); })()");
+    await wait(800);
+    const notesSvc = getNotes();
+    check(notesSvc.get('127.0.0.1:' + server.address().port) === 'Remember: magma is hot', 'typing a note saves it');
+    await shot('15-notes');
+    const mdPath = path.join(dir, 'notes-export.md');
+    await notesSvc.exportTo(mdPath);
+    const md = fs.readFileSync(mdPath, 'utf8');
+    check(md.includes('# Burrow notes') && md.includes('Remember: magma is hot'), 'notes export as Markdown');
+    await js("closePanel()");
+    server.close();
+
+    // --- AI panel (loads a blank page here, so the test never contacts an AI site) ---
+    const aiLoads = [];
+    const realLoadAI = mainWin.loadAI.bind(mainWin);
+    mainWin.loadAI = (url) => { aiLoads.push(url || 'home'); realLoadAI('about:blank'); };
+    const fullWidth = tabs.bounds.width;
+    mainWin.setAI(true);
+    await wait(800);
+    check(mainWin.aiOpen && mainWin.aiView, 'Ctrl+Shift+A opens the AI panel');
+    const aiB = mainWin.aiView.getBounds();
+    check(tabs.bounds.width < fullWidth && aiB.x >= tabs.bounds.x + tabs.bounds.width, 'pages shrink to make room for the AI panel on the right');
+    check(await js("!document.getElementById('aiPanel').hidden && document.querySelectorAll('#aiSeg button').length === 3"), 'the AI panel header offers Claude, ChatGPT and Gemini');
+    await shot('16-ai-panel');
+    mainWin.ask('what is a magma chamber');
+    check(aiLoads.includes('https://claude.ai/new?q=what%20is%20a%20magma%20chamber'), 'with the panel open, Ask AI goes to the panel');
+    mainWin.setAI(false);
+    await wait(400);
+    check(!mainWin.aiOpen && tabs.bounds.width === fullWidth, 'closing the AI panel gives the page its width back');
+    mainWin.loadAI = realLoadAI;
+    tabs.close(art.id);
+    await wait(300);
+
+    // ================= Windows + dragging tabs =================
     const tabCenters = () => js("[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => [t, t.getBoundingClientRect()]).map(([t, r]) => ({ id: +t.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }))");
 
     // --- Ctrl+N opens a new normal window ---

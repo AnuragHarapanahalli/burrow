@@ -84,6 +84,10 @@ const MENU = [
   null,
   'zoom',
   { cmd: 'find', label: 'Find in page', key: 'CTRL F' },
+  { cmd: 'split', label: 'Split view', key: 'CTRL \\', check: () => !!UI.state.split },
+  { cmd: 'reader', label: 'Reader view', key: 'F9', check: () => !!activeTab()?.inReader },
+  { cmd: 'ai', label: 'AI panel', key: 'CTRL SHIFT A', check: () => !!window.aiState?.open, hideInPrivate: true },
+  { cmd: 'notes', label: 'Notes', key: 'CTRL SHIFT E', hideInPrivate: true },
   { cmd: 'pip', label: 'Picture in picture' },
   null,
   { cmd: 'bookmarks', label: 'Bookmarks', key: 'CTRL SHIFT O' },
@@ -129,6 +133,9 @@ mainMenu.addEventListener('click', (e) => {
   else if (cmd === 'bug') B.tabs.navigate('burrow://newtab/#report-bug');
   else if (cmd === 'find') window.openFind();
   else if (cmd === 'pip') window.popOut();
+  else if (cmd === 'split') (UI.state.split ? B.split.off() : B.split.with());
+  else if (cmd === 'reader') window.toggleReader();
+  else if (cmd === 'ai') B.ai.panel();
   else if (cmd === 'reopen') B.tabs.reopen();
   else if (cmd === 'bmbar') B.setPrefs({ bookmarksBar: !UI.theme?.prefs.bookmarksBar });
   else window.openPanel(cmd);

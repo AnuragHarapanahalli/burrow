@@ -2,10 +2,10 @@
 // Shared by the main process, the browser interface and the new tab.
 (function (root) {
   const PROVIDERS = {
-    claude: { name: 'Claude', host: 'claude.ai', prefill: (q) => 'https://claude.ai/new?q=' + encodeURIComponent(q) },
-    chatgpt: { name: 'ChatGPT', host: 'chatgpt.com', prefill: (q) => 'https://chatgpt.com/?q=' + encodeURIComponent(q) },
+    claude: { name: 'Claude', host: 'claude.ai', home: 'https://claude.ai/new', prefill: (q) => 'https://claude.ai/new?q=' + encodeURIComponent(q) },
+    chatgpt: { name: 'ChatGPT', host: 'chatgpt.com', home: 'https://chatgpt.com/', prefill: (q) => 'https://chatgpt.com/?q=' + encodeURIComponent(q) },
     // Gemini doesn't accept a question in the address, so Burrow copies it for you to paste.
-    gemini: { name: 'Gemini', host: 'gemini.google.com', open: 'https://gemini.google.com/app' },
+    gemini: { name: 'Gemini', host: 'gemini.google.com', home: 'https://gemini.google.com/app', open: 'https://gemini.google.com/app' },
   };
   const DEFAULT_PROVIDER = 'claude';
 

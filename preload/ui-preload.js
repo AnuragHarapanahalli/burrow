@@ -20,6 +20,26 @@ contextBridge.exposeInMainWorld('burrow', {
   searchNewTab: send('tab:search'),
   allTabs: () => ipcRenderer.invoke('palette:tabs'),
   onPaletteOpen: listen('palette-open'),
+  split: {
+    with: send('split:with'),
+    off: send('split:off'),
+    swap: send('split:swap'),
+    ratio: send('split:ratio'),
+  },
+  reader: () => ipcRenderer.invoke('reader:toggle'),
+  ai: {
+    panel: send('ai:panel'),
+    width: send('ai:width'),
+    onState: listen('ai-panel'),
+  },
+  notes: {
+    get: () => ipcRenderer.invoke('notes:get'),
+    read: (host) => ipcRenderer.invoke('notes:read', host),
+    set: send('notes:set'),
+    all: () => ipcRenderer.invoke('notes:all'),
+    exportAll: () => ipcRenderer.invoke('notes:export'),
+    onChange: listen('notes-changed'),
+  },
   onMochiSay: listen('mochi-say'),
   zoom: send('zoom:step'),
   find: {

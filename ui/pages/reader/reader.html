@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- No inline scripts can run here: article HTML comes from websites. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; script-src 'self' burrow:; img-src https: http: data:; media-src https: http:; style-src 'self' burrow: 'unsafe-inline'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Reader</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+  <header class="rbar">
+    <span class="pixel rlabel">READER</span>
+    <span class="rsite" id="site"></span>
+    <span class="pixel rtime" id="time"></span>
+    <div class="rtools">
+      <button id="smaller" title="Smaller text" aria-label="Smaller text">A&minus;</button>
+      <button id="bigger" title="Bigger text" aria-label="Bigger text">A+</button>
+      <button id="serif" aria-pressed="false" title="Serif font">Serif</button>
+      <a id="original" class="rorig" href="#">Original page &nearr;</a>
+    </div>
+  </header>
+
+  <main class="rpage">
+    <article id="article" aria-live="polite">
+      <p class="rloading pixel">LOADING&hellip;</p>
+    </article>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>

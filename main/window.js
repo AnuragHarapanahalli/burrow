@@ -9,6 +9,8 @@ const AI = require('../shared/ai');
 
 const ROOT = path.join(__dirname, '..');
 const TITLEBAR_HEIGHT = 40;
+const AI_HEAD = 36;          // the AI panel's header (drawn by Burrow's interface)
+const AI_MIN = 320, AI_MAX = 760;
 
 // Finds the biggest video on the page and pops it out (or brings it back).
 const PIP_SCRIPT = `(async () => {
@@ -34,6 +36,9 @@ class BurrowWindow {
     this.ctx = ctx;
     this.isPrivate = isPrivate;
     this.layout = { top: 80, right: 0, left: 0 };
+    this.aiOpen = false;   // AI side panel
+    this.aiView = null;
+    this.aiShowing = null; // which AI the panel has loaded
 
     if (isPrivate) {
       // A brand-new in-memory session: cookies, logins and cache vanish when the window closes.
@@ -152,7 +157,13 @@ class BurrowWindow {
     const [w, h] = this.win.getContentSize();
     const l = this.layout;
     this.ui.setBounds({ x: 0, y: 0, width: w, height: h });
-    this.tabs.setBounds({ x: l.left, y: l.top, width: Math.max(0, w - l.right - l.left), height: Math.max(0, h - l.top) });
+    // The AI panel takes the right edge; Burrow's interface draws its header and border.
+    const aiW = this.aiOpen ? this.aiWidth() : 0;
+    const right = Math.max(l.right, aiW);
+    this.tabs.setBounds({ x: l.left, y: l.top, width: Math.max(0, w - right - l.left), height: Math.max(0, h - l.top) });
+    if (this.aiOpen && this.aiView) {
+      this.aiView.setBounds({ x: w - aiW + 2, y: l.top + AI_HEAD, width: Math.max(0, aiW - 2), height: Math.max(0, h - l.top - AI_HEAD) });
+    }
   }
 
   setLayout(l) {
@@ -164,7 +175,10 @@ class BurrowWindow {
   // While a menu or suggestion list is open, the UI sits on top of the website.
   setOverlay(open) {
     if (open) this.win.contentView.addChildView(this.ui);
-    else this.tabs.raiseActive();
+    else {
+      this.tabs.raiseActive();
+      if (this.aiOpen && this.aiView) this.win.contentView.addChildView(this.aiView);
+    }
   }
 
   openPanel(section) { this.ui.webContents.focus(); this.send('open-panel', section); }
@@ -172,7 +186,65 @@ class BurrowWindow {
 
   toggleBookmark() {
     const t = this.tabs.active;
-    if (t) this.ctx.library.toggleBookmark(t.url, t.view.webContents.getTitle(), t.favicon);
+    if (t) this.ctx.library.toggleBookmark(this.pageUrl(t), t.view.webContents.getTitle(), t.favicon);
+  }
+
+  // The real web address of a tab (in reader view, the article's original page).
+  pageUrl(t) { return this.tabs.state().tabs.find((x) => x.id === t.id)?.rawUrl || t.url; }
+
+  // ---------- Notes (one per website) ----------
+  currentHost() {
+    const t = this.tabs.active;
+    if (!t) return '';
+    try { const u = new URL(this.pageUrl(t)); return /^https?:$/.test(u.protocol) ? u.host : ''; } catch { return ''; }
+  }
+
+  // ---------- AI side panel ----------
+  aiWidth() { return Math.max(AI_MIN, Math.min(AI_MAX, Number(this.ctx.store.get('aiWidth')) || 420)); }
+
+  aiState() {
+    const id = this.ctx.store.get('aiProvider');
+    return { open: this.aiOpen, width: this.aiWidth(), provider: id, name: AI.PROVIDERS[id]?.name || 'AI' };
+  }
+
+  // Load the chosen AI in the panel (you stay signed in: it's your normal browsing session).
+  loadAI(url) {
+    const id = this.ctx.store.get('aiProvider');
+    if (!this.aiView) {
+      this.aiView = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } });
+      const wc = this.aiView.webContents;
+      wc.setWindowOpenHandler(({ url: u }) => { if (/^https?:/i.test(u)) this.tabs.create(u); return { action: 'deny' }; });
+      wc.on('before-input-event', (e, input) => this.handleInput(e, input));
+    }
+    const target = url || AI.PROVIDERS[id]?.home || AI.PROVIDERS[AI.DEFAULT_PROVIDER].home;
+    this.aiView.webContents.loadURL(target).catch(() => {});
+    this.aiShowing = id;
+  }
+
+  setAI(open) {
+    if (this.isPrivate) { this.send('mochi-say', 'The AI panel is off in private windows'); return; }
+    open = open === undefined ? !this.aiOpen : !!open;
+    if (open === this.aiOpen) return;
+    this.aiOpen = open;
+    if (open) {
+      if (!this.aiView || this.aiShowing !== this.ctx.store.get('aiProvider')) this.loadAI();
+      this.win.contentView.addChildView(this.aiView);
+    } else if (this.aiView) {
+      try { this.win.contentView.removeChildView(this.aiView); } catch { /* not attached */ }
+    }
+    this.send('ai-panel', this.aiState());
+    this.relayout();
+  }
+
+  setAIWidth(px) {
+    this.ctx.store.set('aiWidth', Math.max(AI_MIN, Math.min(AI_MAX, Math.round(Number(px) || 420))));
+    this.relayout();
+  }
+
+  // The chosen AI changed in Settings: switch the open panel over.
+  onAIProviderChange() {
+    if (this.aiOpen && this.aiShowing !== this.ctx.store.get('aiProvider')) this.loadAI();
+    this.send('ai-panel', this.aiState());
   }
 
   // ---------- Find in page ----------
@@ -197,6 +269,8 @@ class BurrowWindow {
       const name = AI.PROVIDERS[this.ctx.store.get('aiProvider')]?.name || 'the AI';
       this.send('mochi-say', `Question copied. Press Ctrl+V in ${name}`);
     }
+    // With the AI panel open, questions go to the panel instead of a tab.
+    if (this.aiOpen && !pageWc) { this.loadAI(copy ? undefined : url); return; }
     if (pageWc) this.tabs.navigateFrom(pageWc, url);
     else if (newTab) this.tabs.create(url);
     else this.tabs.navigate(url);
@@ -242,6 +316,10 @@ class BurrowWindow {
     else if (ctrl && input.shift && k === 'b') ctx.setPrefs({ bookmarksBar: !ctx.store.get('bookmarksBar') });
     else if (ctrl && !input.shift && k === 'f') { this.ui.webContents.focus(); this.send('find-open'); }
     else if (ctrl && !input.shift && k === 'k') { this.ui.webContents.focus(); this.send('palette-open'); }
+    else if (ctrl && !input.shift && (k === '\\' || input.code === 'Backslash')) (tabs.split ? tabs.unsplit() : tabs.splitWith());
+    else if (ctrl && input.shift && k === 'a') this.setAI();
+    else if (ctrl && input.shift && k === 'e') this.openPanel('notes');
+    else if (input.key === 'F9') tabs.toggleReader();
     else if (input.key === 'F3') this.send('find-step', input.shift ? -1 : 1);
     else if (ctrl && (k === '=' || k === '+') ) tabs.stepZoom(1);
     else if (ctrl && (k === '-' || k === '_')) tabs.stepZoom(-1);
@@ -260,6 +338,7 @@ class BurrowWindow {
   }
 
   onClosed() {
+    if (this.aiView) { try { this.aiView.webContents.close(); } catch { /* gone */ } }
     if (this.isPrivate && this.session) {
       // Belt and braces: wipe everything this private session stored.
       this.session.clearStorageData().catch(() => {});

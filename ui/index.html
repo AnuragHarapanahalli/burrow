@@ -44,6 +44,9 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2z"/><path class="pip-inner" d="M8 8h5v4H8z"/></svg>
         </button>
         <button type="button" class="addr-chip zoom-chip pixel" id="zoomBtn" hidden title="Reset zoom (Ctrl+0)"></button>
+        <button type="button" class="addr-chip" id="readerBtn" hidden title="Reader view (F9)" aria-label="Reader view" aria-pressed="false">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h4.5c.8 0 1.5.7 1.5 1.5v8c0-.8-.7-1.5-1.5-1.5H2zM14 3.5H9.5C8.7 3.5 8 4.2 8 5v8c0-.8.7-1.5 1.5-1.5H14z"/></svg>
+        </button>
         <button type="button" class="star" id="star" title="Bookmark this page (Ctrl+D)" aria-label="Bookmark this page" aria-pressed="false">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2l1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3 4.3 13.3l.8-4.1L2 6.3l4.2-.5z"/></svg>
         </button>
@@ -52,6 +55,12 @@
       <button class="tool icon dl-btn" id="dlBtn" hidden title="Downloads (Ctrl+J)" aria-label="Downloads">
         <svg viewBox="0 0 16 16" aria-hidden="true"><g class="dl-arrow"><path d="M8 2v7M5 6.5 8 9.5l3-3"/></g><path d="M2.5 10.5v3h11v-3"/></svg>
         <span class="pixel dl-badge" id="dlBadge"></span>
+      </button>
+      <button class="tool icon" id="splitBtn" title="Split view (Ctrl+\)" aria-label="Split view" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2zM8 3v10"/></svg>
+      </button>
+      <button class="tool label ai-btn" id="aiBtn" title="AI panel (Ctrl+Shift+A)" aria-label="AI panel" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 4.9L14.5 8l-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg><span class="pixel">AI</span>
       </button>
       <button class="tool icon" id="menuBtn" title="Menu" aria-label="Menu" aria-haspopup="menu" aria-expanded="false">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
@@ -92,7 +101,8 @@
         <button data-section="bookmarks" role="tab"><span class="pixel">01</span> Bookmarks</button>
         <button data-section="history" role="tab"><span class="pixel">02</span> History</button>
         <button data-section="downloads" role="tab"><span class="pixel">03</span> Downloads</button>
-        <button data-section="settings" role="tab"><span class="pixel">04</span> Settings</button>
+        <button data-section="notes" role="tab"><span class="pixel">04</span> Notes</button>
+        <button data-section="settings" role="tab"><span class="pixel">05</span> Settings</button>
       </nav>
       <button class="tool icon" id="panelClose" aria-label="Close panel">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
@@ -116,6 +126,16 @@
       <h2>Downloads<span class="dot">.</span></h2>
       <div class="list" id="dlList"></div>
       <button class="text-btn" id="dlClear">Clear list</button>
+    </section>
+
+    <section class="pane" data-pane="notes" hidden>
+      <h2>Notes<span class="dot">.</span></h2>
+      <div class="note-head"><span class="pixel">FOR</span> <b id="noteHost">this site</b><span class="pixel note-saved" id="noteSaved"></span></div>
+      <textarea class="note-text" id="noteText" spellcheck="true" placeholder="Jot anything about this site. It saves as you type."></textarea>
+      <p class="note-off" id="noteOff" hidden></p>
+      <div class="pixel section-label">ALL NOTES</div>
+      <div class="list" id="noteList"></div>
+      <button class="text-btn" id="noteExport">Export all as Markdown (.md)</button>
     </section>
 
     <section class="pane" data-pane="settings" hidden>
@@ -184,6 +204,24 @@
     </section>
   </aside>
 
+  <div class="split-bar" id="splitBar" hidden></div>
+  <div class="split-divider" id="splitDivider" hidden role="separator" aria-orientation="vertical" aria-label="Resize split view" title="Drag to resize. Double-click to swap sides.">
+    <span class="split-grip"></span>
+  </div>
+
+  <aside class="ai-panel" id="aiPanel" hidden aria-label="AI panel">
+    <div class="ai-resize" id="aiResize" title="Drag to resize"></div>
+    <div class="ai-head">
+      <div class="ai-seg" id="aiSeg" role="radiogroup" aria-label="AI service"></div>
+      <button class="tool icon" id="aiPop" title="Open in a tab" aria-label="Open in a tab">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 3h4v4M13 3L7 9M11 9v4H3V5h4"/></svg>
+      </button>
+      <button class="tool icon" id="aiClose" title="Close (Ctrl+Shift+A)" aria-label="Close AI panel">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      </button>
+    </div>
+  </aside>
+
   <div class="tear-hint pixel" id="tearHint" hidden>DROP TO OPEN IN A NEW WINDOW</div>
 
   <!-- Floats above websites while open (menus, address suggestions). -->
@@ -213,5 +251,6 @@
   <script src="burrow://app/ui/find.js"></script>
   <script src="burrow://app/ui/drag.js"></script>
   <script src="burrow://app/ui/palette.js"></script>
+  <script src="burrow://app/ui/panes.js"></script>
 </body>
 </html>

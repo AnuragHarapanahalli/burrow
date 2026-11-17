@@ -9,6 +9,7 @@ if (location.protocol === 'burrow:') {
     navigate: (text) => ipcRenderer.send('page:navigate', String(text || '')),
     setSearchEngine: (id) => ipcRenderer.send('page:search-engine', String(id || '')),
     ask: (text) => ipcRenderer.send('page:ask', String(text || '')),
+    readerArticle: (key) => ipcRenderer.invoke('page:reader', String(key || '')),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),
     reportBug: (report) => ipcRenderer.send('page:report-bug', {
       title: String(report?.title || ''), what: String(report?.what || ''),

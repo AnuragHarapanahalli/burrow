@@ -3,6 +3,13 @@
 const path = require('path');
 const { WebContentsView } = require('electron');
 const { toUrl, displayUrl, NEWTAB } = require('./url');
+const Reader = require('./reader');
+
+// In reader view the tab's address is burrow://reader/?k=…&u=<original>; this gets the original.
+function readerOriginal(url) {
+  if (!String(url).startsWith('burrow://reader')) return null;
+  try { const u = new URL(url).searchParams.get('u'); return /^https?:\/\//i.test(u || '') ? u : null; } catch { return null; }
+}
 
 const MAX_CLOSED = 25;
 // IDs are unique across every window, so a tab can move between windows without clashing.
@@ -25,6 +32,8 @@ class Tabs {
     this.workspaces = [];     // { id, name, activeId }
     this.currentWs = null;
     this.activeId = null;
+    this.shownTabs = [];     // pages attached to the window right now (1, or 2 in split view)
+    this.split = null;       // split view: { a, b, ratio } — tab a on the left, b on the right
     this.closed = [];         // recently closed: { url, ws }
     this.bounds = { x: 0, y: 80, width: 800, height: 600 };
   }
@@ -52,10 +61,10 @@ class Tabs {
     wc.on('page-title-updated', (_e, title) => { update({ title }); T().onTitle(tab.url, title); });
     wc.on('page-favicon-updated', (_e, icons) => update({ favicon: icons[0] || null }));
     wc.on('did-start-loading', () => update({ loading: true }));
-    wc.on('did-stop-loading', () => update({ loading: false }));
+    wc.on('did-stop-loading', () => { update({ loading: false }); T().checkReader(tab); });
     wc.on('did-navigate', (_e, u) => {
       T().applyZoom(tab, u);
-      update({ url: u, favicon: null, media: false });
+      update({ url: u, favicon: null, media: false, readerable: false });
       T().onVisit(u, wc.getTitle());
     });
     // Sound + video: a speaker on the tab, and the picture-in-picture button.
@@ -71,6 +80,7 @@ class Tabs {
       T().onVisit(u, wc.getTitle());
     });
     wc.on('before-input-event', (e, input) => T().onInput(e, input));
+    wc.on('focus', () => T().focusPane(tab));
     // Links that open a new window become new tabs next to this one.
     wc.setWindowOpenHandler(({ url: u }) => {
       if (/^https?:/i.test(u)) T().create(u, { after: tab.id, ws: tab.ws });
@@ -91,16 +101,106 @@ class Tabs {
     if (!next) return;
     if (next.ws !== this.currentWs) return this.switchWorkspace(next.ws, id);
     const prev = this.active;
-    if (prev && prev !== next) {
-      prev.view.webContents.stopFindInPage('clearSelection');
-      this.win.contentView.removeChildView(prev.view);
-    }
+    if (prev && prev !== next) prev.view.webContents.stopFindInPage('clearSelection');
     this.activeId = id;
     this.ws(this.currentWs).activeId = id;
-    this.win.contentView.addChildView(next.view);
-    next.view.setBounds(this.bounds);
+    // A tab from the split pair brings its partner along; any other tab shows on its own.
+    const sp = this.split;
+    const pair = sp && (id === sp.a || id === sp.b) ? [this.get(sp.a), this.get(sp.b)] : null;
+    this.show(pair && pair[0] && pair[1] ? pair : [next]);
     next.view.webContents.focus();
     this.emit();
+  }
+
+  // Attach exactly these pages to the window (and detach any others).
+  show(list) {
+    for (const t of this.shownTabs) {
+      if (!list.includes(t)) { try { this.win.contentView.removeChildView(t.view); } catch { /* already gone */ } }
+    }
+    for (const t of list) this.win.contentView.addChildView(t.view);
+    this.shownTabs = list;
+    this.layoutViews();
+  }
+
+  // Position the shown page(s): full size, or left/right with a gap for the divider.
+  layoutViews() {
+    const b = this.bounds;
+    const list = this.shownTabs;
+    if (list.length !== 2 || !this.split) { list[0]?.view.setBounds(b); return; }
+    const GAP = Tabs.SPLIT_GAP, TOP = Tabs.SPLIT_TOP;
+    const h = Math.max(0, b.height - TOP);
+    const lw = Math.round((b.width - GAP) * this.split.ratio);
+    list[0].view.setBounds({ x: b.x, y: b.y + TOP, width: Math.max(0, lw), height: h });
+    list[1].view.setBounds({ x: b.x + lw + GAP, y: b.y + TOP, width: Math.max(0, b.width - lw - GAP), height: h });
+  }
+
+  // ---------------- Reader mode ----------------
+  // After a page loads, quietly check whether it looks like an article (shows the reader button).
+  checkReader(tab) {
+    if (!/^https?:/i.test(tab.url)) return;
+    Reader.isReaderable(tab.view.webContents).then((ok) => {
+      if (tab.readerable !== ok) { tab.readerable = ok; tab.owner.emit(); }
+    });
+  }
+  // Open the active tab in reader view, or go back to the original page.
+  async toggleReader(tab = this.active) {
+    if (!tab) return false;
+    const wc = tab.view.webContents;
+    const original = readerOriginal(tab.url);
+    if (original) {
+      const nav = wc.navigationHistory;
+      if (nav.canGoBack()) nav.goBack(); else wc.loadURL(original).catch(() => {});
+      return true;
+    }
+    if (!/^https?:/i.test(tab.url)) return false;
+    const key = await Reader.extract(wc);
+    if (!key) return false;
+    wc.loadURL(`burrow://reader/?k=${key}&u=${encodeURIComponent(tab.url)}`).catch(() => {});
+    return true;
+  }
+
+  // ---------------- Split view ----------------
+  // Put the current tab on the left and another tab (or the next one, or a new tab) on the right.
+  splitWith(otherId) {
+    const a = this.active;
+    if (!a) return;
+    let b = this.get(otherId);
+    if (!b || b === a || b.ws !== a.ws) {
+      const vis = this.visible;
+      const i = vis.indexOf(a);
+      b = vis[i + 1] || vis[i - 1] || null;
+    }
+    if (!b) b = this.create(NEWTAB, { activate: false, after: a.id });
+    this.split = { a: a.id, b: b.id, ratio: 0.5 };
+    this.activate(a.id);
+  }
+  unsplit() {
+    if (!this.split) return;
+    this.split = null;
+    this.activate(this.activeId);
+  }
+  swapSplit() {
+    const sp = this.split;
+    if (!sp) return;
+    [sp.a, sp.b] = [sp.b, sp.a];
+    if (this.shownTabs.length === 2) this.show([this.get(sp.a), this.get(sp.b)]);
+    this.emit();
+  }
+  setSplitRatio(r) {
+    if (!this.split) return;
+    this.split.ratio = Math.max(0.2, Math.min(0.8, Number(r) || 0.5));
+    this.layoutViews();
+  }
+  // Clicking into one side of a split makes it the active tab (address bar follows).
+  focusPane(tab) {
+    if (tab.owner !== this || this.activeId === tab.id || !this.shownTabs.includes(tab)) return;
+    this.activeId = tab.id;
+    this.ws(this.currentWs).activeId = tab.id;
+    this.emit();
+  }
+  // Leaving split view when one of its tabs closes or moves away.
+  dropFromSplit(id) {
+    if (this.split && (this.split.a === id || this.split.b === id)) this.split = null;
   }
 
   close(id) {
@@ -112,13 +212,15 @@ class Tabs {
       this.closed.push({ url: tab.url, ws: tab.ws });
       if (this.closed.length > MAX_CLOSED) this.closed.shift();
     }
+    const wasShown = this.shownTabs.includes(tab);
+    this.dropFromSplit(id);
     this.tabs.splice(this.tabs.indexOf(tab), 1);
     if (this.activeId === id) {
-      this.win.contentView.removeChildView(tab.view);
       this.activeId = null;
       const neighbour = vis[vi + 1] || vis[vi - 1];
       if (neighbour) this.activate(neighbour.id);
-    }
+      else this.show([]);
+    } else if (wasShown) this.activate(this.activeId); // its split partner stays, on its own
     tab.view.webContents.close();
     if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
@@ -153,13 +255,16 @@ class Tabs {
     if (!tab || this.tabs.length < 2) return null; // a window's very last tab stays put
     const vis = this.visible;
     const vi = vis.indexOf(tab);
+    const wasShown = this.shownTabs.includes(tab);
+    this.dropFromSplit(id);
     this.tabs.splice(this.tabs.indexOf(tab), 1);
     if (this.activeId === id) {
-      this.win.contentView.removeChildView(tab.view);
       this.activeId = null;
       const neighbour = vis[vi + 1] || vis[vi - 1];
       if (neighbour) this.activate(neighbour.id);
-    }
+      else this.show([]);
+    } else if (wasShown) this.activate(this.activeId);
+    if (this.shownTabs.includes(tab)) this.show(this.shownTabs.filter((t) => t !== tab));
     tab.view.webContents.stopFindInPage('clearSelection');
     if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
@@ -240,11 +345,11 @@ class Tabs {
 
   setBounds(bounds) {
     this.bounds = bounds;
-    this.active?.view.setBounds(bounds);
+    this.layoutViews();
   }
 
   // Put the active website back on top (after the UI overlay closes).
-  raiseActive() { if (this.active) this.win.contentView.addChildView(this.active.view); }
+  raiseActive() { for (const t of this.shownTabs) this.win.contentView.addChildView(t.view); }
 
   // Which workspace a page belongs to (so the new tab can show that workspace's links).
   workspaceOf(webContents) {
@@ -277,7 +382,7 @@ class Tabs {
       const other = this.workspaces.find((w) => w.id !== id);
       this.switchWorkspace(other.id);
     }
-    for (const t of this.tabs.filter((x) => x.ws === id)) t.view.webContents.close();
+    for (const t of this.tabs.filter((x) => x.ws === id)) { this.dropFromSplit(t.id); t.view.webContents.close(); }
     this.tabs = this.tabs.filter((t) => t.ws !== id);
     this.closed = this.closed.filter((c) => c.ws !== id);
     this.workspaces = this.workspaces.filter((w) => w.id !== id);
@@ -287,7 +392,7 @@ class Tabs {
   switchWorkspace(id, tabId) {
     const w = this.ws(id);
     if (!w) return;
-    if (this.active) this.win.contentView.removeChildView(this.active.view);
+    this.show([]);
     this.activeId = null;
     this.currentWs = id;
     const target = this.get(tabId) || this.get(w.activeId) || this.visible[0];
@@ -312,8 +417,10 @@ class Tabs {
           id: t.id,
           // Pages without a title show their address instead of "New tab".
           title: t.url.startsWith('burrow://newtab') ? 'New tab' : (t.title && t.title !== 'New tab' ? t.title : displayUrl(t.url)),
-          url: displayUrl(t.url),
-          rawUrl: t.url,
+          url: readerOriginal(t.url) || displayUrl(t.url),
+          rawUrl: readerOriginal(t.url) || t.url,
+          readerable: !!t.readerable,
+          inReader: !!readerOriginal(t.url),
           favicon: t.favicon,
           loading: t.loading,
           audible: t.audible,
@@ -325,6 +432,10 @@ class Tabs {
         };
       }),
       canReopen: this.closed.length > 0,
+      // Split view as the interface needs it: which tabs pair up, and whether it's on screen now.
+      split: this.split && this.get(this.split.a)?.ws === this.currentWs
+        ? { a: this.split.a, b: this.split.b, ratio: this.split.ratio, shown: this.shownTabs.length === 2 }
+        : null,
     };
   }
 
@@ -383,6 +494,8 @@ class Tabs {
   }
 }
 
+Tabs.SPLIT_GAP = 8; // px between the two pages (the divider lives here)
+Tabs.SPLIT_TOP = 3; // px above the pages, where the active side's accent bar shows
 Tabs.usedWs = new Set(); // workspace IDs already taken by some window
 // Make sure new workspace IDs never collide with ones saved earlier.
 Tabs.reserveWsIds = (ids) => { for (const id of ids) if (Number(id) >= nextWsId) nextWsId = Number(id) + 1; };

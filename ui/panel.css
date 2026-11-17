@@ -240,3 +240,50 @@
 .pal-row.sel .kind, .pal-row.sel .u, .pal-row.sel .pal-key { color: var(--accent); }
 .pal-empty { padding: 16px 14px; color: var(--muted); }
 .pal-foot { padding: 6px 14px; color: var(--muted); border-top: var(--hair); }
+
+/* ---------- Split view: divider and active-side bar (drawn in the gaps between the two pages) ---------- */
+.split-divider {
+  position: fixed; bottom: 0; z-index: 1; cursor: col-resize; display: grid; place-items: center;
+  background: var(--bg); border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+}
+.split-divider[hidden], .split-bar[hidden] { display: none; }
+.split-grip { width: 2px; height: 40px; background: var(--muted); transition: background-color .12s, height .15s; }
+.split-divider:hover .split-grip, body.split-resizing .split-grip { background: var(--accent); height: 64px; }
+.split-bar { position: fixed; z-index: 1; background: var(--accent); transition: left .18s var(--ease-out), width .18s var(--ease-out); }
+body.split-resizing, body.split-resizing * { cursor: col-resize !important; }
+body.split-resizing .split-bar { transition: none; }
+/* Paired tabs get a bracket underneath, joining the two */
+.tab.paired { box-shadow: inset 0 -3px 0 var(--accent); }
+.side-tab.paired { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* ---------- AI side panel ---------- */
+.ai-panel { position: fixed; right: 0; bottom: 0; z-index: 1; background: var(--bg); border-left: var(--rule); }
+.ai-panel[hidden] { display: none; }
+.ai-panel.slide-in { animation: slide-in .2s var(--ease-out); }
+.ai-head { height: 36px; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; border-bottom: var(--rule); }
+.ai-seg { flex: 1; display: flex; gap: 0; }
+.ai-seg button { font-weight: 600; padding: 4px 9px; color: var(--muted); transition: background-color .12s, color .12s; }
+.ai-seg button:hover { color: var(--fg); }
+.ai-seg button[aria-checked="true"] { background: var(--fg); color: var(--bg); }
+.ai-resize { position: absolute; left: -5px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 2; }
+.ai-resize:hover { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.ai-btn svg { width: 15px; height: 15px; }
+.ai-btn[aria-pressed="true"], #splitBtn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+
+/* ---------- Notes ---------- */
+.note-head { display: flex; align-items: baseline; gap: 6px; color: var(--muted); }
+.note-head b { color: var(--fg); }
+.note-saved { margin-left: auto; color: var(--accent-ink); }
+.note-text {
+  min-height: 180px; resize: vertical; padding: 10px 12px; font: inherit; font-size: 14px; line-height: 1.55;
+  border: 1px solid var(--line); background: var(--surface); outline: 0; user-select: text;
+}
+.note-text:focus { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.note-text[hidden], .note-off[hidden] { display: none; }
+.note-off { color: var(--muted); margin: 0; }
+#noteList .item.current { box-shadow: inset 3px 0 0 var(--accent); padding-left: 6px; }
+
+/* Panel nav: five sections in a 3 + 2 grid */
+.panel-nav { grid-template-columns: 1fr 1fr 1fr; }
+.panel-nav button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 7px 8px; font-size: 12.5px; }
+.panel-nav button .pixel { margin-right: 3px; }
