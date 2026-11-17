@@ -21,6 +21,9 @@ if (location.protocol === 'burrow:') {
     gateUnlock: () => ipcRenderer.invoke('page:gate-unlock'),
     gateAction: (action, value) => ipcRenderer.send('page:gate-action', String(action || ''), String(value || '')),
     welcome: (action, value) => ipcRenderer.send('page:welcome', String(action || ''), String(value || '')),
+    importSources: () => ipcRenderer.invoke('page:import-sources'),
+    importRun: (id, want) => ipcRenderer.invoke('page:import-run', String(id || ''), { bookmarks: want?.bookmarks !== false, history: want?.history !== false }),
+    importQuickLinks: (sites) => ipcRenderer.invoke('page:import-quicklinks', Array.isArray(sites) ? sites.slice(0, 8).map((x) => ({ name: String(x?.name || ''), url: String(x?.url || '') })) : []),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),
     reportBug: (report) => ipcRenderer.send('page:report-bug', {
       title: String(report?.title || ''), what: String(report?.what || ''),

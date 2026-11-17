@@ -3,9 +3,10 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
 
-const STEPS = ['Hello', 'Look', 'Search', 'AI', 'Keys', 'Go'];
+const STEPS = ['Hello', 'Bring', 'Look', 'Search', 'AI', 'Keys', 'Go'];
 const SAY = [
   "Hi! I'll show you around.",
+  'Moving in? I can carry boxes.',
   'Ooh, pick a colour you like.',
   'Your searches, your choice.',
   'Sign in once, ask anything later.',
@@ -40,6 +41,7 @@ function renderSteps() {
   $('next').hidden = step === STEPS.length - 1;
   say(SAY[step]);
   if (step === STEPS.length - 1) renderSummary();
+  if (step === 1) loadImport();
   document.querySelector(`.step[data-step="${step}"] h1`)?.focus({ preventScroll: true });
 }
 function goTo(i) {
@@ -55,6 +57,39 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(step - 1); }
 });
 function finish() { window.burrowPage.welcome('done'); }
+
+// ---------- Bring your stuff: import from other browsers ----------
+let impLoaded = false;
+const impFmt = (n) => Number(n || 0).toLocaleString('en');
+const impPl = (n, w) => `${impFmt(n)} ${w}${Number(n) === 1 ? '' : 's'}`;
+const imported = []; // what you brought (for the summary)
+async function loadImport() {
+  if (impLoaded) return;
+  impLoaded = true;
+  const list = (await window.burrowPage.importSources()) || [];
+  $('impCards').innerHTML = list.length
+    ? list.map((src) => `<button class="card" data-import="${esc(src.id)}"><span class="n">${esc(src.label)}</span><span class="h">${impPl(src.bookmarks, 'bookmark')} &middot; ${impPl(src.history, 'page')}</span><span class="h pixel imp-state">IMPORT</span></button>`).join('')
+    : '<p class="note">No other browsers found. Starting fresh is nice too.</p>';
+}
+$('impCards').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-import]');
+  if (!b || b.disabled) return;
+  b.disabled = true;
+  b.querySelector('.imp-state').textContent = 'IMPORTING…';
+  const r = await window.burrowPage.importRun(b.dataset.import);
+  if (!r || r.error) { b.disabled = false; b.querySelector('.imp-state').textContent = 'TRY AGAIN'; return; }
+  b.setAttribute('aria-checked', 'true');
+  b.querySelector('.imp-state').textContent = `\u2713 ${impFmt(r.bookmarks.added)} BOOKMARKS \u00b7 ${impFmt(r.history.added)} PAGES`;
+  imported.push(r.label);
+  say('Unpacked! Everything has a place now.');
+  if (r.top?.length && !$('impLinks')) {
+    const p = document.createElement('p');
+    p.className = 'note';
+    p.innerHTML = `<button class="link-btn" id="impLinks">Add ${esc(r.top.map((t) => t.name).join(', '))} to your quick links</button>`;
+    $('impNote').before(p);
+    $('impLinks').onclick = async () => { await window.burrowPage.importQuickLinks(r.top); p.textContent = 'Added to your quick links.'; };
+  }
+});
 $('skip').onclick = finish;
 $('go').onclick = finish;
 
@@ -109,7 +144,8 @@ function renderSummary() {
   const ai = prefs.aiProviders.find((p) => p.id === prefs.aiProvider)?.name;
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   $('summary').innerHTML = [
-    ['Look', `${cap(settings.mode === 'system' ? 'follow Windows' : settings.mode)} · ${colour}`],
+    ...(imported.length ? [['Brought', `Bookmarks and history from ${imported.join(', ')}`]] : []),
+    ['Look',`${cap(settings.mode === 'system' ? 'follow Windows' : settings.mode)} · ${colour}`],
     ['Search', engine],
     ['AI', `${ai}${signedIn.size ? ` · opened sign-in for ${[...signedIn].map((id) => prefs.aiProviders.find((p) => p.id === id)?.name).join(', ')}` : ''}`],
   ].map(([k, v]) => `<dt class="pixel">${k.toUpperCase()}</dt><dd>${esc(v)}</dd>`).join('');

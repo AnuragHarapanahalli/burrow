@@ -88,6 +88,49 @@ class Library {
     return true;
   }
 
+  // ---------- Imports from other browsers ----------
+  // Bookmarks: skip any address you already have. Imported bar items go on Burrow's bookmarks bar;
+  // the rest keep their folder as a label and stay off the bar.
+  importBookmarks(list) {
+    const have = new Set(this.bookmarks.map((b) => b.url));
+    let id = this.bookmarkStore.get('nextId') || 1;
+    let added = 0;
+    const fresh = [];
+    for (const b of list) {
+      if (!isWeb(b.url) || have.has(b.url)) continue;
+      have.add(b.url);
+      fresh.push({ id: id++, url: b.url, title: String(b.title || b.url).slice(0, 300), favicon: null, created: Date.now(), folder: b.folder || '', bar: !!b.bar, imported: true });
+      added++;
+    }
+    this.bookmarkStore.set('nextId', id);
+    // Your own bookmarks stay first; imported ones follow in their original order.
+    this.bookmarks = [...this.bookmarks, ...fresh];
+    if (added) this.saveBookmarks();
+    return { added, skipped: list.length - added };
+  }
+
+  // History: merged by address (keeping the newer visit), newest first, within the 5,000 limit.
+  importHistory(list) {
+    let added = 0;
+    for (const h of list) {
+      if (!isWeb(h.url)) continue;
+      const cur = this.byUrl.get(h.url);
+      if (cur) {
+        if (h.last > cur.last) { cur.last = h.last; if (h.title && !cur.title) cur.title = h.title; }
+        cur.visits = Math.max(cur.visits, h.visits || 1);
+        continue;
+      }
+      const e = { url: h.url, title: h.title || '', last: h.last || Date.now(), visits: h.visits || 1 };
+      this.history.push(e);
+      this.byUrl.set(e.url, e);
+      added++;
+    }
+    this.history.sort((a, b) => b.last - a.last);
+    while (this.history.length > MAX_HISTORY) this.byUrl.delete(this.history.pop().url);
+    if (added) this.saveHistory();
+    return { added };
+  }
+
   removeBookmark(id) {
     this.bookmarks = this.bookmarks.filter((b) => b.id !== id);
     this.saveBookmarks();

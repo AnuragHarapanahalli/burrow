@@ -39,6 +39,8 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | Imported bookmarks keep their **folder as a label**; only the other browser's **bar items** go on Burrow's bookmarks bar | Put everything on the bar; build real folders | Burrow's bar showed every bookmark — 300 imported ones would bury yours. Real folders can come later |
+| 2026-11-18 | History is read with **Node's built-in SQLite** (in Electron 45), from a temporary copy | Add a SQLite library | Nothing extra to install; the copy works while the other browser is open and can't change its files |
 | 2026-11-17 | **Phases 10–13 planned** (details in PLAN.md): 10 right-click menus + window fixes, 11 import from other browsers, 12 helpful Mochi, 13 fun Mochi. The polish/installer phase moves to 14 | Do them inside the polish phase | Each is big enough to build, test and merge on its own |
 | 2026-11-17 | Right-click menus are **Burrow-styled** (our own menus) | Native Windows menus | Same look as the rest of Burrow, and room for Burrow actions (Ask AI about a selection, open in split view) |
 | 2026-11-17 | **Closing the last tab closes the window**; the last window quits Burrow | Always keep a new tab | You asked; it's what Chrome does. A workspace's last tab and Mochi eating the last tab still leave a new tab |
@@ -221,6 +223,7 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Edit a bookmark (name + address) | ✅ done (tested) |
 | Last tab closes the window | ✅ done (tested, incl. workspace and Mochi exceptions) |
 | Drag a window's only tab onto another window; drop where you let go, with a marker | ✅ done (tested) |
+| Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox (Settings → Import, welcome tour, Ctrl+K) | ✅ done (tested with fake profiles; counts checked on your real Chrome + Edge) |
 | Windows installer | planned |
 
 ---
@@ -234,6 +237,7 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ importer.js         finds other browsers' profiles and reads their bookmarks + history (read-only copies)
 │  ├─ ctxmenu.js          right-click menus for web pages: what to offer, and running the chosen item
 │  ├─ stats.js            weekly report data: time per site per day + daily counts, kept 5 weeks (stats.json)
 │  ├─ focus.js            focus tools: daily limits, time counting, warnings, "1 more minute", gate unlock, focus sessions (focus.json)
@@ -290,7 +294,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
-- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, windows. Several work too: `npm test -- phase7 phase8`.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
@@ -411,13 +415,20 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - The self-test right-clicks a local test page with real mouse input (page, link, selected text, image, text box) and runs the actions; checks that items not on the menu (or from an old menu) are ignored; and drops a single-tab window onto the main window at the 2nd slot.
 - Test fix: one check compared window counts against a number taken while an extra test window was still open.
 
+**2026-11-18 — Phase 11 done**
+- Import bookmarks and history from other browsers: Settings → Import, a new "Bring your stuff" step in the welcome tour (now 7 steps), and Ctrl+K.
+- How it works: Burrow looks in the usual folders where each browser keeps its profiles (Chrome, Edge, Brave, Vivaldi, Opera in %LOCALAPPDATA% / %APPDATA%; Firefox via its profiles.ini), copies the bookmarks file and history database to a temporary folder, reads them, and deletes the copies.
+- Gotcha found: Chrome stores visit times as microseconds since the year 1601 — numbers too big for ordinary JavaScript numbers. They're read as "BigInts" and converted.
+- The self-test builds fake Chrome (two profiles), Edge and Firefox profiles in its own folder, so it never reads your real browsers. Separately, a counts-only check on your real Chrome and Edge confirmed the real formats read correctly (nothing imported).
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
 - Tabs in other workspaces keep running in the background (uses memory) until tab sleeping is built.
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 11):** import bookmarks + history from other browsers. Then Mochi (12–13), polish + installer (14).
+- **Next (phase 12):** helpful Mochi. Then fun Mochi (13), polish + installer (14).
+- Imported bookmark folders are shown as labels, not real folders you can open and close.
 - Right-click menus on media inside embedded frames (a YouTube video embedded on another site) may not control the video; the menu still shows. Phase 5b ("Ask AI about this page") is still postponed.
 - The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
 - Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
@@ -438,8 +449,8 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | ✅ done |
 | 9 | New-tab stat + weekly report | ✅ done |
 | 10 | Right-click menus, last tab closes the window, drag tabs back between windows | ✅ done |
-| 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | next (planned) |
-| 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | planned |
+| 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | ✅ done |
+| 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | next (planned) |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | planned |
 | 14 | Polish, accessibility, Windows installer | planned |
 | 15 | Password manager + password import | later |

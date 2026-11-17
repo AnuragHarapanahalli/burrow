@@ -191,7 +191,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("openPanel('settings')");
     await wait(500);
     check(await js("document.querySelectorAll('#engines .engine').length") === 6, 'settings lists search engines');
-    check(await js("document.querySelectorAll('#panel details.sect').length") === 8, 'settings has eight dropdown sections');
+    check(await js("document.querySelectorAll('#panel details.sect').length") === 9, 'settings has nine dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
     await wait(400);
@@ -564,8 +564,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     const wjs = (code) => wt.view.webContents.executeJavaScript(code);
     check((await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith("Hi. I'm Mochi"), 'the tour opens with Mochi saying hello');
-    check(await wjs("document.querySelectorAll('#stepList li').length") === 6, 'the tour has six steps');
+    check(await wjs("document.querySelectorAll('#stepList li').length") === 7, 'the tour has seven steps');
     await shot('17-welcome-hello', true);
+    await wjs("document.getElementById('next').click()");
+    check(await until(async () => (await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith('Bring your stuff')), 'step 2 offers to bring your stuff from another browser');
     await wjs("document.getElementById('next').click()");
     await wait(300);
     await wjs("document.querySelector('#modeSeg [data-mode=dark]').click()");
@@ -1285,6 +1287,111 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(500);
     tabs.close(mt10.id);
     srv10.close();
+    }
+    if (section('phase11')) {
+    // ================= Phase 11: import from other browsers (fake profiles made here) =================
+    const { DatabaseSync } = require('node:sqlite');
+    const B11 = path.join(dir, 'browsers');
+    fs.rmSync(B11, { recursive: true, force: true }); // fresh fake profiles every run
+    const mk = (...p) => { const d = path.join(B11, ...p); fs.mkdirSync(d, { recursive: true }); return d; };
+    const now11 = Date.now();
+    const chromeTime = (ms) => (BigInt(Math.round(ms)) + 11644473600000n) * 1000n;
+    // Chrome with two profiles
+    const cRoot = mk('Local', 'Google', 'Chrome', 'User Data');
+    fs.writeFileSync(path.join(cRoot, 'Local State'), JSON.stringify({ profile: { info_cache: { Default: { name: 'Anu' }, 'Profile 1': { name: 'Work' } } } }));
+    const cDef = mk('Local', 'Google', 'Chrome', 'User Data', 'Default');
+    fs.writeFileSync(path.join(cDef, 'Bookmarks'), JSON.stringify({ roots: {
+      bookmark_bar: { type: 'folder', children: [
+        { type: 'url', name: 'Moodle', url: 'https://moodle.example.edu/' },
+        { type: 'folder', name: 'Dev', children: [{ type: 'url', name: 'MDN', url: 'https://developer.mozilla.org/' }] },
+      ] },
+      other: { type: 'folder', children: [{ type: 'url', name: 'Recipes', url: 'https://recipes.example.com/' }, { type: 'url', name: 'Bad', url: 'javascript:alert(1)' }] },
+      synced: { type: 'folder', children: [] },
+    } }));
+    const hdb = new DatabaseSync(path.join(cDef, 'History'));
+    hdb.exec('CREATE TABLE urls (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER, typed_count INTEGER, last_visit_time INTEGER, hidden INTEGER)');
+    const ins = hdb.prepare('INSERT INTO urls (url, title, visit_count, typed_count, last_visit_time, hidden) VALUES (?, ?, ?, 0, ?, ?)');
+    ins.run('https://news.example.com/a', 'News A', 30, chromeTime(now11 - 864e5), 0);
+    ins.run('https://news.example.com/b', 'News B', 12, chromeTime(now11 - 2 * 864e5), 0);
+    ins.run('https://wiki.example.org/x', 'Wiki', 8, chromeTime(now11 - 3 * 864e5), 0);
+    ins.run('https://old.example.com/', 'Too old', 50, chromeTime(now11 - 120 * 864e5), 0);
+    ins.run('https://hidden.example.com/', 'Hidden', 5, chromeTime(now11 - 864e5), 1);
+    hdb.close();
+    const cWork = mk('Local', 'Google', 'Chrome', 'User Data', 'Profile 1');
+    fs.writeFileSync(path.join(cWork, 'Bookmarks'), JSON.stringify({ roots: { bookmark_bar: { type: 'folder', children: [{ type: 'url', name: 'Jira', url: 'https://jira.example.com/' }] }, other: { children: [] } } }));
+    // Edge, bookmarks only
+    const eDef = mk('Local', 'Microsoft', 'Edge', 'User Data', 'Default');
+    fs.writeFileSync(path.join(eDef, 'Bookmarks'), JSON.stringify({ roots: { bookmark_bar: { children: [{ type: 'url', name: 'Outlook', url: 'https://outlook.example.com/' }] }, other: { children: [] } } }));
+    // Firefox
+    const ffRoot = mk('Roaming', 'Mozilla', 'Firefox');
+    fs.writeFileSync(path.join(ffRoot, 'profiles.ini'), '[General]\nStartWithLastProfile=1\n\n[Profile0]\nName=default-release\nIsRelative=1\nPath=Profiles/abcd.default-release\nDefault=1\n');
+    const ffDir = mk('Roaming', 'Mozilla', 'Firefox', 'Profiles', 'abcd.default-release');
+    const pdb = new DatabaseSync(path.join(ffDir, 'places.sqlite'));
+    pdb.exec('CREATE TABLE moz_places (id INTEGER PRIMARY KEY, url TEXT, title TEXT, visit_count INTEGER, hidden INTEGER, last_visit_date INTEGER); CREATE TABLE moz_bookmarks (id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER, parent INTEGER, position INTEGER, title TEXT, guid TEXT)');
+    pdb.exec("INSERT INTO moz_bookmarks (id, type, parent, title, guid) VALUES (1, 2, 0, '', 'root________'), (2, 2, 1, 'menu', 'menu________'), (3, 2, 1, 'toolbar', 'toolbar_____'), (4, 2, 2, 'Reading', 'readingfolder')");
+    const pins = pdb.prepare('INSERT INTO moz_places (id, url, title, visit_count, hidden, last_visit_date) VALUES (?, ?, ?, ?, 0, ?)');
+    pins.run(10, 'https://fox-toolbar.example.com/', 'Fox toolbar', 3, (now11 - 864e5) * 1000);
+    pins.run(11, 'https://fox-reading.example.com/', 'Fox reading', 2, (now11 - 2 * 864e5) * 1000);
+    pdb.exec("INSERT INTO moz_bookmarks (type, fk, parent, position, title) VALUES (1, 10, 3, 0, 'Fox toolbar'), (1, 11, 4, 0, 'Fox reading')");
+    pdb.close();
+
+    // --- What Burrow finds ---
+    const srcs = await ui.webContents.executeJavaScript('burrow.importer.sources()');
+    const labels = srcs.map((x) => x.label).sort();
+    check(JSON.stringify(labels) === JSON.stringify(['Chrome \u00b7 Anu', 'Chrome \u00b7 Work', 'Edge', 'Firefox']), 'finds Chrome (both profiles, by name), Edge and Firefox (' + labels.join(', ') + ')');
+    const anu = srcs.find((x) => x.label === 'Chrome \u00b7 Anu');
+    check(anu.bookmarks === 3 && anu.history === 3, 'counts web bookmarks (3) and recent visible history (3) — skips javascript: links, hidden and 90+ day old pages');
+    // --- Import Chrome ---
+    const bmBefore = library.bookmarks.length;
+    let r = await ui.webContents.executeJavaScript("burrow.importer.run('chrome:Default', { bookmarks: true, history: true })");
+    check(r && r.bookmarks.added === 3 && r.history.added === 3, 'importing Chrome brings 3 bookmarks and 3 pages of history');
+    check(library.bookmarks.length === bmBefore + 3, 'they are now Burrow bookmarks');
+    const mdn = library.bookmarks.find((b) => b.url === 'https://developer.mozilla.org/');
+    const rec = library.bookmarks.find((b) => b.url === 'https://recipes.example.com/');
+    check(mdn?.folder === 'Dev' && mdn.bar === true && rec?.folder === 'Other bookmarks' && rec.bar === false, "folders are kept; Chrome's bookmarks-bar items go on Burrow's bar");
+    setPrefs({ bookmarksBar: true });
+    check(await until(() => js("(() => { const t = document.getElementById('bmItems').textContent; return t.includes('Moodle') && t.includes('MDN') && !t.includes('Recipes'); })()")), 'the bookmarks bar shows the bar items, not every imported folder');
+    check(library.searchHistory('news.example.com').length === 2 && !library.searchHistory('old.example.com').length, 'history arrives (and the old page stays behind)');
+    check(Array.isArray(r.top) && r.top[0]?.url === 'https://news.example.com/', 'your most-visited site is offered as a quick link');
+    r = await ui.webContents.executeJavaScript("burrow.importer.run('chrome:Default', { bookmarks: true, history: true })");
+    check(r.bookmarks.added === 0 && r.bookmarks.skipped === 3 && r.history.added === 0, 'importing twice adds nothing new (no duplicates)');
+    // --- Firefox ---
+    r = await ui.webContents.executeJavaScript("burrow.importer.run('firefox:abcd.default-release', { bookmarks: true, history: false })");
+    const foxBar = library.bookmarks.find((b) => b.url === 'https://fox-toolbar.example.com/');
+    const foxRead = library.bookmarks.find((b) => b.url === 'https://fox-reading.example.com/');
+    check(r.bookmarks.added === 2 && r.history.added === 0 && foxBar?.bar === true && foxRead?.folder === 'Bookmarks menu / Reading', 'Firefox: toolbar bookmarks go on the bar, menu folders are kept; "History" unticked imports none');
+    check(!library.searchHistory('fox-reading').length, 'unticked history really stays behind');
+
+    // --- Settings → Import ---
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('importSect').open = true");
+    check(await until(() => js("document.querySelectorAll('#impList .imp-row').length === 4")), 'Settings → Import lists the four browsers found');
+    await js("document.querySelector('#impList [data-import=\"edge:Default\"]').click()");
+    check(await until(() => js("document.getElementById('impResult').textContent.includes('From Edge')")), 'clicking Import shows what came across');
+    check(library.bookmarks.some((b) => b.url === 'https://outlook.example.com/'), 'Edge bookmarks arrived');
+    await js("document.querySelector('#impList [data-import=\"chrome:Default\"]').click()");
+    check(await until(() => js("!!document.getElementById('impLinks')")), 'it offers to add your most-visited sites as quick links');
+    await shot('40-import-settings');
+    await js("document.getElementById('impLinks').click()");
+    check(await until(() => (store.get('quickLinks') || []).some((q) => q.url === 'https://news.example.com/')), 'one click adds them to the new-tab quick links');
+    await js("closePanel()");
+    // --- Private windows can't import ---
+    const pw11 = openWindow({ isPrivate: true });
+    await until(() => pw11.tabs.active, 5000);
+    await wait(500);
+    check((await pw11.ui.webContents.executeJavaScript('burrow.importer.sources()')).length === 0, 'private windows offer no import');
+    pw11.win.close();
+    // --- The welcome tour step ---
+    const wt11 = tabs.create('burrow://welcome/');
+    await ready(wt11);
+    const w11 = (code) => wt11.view.webContents.executeJavaScript(code);
+    await w11("document.getElementById('next').click()");
+    check(await until(() => w11("document.querySelectorAll('#impCards [data-import]').length === 4")), 'the tour step lists the browsers');
+    await w11("document.querySelector('#impCards [data-import=\"chrome:Profile 1\"]').click()");
+    check(await until(() => w11("document.querySelector('#impCards [data-import=\"chrome:Profile 1\"]').getAttribute('aria-checked') === 'true'")) && library.bookmarks.some((b) => b.url === 'https://jira.example.com/'), 'one click in the tour imports that browser');
+    await shot('41-import-tour', true);
+    tabs.close(wt11.id);
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

@@ -296,6 +296,7 @@ palActions = function () {
     ? A('End the focus session', () => B.focus.session('end'), '', 'focus pomodoro timer stop')
     : A('Start a focus session (25 min)', () => B.focus.session('start'), '', 'focus pomodoro timer work study'));
   if (!UI.state.isPrivate) list.push(A('Weekly report', () => B.openReport(), '', 'stats week time screen report mochi'));
+  if (!UI.state.isPrivate) list.push(A('Import bookmarks and history', () => { openPanel('settings'); setTimeout(() => { const d = $('importSect'); if (d) d.open = true; }, 50); }, '', 'import chrome edge firefox brave opera move switch browser'));
   list.push(A('Focus settings (time limits)', () => { openPanel('settings'); setTimeout(() => { const d = $('focusSect'); if (d) d.open = true; }, 50); }, '', 'limit time doomscroll'));
   if (t && /^https?:/.test(t.rawUrl || '')) {
     let host = '';

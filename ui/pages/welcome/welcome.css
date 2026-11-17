@@ -112,3 +112,10 @@ button.card[aria-checked="true"] .h { color: var(--accent); }
   .swatches { grid-template-columns: repeat(4, minmax(0, 72px)); }
   .mochi-spot { display: none; }
 }
+
+/* Bring your stuff */
+#impCards .card { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+#impCards .imp-state { font-size: 10px; color: var(--accent-ink); margin-top: 6px; }
+#impCards .card[aria-checked="true"] .imp-state { color: var(--accent); }
+.link-btn { border-bottom: 1px solid currentColor; font-weight: 600; padding: 0; }
+.link-btn:hover { color: var(--accent-ink); }

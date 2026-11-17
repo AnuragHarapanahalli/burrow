@@ -10,6 +10,7 @@ const { Downloads } = require('./downloads');
 const { Notes } = require('./notes');
 const { Focus, pretty: sitePretty } = require('./focus');
 const { Stats } = require('./stats');
+const { Importer, topSites } = require('./importer');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -248,6 +249,48 @@ function startFocus() {
   });
 }
 
+// ---------------- Import from other browsers ----------------
+// The self-test points the importer at fake browser profiles inside its own folder.
+let importer = null;
+const getImporter = () => importer || (importer = new Importer(SELFTEST
+  ? { local: path.join(SELFTEST, 'browsers', 'Local'), roaming: path.join(SELFTEST, 'browsers', 'Roaming') }
+  : {}));
+function importSources() {
+  return getImporter().sources().map((src) => ({ id: src.id, label: src.label, browser: src.browser, ...getImporter().preview(src) }));
+}
+const hostKey = (u) => { try { return new URL(u).host.replace(/^www\./, ''); } catch { return ''; } };
+function runImport(id, want) {
+  const src = getImporter().sources().find((x) => x.id === String(id));
+  if (!src) return null;
+  const opts = { bookmarks: want?.bookmarks !== false, history: want?.history !== false };
+  let data;
+  try { data = getImporter().read(src, opts); } catch (err) { return { error: String(err.message || err) }; }
+  const bookmarks = opts.bookmarks ? library.importBookmarks(data.bookmarks) : { added: 0, skipped: 0 };
+  const history = opts.history ? library.importHistory(data.history) : { added: 0 };
+  const have = new Set((store.get('quickLinks') || []).map((q) => hostKey(q.url)));
+  const top = topSites(data.history).filter((t) => !have.has(hostKey(t.url)));
+  everyWindow((w) => w.sendBookmarks());
+  store.set('importedFrom', [...new Set([...(store.get('importedFrom') || []), src.browser])]);
+  return { label: src.label, bookmarks, history, top };
+}
+// Add suggested sites to the new tab's quick links (up to 8 in all, web addresses only).
+function addQuickLinks(sites) {
+  const links = [...(store.get('quickLinks') || [])];
+  const have = new Set(links.map((q) => hostKey(q.url)));
+  for (const site of (Array.isArray(sites) ? sites : []).slice(0, 8)) {
+    if (links.length >= 8) break;
+    try {
+      const u = new URL(String(site?.url || ''));
+      if (!/^https?:$/.test(u.protocol) || have.has(hostKey(u.href))) continue;
+      links.push({ name: String(site.name || u.host).replace(/\s+/g, ' ').trim().slice(0, 24) || u.host, url: u.href });
+      have.add(hostKey(u.href));
+    } catch { /* not an address */ }
+  }
+  store.set('quickLinks', links);
+  broadcastTheme();
+  return links.length;
+}
+
 // ---------------- New-tab stat line + weekly report ----------------
 const mins = (sec) => Math.max(1, Math.round(sec / 60));
 function statLine(w) {
@@ -354,6 +397,10 @@ function registerIpc() {
   on('window:new', () => openWindow());
   // Clipboard text for Burrow's own text boxes (Paste in the right-click menu). Websites can't read it.
   handle('clip:read', () => clipboard.readText());
+  // Import from other browsers (Settings → Import, Ctrl+K)
+  handle('import:sources', (w) => (w.isPrivate ? [] : importSources()));
+  handle('import:run', (w, id, want) => (w.isPrivate ? null : runImport(id, want)));
+  handle('import:quicklinks', (w, sites) => (w.isPrivate ? 0 : addQuickLinks(sites)));
   // Right-click menus on pages: run / close (the window checks the token and the item).
   on('ctx:run', (w, token, id) => w.runPageMenu(Number(token), String(id || '')));
   on('ctx:closed', (w, token) => w.closePageMenu(Number(token)));
@@ -564,6 +611,11 @@ function registerIpc() {
     return Reader.get(key);
   });
   // The welcome tour (burrow://welcome only) can set up the basics and open AI sign-in pages.
+  // The welcome tour's "Bring your stuff" step (burrow://welcome only).
+  const welcomePage = (e) => e.sender.getURL().startsWith('burrow://welcome') && winOfPage(e.sender);
+  ipcMain.handle('page:import-sources', (e) => (welcomePage(e) ? importSources() : null));
+  ipcMain.handle('page:import-run', (e, id, want) => (welcomePage(e) ? runImport(id, want) : null));
+  ipcMain.handle('page:import-quicklinks', (e, sites) => (welcomePage(e) ? addQuickLinks(sites) : 0));
   ipcMain.on('page:welcome', (e, action, value) => {
     const w = e.sender.getURL().startsWith('burrow://welcome') && winOfPage(e.sender);
     if (!w) return;

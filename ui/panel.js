@@ -50,7 +50,7 @@ async function renderBookmarks() {
   $('bmList').innerHTML = items.length
     ? items.map((b) => `<div class="item" data-url="${esc(b.url)}" title="${esc(b.url)}">
         <span class="meta pixel">&#9733;</span>
-        <div class="main"><div>${esc(b.title || b.url)}</div><div class="sub">${esc(host(b.url))}</div></div>
+        <div class="main"><div>${esc(b.title || b.url)}</div><div class="sub">${b.folder ? `<span class="folder">${esc(b.folder)}</span> \u00b7 ` : ''}${esc(host(b.url))}</div></div>
         <button class="x" data-rm="${b.id}" aria-label="Remove bookmark">&times;</button></div>`).join('')
     : `<div class="empty">${$('bmSearch').value ? 'No bookmarks match that.' : 'No bookmarks yet. Press Ctrl+D or the star in the address bar on any page.'}</div>`;
 }
@@ -294,6 +294,46 @@ $('statsClear').addEventListener('click', () => {
   setTimeout(() => { b.textContent = 'Clear my stats'; }, 2000);
 });
 $('focusStart').addEventListener('click', () => { B.focus.session(UI.focus?.session ? 'end' : 'start'); setTimeout(renderFocusSettings, 300); });
+
+// ---------- Settings → Import (from Chrome, Edge, Firefox…) ----------
+const impFmt = (n) => Number(n || 0).toLocaleString('en');
+const impPl = (n, w) => `${impFmt(n)} ${w}${Number(n) === 1 ? '' : 's'}`;
+let impTop = [];
+async function renderImport() {
+  $('impList').innerHTML = '<div class="empty">Looking for other browsers&hellip;</div>';
+  const list = (await B.importer.sources()) || [];
+  $('impList').innerHTML = list.length
+    ? list.map((src) => `<div class="imp-row" data-src="${esc(src.id)}">
+        <div class="imp-name"><b>${esc(src.label)}</b><span>${impPl(src.bookmarks, 'bookmark')} &middot; ${impPl(src.history, 'page')}</span></div>
+        <button class="imp-go" data-import="${esc(src.id)}">Import</button></div>`).join('')
+    : '<div class="empty">No other browsers found on this computer.</div>';
+}
+window.renderImport = renderImport;
+$('importSect').addEventListener('toggle', () => { if ($('importSect').open) renderImport(); });
+$('impList').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-import]');
+  if (!b || b.disabled) return;
+  b.disabled = true;
+  b.textContent = 'Importing…';
+  const r = await B.importer.run(b.dataset.import, { bookmarks: $('impBookmarks').checked, history: $('impHistory').checked });
+  b.textContent = r && !r.error ? 'Done' : 'Try again';
+  b.disabled = !!(r && !r.error);
+  const out = $('impResult');
+  out.hidden = false;
+  if (!r || r.error) { out.textContent = "Couldn't read that browser's files."; return; }
+  impTop = r.top || [];
+  const skipped = r.bookmarks.skipped ? ` (${impFmt(r.bookmarks.skipped)} you already had)` : '';
+  out.innerHTML = `<p><b>From ${esc(r.label)}:</b> ${impPl(r.bookmarks.added, 'bookmark')}${skipped} and ${impPl(r.history.added, 'page')} of history.</p>`
+    + (impTop.length ? `<button class="text-btn" id="impLinks">Add ${esc(impTop.map((t) => t.name).join(', '))} to your new-tab quick links</button>` : '');
+  $('sumImport').textContent = `From ${r.label}`;
+  if (r.bookmarks.added || r.history.added) mochiSay(`Moved in! ${impPl(r.bookmarks.added, 'bookmark')} unpacked`, { pose: 'celebrate', essential: true });
+  else mochiSay('All of that was already here', { pose: 'idle', essential: true });
+});
+$('impResult').addEventListener('click', async (e) => {
+  if (!e.target.closest('#impLinks')) return;
+  await B.importer.addQuickLinks(impTop);
+  e.target.closest('#impLinks').outerHTML = '<p class="sect-note">Added to your quick links.</p>';
+});
 
 $('mochiSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-mochi]');

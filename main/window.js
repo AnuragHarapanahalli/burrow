@@ -134,7 +134,8 @@ class BurrowWindow {
   }
 
   sendBookmarks() {
-    this.send('bookmarks', this.ctx.library.bookmarks.slice(0, 100).map(({ id, url, title, favicon }) => ({ id, url, title, favicon })));
+    // The bookmarks bar: your own bookmarks plus the other browser's bar items (not every imported folder).
+    this.send('bookmarks', this.ctx.library.bookmarks.filter((b) => b.bar !== false).slice(0, 100).map(({ id, url, title, favicon }) => ({ id, url, title, favicon })));
   }
 
   applyTheme() {

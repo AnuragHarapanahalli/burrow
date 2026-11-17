@@ -25,8 +25,16 @@
         <p class="hint pixel">PRESS ENTER OR &rarr; TO CONTINUE</p>
       </div>
 
-      <div class="step" data-step="1" aria-labelledby="h1" hidden>
-        <p class="pixel kicker">02 &mdash; LOOK</p>
+      <div class="step" data-step="1" aria-labelledby="hb" hidden>
+        <p class="pixel kicker">02 &mdash; BRING</p>
+        <h1 id="hb">Bring your stuff<span class="dot">.</span></h1>
+        <p class="lead">Moving from another browser? Bring your bookmarks and history along. They're only read and stay on this computer.</p>
+        <div class="cards cards-3" id="impCards"><p class="note">Looking for other browsers&hellip;</p></div>
+        <p class="note" id="impNote">Passwords and sign-ins stay where they are &mdash; you'll sign in to each site once.</p>
+      </div>
+
+      <div class="step" data-step="2" aria-labelledby="h1" hidden>
+        <p class="pixel kicker">03 &mdash; LOOK</p>
         <h1 id="h1">Make it yours<span class="dot">.</span></h1>
         <p class="lead">Pick light or dark, and a colour. Every other colour in Burrow is made from this one.</p>
         <div class="seg" id="modeSeg" role="radiogroup" aria-label="Theme">
@@ -37,29 +45,29 @@
         <div class="swatches" id="swatches" role="radiogroup" aria-label="Colour"></div>
       </div>
 
-      <div class="step" data-step="2" aria-labelledby="h2" hidden>
-        <p class="pixel kicker">03 &mdash; SEARCH</p>
+      <div class="step" data-step="3" aria-labelledby="h2" hidden>
+        <p class="pixel kicker">04 &mdash; SEARCH</p>
         <h1 id="h2">Where should searches go<span class="dot">?</span></h1>
         <p class="lead">When you type something that isn't a question or an address, Burrow searches here.</p>
         <div class="cards cards-3" id="engines" role="radiogroup" aria-label="Search engine"></div>
       </div>
 
-      <div class="step" data-step="3" aria-labelledby="h3" hidden>
-        <p class="pixel kicker">04 &mdash; AI</p>
+      <div class="step" data-step="4" aria-labelledby="h3" hidden>
+        <p class="pixel kicker">05 &mdash; AI</p>
         <h1 id="h3">Your AI, one keypress away<span class="dot">.</span></h1>
         <p class="lead">Type a question anywhere and Burrow sends it to your AI &mdash; or keep it docked beside the page with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd>. Sign in once and you stay signed in.</p>
         <div class="cards ai-cards" id="ais"></div>
         <p class="note">Sign in opens the service's own page in a tab. You sign in on their site &mdash; Burrow never sees your password.</p>
       </div>
 
-      <div class="step" data-step="4" aria-labelledby="h4" hidden>
-        <p class="pixel kicker">05 &mdash; KEYS</p>
+      <div class="step" data-step="5" aria-labelledby="h4" hidden>
+        <p class="pixel kicker">06 &mdash; KEYS</p>
         <h1 id="h4">Shortcuts worth knowing<span class="dot">.</span></h1>
         <div class="keys" id="keys"></div>
       </div>
 
-      <div class="step" data-step="5" aria-labelledby="h5" hidden>
-        <p class="pixel kicker">06 &mdash; GO</p>
+      <div class="step" data-step="6" aria-labelledby="h5" hidden>
+        <p class="pixel kicker">07 &mdash; GO</p>
         <h1 id="h5">You're all set<span class="dot">.</span></h1>
         <dl class="summary" id="summary"></dl>
         <button class="go" id="go">Start browsing &rarr;</button>
@@ -68,7 +76,7 @@
 
       <footer class="nav">
         <button class="back" id="back">&larr; Back</button>
-        <span class="pixel count" id="count">01 / 06</span>
+        <span class="pixel count" id="count">01 / 07</span>
         <button class="next" id="next">Next &rarr;</button>
       </footer>
     </section>

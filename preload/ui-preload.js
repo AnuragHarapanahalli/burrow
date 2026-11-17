@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld('burrow', {
   openWindow: send('window:new'),
   otherWindows: () => ipcRenderer.invoke('windows:others'),
   readClipboard: () => ipcRenderer.invoke('clip:read'),
+  importer: {
+    sources: () => ipcRenderer.invoke('import:sources'),
+    run: (id, want) => ipcRenderer.invoke('import:run', id, want),
+    addQuickLinks: (sites) => ipcRenderer.invoke('import:quicklinks', sites),
+  },
   // Right-click menus on pages: Burrow shows them, and sends back only the chosen item.
   ctx: { onMenu: listen('ctx-menu'), run: send('ctx:run'), closed: send('ctx:closed') },
   onDropMarker: listen('drop-marker'),

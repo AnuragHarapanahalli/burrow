@@ -472,3 +472,19 @@ body.split-resizing .split-bar { transition: none; }
 .drop-marker { position: fixed; z-index: 30; width: 3px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 1px var(--bg); }
 .drop-marker.side { height: 3px; }
 .drop-marker[hidden] { display: none; }
+
+/* Settings → Import */
+.imp-what { display: flex; gap: 16px; }
+.imp-what label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.imp-what input { accent-color: var(--accent); }
+.imp-list { display: flex; flex-direction: column; border-top: var(--rule); }
+.imp-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: var(--hair); }
+.imp-name { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.imp-name span { color: var(--muted); font-size: 12px; }
+.imp-go { padding: 4px 12px; background: var(--fg); color: var(--bg); font-weight: 600; transition: background-color .12s; }
+.imp-go:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.imp-go:disabled { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.imp-result { display: flex; flex-direction: column; gap: 8px; font-size: 13.5px; }
+.imp-result[hidden] { display: none; }
+.imp-result p { margin: 0; }
+.sub .folder { color: var(--fg); }
