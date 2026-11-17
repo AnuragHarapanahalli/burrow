@@ -1,0 +1,28 @@
+/* Shared base for every Burrow page: fonts + colour tokens (filled in by shared/theme.js). */
+@import url('burrow://app/node_modules/@fontsource/inter-tight/400.css');
+@import url('burrow://app/node_modules/@fontsource/inter-tight/500.css');
+@import url('burrow://app/node_modules/@fontsource/inter-tight/800.css');
+@import url('burrow://app/node_modules/@fontsource/silkscreen/400.css');
+
+:root {
+  /* Fallbacks (Signal red, light) until the theme arrives. */
+  --bg: #F3F1F1; --fg: #1B1414; --surface: #FDFCFC; --line: #DAD3D3; --muted: #645A5A;
+  --accent: #E63027; --accent-ink: #D42A21; --on-accent: #FFFFFF; --hover: #E8E2E2;
+  --mochi-body: #FFFFFF; --mochi-inner: #F7B3AE;
+  --sans: 'Inter Tight', 'Segoe UI', system-ui, sans-serif;
+  --pixel: 'Silkscreen', ui-monospace, monospace;
+  --rule: 2px solid var(--fg);
+  --hair: 1px solid var(--line);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 13px/1.4 var(--sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; padding: 0; }
+.pixel { font-family: var(--pixel); font-size: 11px; letter-spacing: 0; }
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

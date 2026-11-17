@@ -1,0 +1,301 @@
+# Burrow — project journal
+
+> Your plain-language guide to what's being built, why, and where things stand.
+> Updated after every phase of work and every new decision. Latest entry is at the top of the decision log.
+
+---
+
+## 1. The pitch
+**Burrow** is a desktop web browser for Windows that feels like a well-designed poster: a strict Swiss grid, bold flush-left type, crisp black rules, with pixel-art accents. It lives alongside **Mochi**, a small pixel bunny-mochi who reacts to what you do (greets you, celebrates finished downloads and streaks, nudges you during focus sessions). It has the everyday features you expect (tabs, bookmarks, history, downloads) plus standout ones: workspaces, split view, notes, reader mode, a Ctrl+K command palette, sleeping tabs, focus sessions, and gentle tools to stop doomscrolling (when your time on a site runs out, Mochi walks up to the tab's × and presses it).
+
+Doomscroll control is **one feature among many**, not the main selling point.
+
+---
+
+## 2. How it works (simple version)
+
+Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (the engine inside Chrome) with Node.js, so we can write the browser's interface in HTML/CSS/JavaScript and still render every website properly.
+
+```
+┌──────────────────────────── Burrow window (BaseWindow) ────────────────────────────┐
+│  UI view   ← our own HTML page: title bar, numbered tabs, address bar, panels       │
+├────────────────────────────────────────────────────────────────────────────────────┤
+│  Tab view  ← one per open tab; this is where websites load (sandboxed, isolated)   │
+│  (+ overlay view for the command palette and focus screens, later)                 │
+└────────────────────────────────────────────────────────────────────────────────────┘
+          ▲                                   ▲
+          │ messages (IPC) via a safe "bridge" │
+          ▼                                   │
+   Main process (Node.js) — the brain: creates tabs, saves settings, tracks time
+```
+
+- **Main process** = the back-office. It owns all the real state (which tabs exist, settings, history) and saves it to disk.
+- **UI view** = the browser's own interface. It can't touch your computer directly; it asks the main process via a tiny, controlled API called `window.burrow`.
+- **Tab views** = websites. They're sandboxed and know nothing about Burrow's internals.
+
+---
+
+## 3. Decision log
+
+| Date | Decision | Options considered | Why |
+|---|---|---|---|
+| 2026-11-17 | **Ctrl+N opens a new window**; any number of normal windows, each with its own tabs and workspaces. All windows open at quit come back next time; closing one of several windows forgets its tabs | One window only; or restore every window ever closed | Same behaviour as Chrome, which people already expect |
+| 2026-11-17 | **Drag tabs to reorder** (strip and sidebar); the others slide aside | Reorder with keyboard only | You asked; it's how every browser works |
+| 2026-11-17 | **Pull a tab down to open it in a new window**; drop it on another window's tabs to move it there. The *same live page* moves (video keeps playing, forms keep their text). Private tabs can be reordered but not pulled out; a window's last tab stays put | Reload the page in the new window | Moving the live page is faster and loses nothing |
+| 2026-11-17 | Tab and workspace numbers are unique across all windows | Per-window numbering | A moved tab can't collide with one already in the new window; quick links scoped to a workspace stay correct |
+| 2026-11-17 | Burrow now supports **several windows**: per-window code moved to `main/window.js`; `main.js` keeps app-wide things (settings, history, bookmarks) and sends each message to the window it came from | Keep one-window code and bolt on a second window | Private windows need their own tabs, interface and session; a clean split avoids mix-ups between windows |
+| 2026-11-17 | **Private window** (Ctrl+Shift+N): brand-new in-memory session per window, always dark with a striped tab strip, Mochi in sunglasses. No history, no saved tabs, downloads list kept in memory; storage wiped on close. Bookmarks you add still save | Share one private session for all private windows | Separate sessions mean two private windows can't see each other's logins either |
+| 2026-11-17 | Closing the main window quits Burrow (private windows close with it) | Keep private windows open on their own | Simpler; avoids a "ghost" app with no main window |
+| 2026-11-17 | **Find in page** is a bar under the toolbar (not a floating box) | Floating box over the page like Chrome | A floating box would block clicks on the page; a bar lets you keep scrolling while searching |
+| 2026-11-17 | **Zoom** steps match Chrome (25%–500%), remembered **per site**; Ctrl+wheel works; a "110%" chip appears in the address bar only when not at 100%. Private windows use but don't save zoom | One zoom for everything | Some sites have tiny text; you set it once per site |
+| 2026-11-17 | **Picture-in-picture** button appears in the address bar once media plays; also in the ☰ menu. **Tab speaker** shows on tabs making sound — click to mute | Always-visible PiP button | Only shows up when it's useful |
+| 2026-11-17 | Quick links can be **global or for one workspace** (chosen in the link form: "All workspaces" / "Only College"). Workspace links vanish with their workspace | Separate link lists per workspace | Most links (Mail, Drive) are wanted everywhere; a few (Moodle) only in one place |
+| 2026-11-17 | Settings sections are **dropdowns** that show their current value when closed; only one open at a time; "Mode" renamed "Theme" | Long scrolling list | Settings is scannable at a glance; you open only what you want to change |
+| 2026-11-17 | New-tab footer: "Made with ♥ by Anurag · v0.1.0". The heart is a pixel heart in the accent colour; the version is read from `package.json` | Hard-coded version text | Bumping the version in one place updates it everywhere automatically |
+| 2026-11-17 | **Releases (proposed, not set up yet):** GitHub Releases + `electron-builder` + `electron-updater` — see section 11 | update.electronjs.org; Microsoft Store; manual zips | Free, simplest to run, and the app can update itself |
+| 2026-11-17 | **Editable quick links** on the new tab: Edit → rename, change address, remove, add (max 8), drag to reorder. Saved in settings, shared by every new tab. Only web addresses (http/https) are accepted, checked again by the main process | Fixed links; editing in Settings | You asked to edit them; editing in place is the most direct. The double check stops a malicious page from planting a `javascript:` link |
+| 2026-11-17 | **Search engine: you choose.** The new tab asks once (Google, Bing, DuckDuckGo, Brave, Ecosia, Startpage); changeable in Settings. Google until you pick | DuckDuckGo as a fixed default (what I had) | You asked why DuckDuckGo — I'd picked it for privacy without asking. A choice screen respects your preference |
+| 2026-11-17 | THEME and LIBRARY buttons replaced by one **☰ menu**; theme lives in Menu → Settings | Keep a toolbar button for theme | Theme is set once and rarely touched; it shouldn't take permanent toolbar space |
+| 2026-11-17 | Downloads button only appears once you have downloads, with an "arrow into tray" icon that bounces while downloading | Always-visible ⇩ glyph | The old ⇩ wasn't recognisable; hiding it until needed keeps the toolbar calm (same as Chrome) |
+| 2026-11-17 | Tabs are one line: `01  icon  Title  ×`; the Ctrl+number hint moved into the tooltip | Number + `^1` stacked above the title | You found the stacked numbering cluttered |
+| 2026-11-17 | Bookmarks bar on by default, toggle with Ctrl+Shift+B / menu / Settings; overflow goes in a » menu | Off by default | You asked for it; it makes bookmarks one click away |
+| 2026-11-17 | **Motion:** tabs slide in/shrink out, buttons press down, menus pop, panel slides, star pops, reload spins, download arrow bounces. Short (80–320 ms) and switched off when Windows "reduce animations" is on | No motion; long playful animations | Motion shows what happened (a tab really closed, a menu came from that button) without slowing you down |
+| 2026-11-17 | Menus and address suggestions float **over** websites by briefly lifting Burrow's interface above the page (the interface is see-through below the toolbar) | Shrinking the page to make room; a separate overlay window | Feels like a normal browser dropdown; the same trick will power the Ctrl+K command palette |
+| 2026-11-17 | Tabs move to a left **sidebar** automatically past 8 tabs ("Auto"), or always Top / always Side (Customize, 03 TABS) | Shrinking tabs forever; scrolling only | Numbered tabs stay readable; matches the plan's overflow rule |
+| 2026-11-17 | Downloads save straight to your Downloads folder (no "Save as" dialog), with "(1)", "(2)" added to avoid overwriting | Ask every time | Same as Chrome's default; fewer clicks |
+| 2026-11-17 | History keeps the latest 5,000 pages; clearing it needs two clicks | Unlimited; one click | Keeps the file small; prevents accidents |
+| 2026-11-17 | Workspace delete also closes its tabs, and needs a second click ("Delete?") | Move tabs to Home | Simple and predictable; the confirm click prevents mistakes |
+| 2026-11-15 | Websites get **no** permissions (camera, mic, location, notifications) until Burrow has a proper "Allow / Block" prompt; only fullscreen, copy-to-clipboard and pointer lock are allowed | Electron's default: allow everything silently | Electron grants every permission by default, which is unsafe for a browser |
+| 2026-11-15 | Default search engine: DuckDuckGo (Google/Bing available in code, setting later) | Google | Privacy-friendly default |
+| 2026-11-15 | Remove "Electron" from the browser's user-agent string | Leave it | Some sites block or downgrade unknown browsers |
+| 2026-11-15 | Electron **45.3.2** (not 39) | Electron 39 | npm flagged 12 security advisories in older Electron; a browser must run a patched engine |
+| 2026-11-15 | Fonts installed from npm (`@fontsource`) instead of downloading from Google | Google Fonts CDN | Works offline, no requests to Google on every launch |
+| 2026-11-14 | Design locked; development starts | — | User approved after 5 design rounds |
+| 2026-11-14 | Chrome-style theme picker ("Customize Burrow"): preset swatches, custom colour, or Windows accent; Light / Dark / System. Whole palette generated from one colour | One fixed palette; four fixed palettes | User wanted to choose colours like in Chrome. Generating from one colour keeps every choice readable |
+| 2026-11-14 | Design review accepted: hide grid lines, search bigger than clock, one gentle stat, Mochi only when relevant | Keep visible grid, giant clock, full stats on every tab | Grid lines are noise over websites; new tab is for searching; constant stats feel guilt-trippy |
+| 2026-11-14 | v1 extra features: Ctrl+K command palette, tab sleeping, focus sessions, picture-in-picture, weekly report | Unlockable outfits, scroll desaturation (moved to v2) | Useful daily; fits the theme |
+| 2026-11-14 | No Chrome extensions in v1 | Partial support via a library | Electron's extension support is limited; keeps v1 simple |
+| 2026-11-14 | Design language: **Swiss grid + pixel** | Cozy pixel, Sleek glass, Retro OS, Neon night | User's direction after seeing cozy pixel variants |
+| 2026-11-14 | Fonts: Inter Tight (UI) + Silkscreen (pixel numbers/labels, min 11px) | Pixelify Sans | Swiss clarity + a pixel accent; pixel font kept away from body text for readability |
+| 2026-11-14 | Name **Burrow**, mascot **Mochi** | Nook/Pip, Woah/Damn-o, Kite/Kip, and ~10 others | A snug home on the web; cute, memorable |
+| 2026-11-14 | Mochi is a companion everywhere (not just for limits) | New-tab only; toggle | Gives the browser its personality |
+| 2026-11-14 | Standout features: workspaces, split view, notes + reader mode, doomscroll tools | Built-in ad blocker (not picked) | User's choice |
+| 2026-11-14 | Platform: **Electron**, plain HTML/CSS/JS, no build step | Chrome extension, Tauri | Real browser engine, full control over UI; no Rust needed; simple to run |
+
+---
+
+## 4. Design spec
+
+**Layout rules**
+- 12-column grid as hidden structure (optional "Show grid lines" toggle in Customize).
+- Flush-left text, 2px rules in the text colour to separate regions, 1px rules in the line colour inside regions.
+- One accent use per screen (active-tab number, one highlight).
+- Tabs are numbered `01 02 03…` and Ctrl+1–9 jumps to them. Active tab is inverted (text colour background).
+
+**Typography**
+- Inter Tight: all UI and body text. Weights 400 / 500 / 800.
+- Silkscreen (pixel): clock, small labels, tab numbers, badges. Never below 11px, never for URLs or paragraphs.
+
+**Colour (generated from one "seed" colour)**
+| Token | Light mode | Dark mode |
+|---|---|---|
+| `--bg` page | seed hue, low saturation, 95% lightness | seed hue, 7% lightness |
+| `--fg` text & rules | seed hue, 9% lightness | 94% lightness |
+| `--muted` secondary text | 36% lightness | 66% lightness |
+| `--line` hairlines | 84% lightness | 18% lightness |
+| `--surface` inputs/cards | 99% lightness | 11% lightness |
+| `--accent` | the seed itself | seed lifted to ≥62% lightness |
+| `--on-accent` text on accent | black or white, picked by contrast | dark |
+
+Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphite.
+
+**Mochi**
+- 12×10 pixel sprite with a 1-pixel outline in the text colour; body white/cream; cheeks in the accent colour.
+- Poses: idle, blink/sleepy, happy, wave (later: walk, press, celebrate).
+- Appears only with a reason; quiet mode turns off non-essential appearances; respects "reduce motion".
+
+---
+
+## 5. Feature status
+
+| Feature | Status |
+|---|---|
+| Project journal | ✅ done |
+| Electron scaffold, custom title bar | ✅ done (tested 2026-11-17) |
+| Numbered tabs, navigation, address bar | ✅ done (tested) |
+| Theme engine + Customize Burrow panel | ✅ done (tested light/dark, Klein, Matcha, grid lines) |
+| New-tab page with Mochi | ✅ done (tested) |
+| Session restore + keyboard shortcuts | ✅ done (restore tested) |
+| Workspaces (create, rename, delete, switch; Ctrl+Shift+1–9) | ✅ done (tested) |
+| Tab sidebar (auto beyond 8 tabs, or always top/side) | ✅ done (tested) |
+| Reopen closed tab (Ctrl+Shift+T) | ✅ done (tested) |
+| Address-bar suggestions from bookmarks + history | ✅ done (tested) |
+| Bookmarks (star, Ctrl+D, panel with search) | ✅ done (tested) |
+| History (panel grouped by day, search, remove, clear all) | ✅ done (tested) |
+| Downloads (progress, pause, cancel, open, show in folder; Mochi says when done) | ✅ done (tested) |
+| Search engine chooser + Settings list | ✅ done (tested) |
+| ☰ menu (replaces THEME / LIBRARY buttons) | ✅ done (tested) |
+| Bookmarks bar with show/hide | ✅ done (tested) |
+| Motion pass (tabs, buttons, menus, panel) | ✅ done (open/close tested) |
+| Editable quick links on new tab | ✅ done (tested, incl. rejecting javascript: links) |
+| Quick links per workspace or global | ✅ done (tested) |
+| Settings as dropdowns | ✅ done (tested) |
+| Footer with version | ✅ done (tested) |
+| Auto-updates via GitHub Releases | proposed (needs a GitHub repo) |
+| Find in page (Ctrl+F, F3, match case) | ✅ done (tested) |
+| Zoom per site (Ctrl +/−/0, Ctrl+wheel, menu row) | ✅ done (tested) |
+| Private window (Ctrl+Shift+N) | ✅ done (tested: own session, no history, no cookie leak) |
+| Picture-in-picture | ✅ done (tested with a test video) |
+| Tab speaker + click to mute | ✅ done (tested) |
+| New window (Ctrl+N) + restore all windows | ✅ done (tested) |
+| Drag tabs to reorder | ✅ done (tested with real mouse drags) |
+| Pull a tab out into a new window / onto another window | ✅ done (tested) |
+| Ctrl+K command palette | planned |
+| Split view, notes (+ .md export), reader mode | planned |
+| Tab sleeping | planned |
+| Mochi animations + reactions | planned |
+| Focus tools (limits, Mochi closes tab, focus sessions) | planned |
+| Weekly Burrow report | planned |
+| Windows installer | planned |
+
+---
+
+## 6. File map
+```
+WOAHDAMN/
+├─ package.json           project info + dependencies (Electron, the two fonts) + "npm start"
+├─ PLAN.md                the full development plan
+├─ PROJECT_JOURNAL.md     this file
+├─ main/                  ── the "brain" (Node.js, runs once) ──
+│  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
+│  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP
+│  ├─ tabs.js             tabs + workspaces: create/close/switch, reopen closed, session restore
+│  ├─ library.js          history + bookmarks (history.json / bookmarks.json), address suggestions
+│  ├─ downloads.js        saves downloads to your Downloads folder, tracks progress (downloads.json)
+│  ├─ selftest.js         developer-only: drives Burrow and saves screenshots (BURROW_SELFTEST=<folder>)
+│  ├─ store.js            saves settings + open tabs to a JSON file (crash-safe writes)
+│  └─ url.js              turns address-bar text into a URL or a search
+├─ preload/               ── safe bridges between pages and the brain ──
+│  ├─ ui-preload.js       gives Burrow's interface its `window.burrow` controls
+│  └─ tab-preload.js      gives Burrow's own pages (new tab) a read-only theme + search; websites get nothing
+├─ shared/                ── code used by both the brain and the pages ──
+│  ├─ theme.js            the colour engine: one seed colour → every colour token, with contrast checks
+│  └─ mochi.js            Mochi's pixel sprites (idle, blink, happy, wave) drawn as SVG
+└─ ui/                    ── what you see ──
+   ├─ base.css            fonts + colour variables shared by every Burrow page
+   ├─ index.html          the browser's interface (one page)
+   ├─ ui.css / ui.js      tab strip, sidebar tabs, toolbar, Mochi popping into the strip
+   ├─ overlay.js          things that float over websites: workspace menu, address suggestions
+   ├─ panel.css / panel.js   side panel: Bookmarks, History, Downloads, Settings
+   ├─ bmbar.js            the bookmarks bar (and its » overflow menu)
+   ├─ find.js             the find-in-page bar
+   ├─ drag.js             dragging tabs: reorder, pull out into a new window
+   └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
+      └─ quicklinks.js    the editable quick links
+```
+
+**`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
+`burrow://newtab/` is the new tab; `burrow://app/...` serves the interface, shared code and fonts (only from allowed folders).
+
+---
+
+## 7. How to run
+1. Install [Node.js](https://nodejs.org) (v20 or newer).
+2. In this folder, run `npm install` once (downloads Electron, ~100 MB).
+3. Run `npm start` to open Burrow.
+
+Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
+
+**Shortcuts so far:** Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
+
+---
+
+## 8. Glossary
+- **Electron** — toolkit for building desktop apps with web tech; ships Chromium + Node.js.
+- **Chromium** — the open-source engine behind Chrome; renders websites.
+- **Main process** — the Node.js "brain" of the app; one per app.
+- **Renderer** — any web page Electron shows (our UI, or a website).
+- **WebContentsView** — a rectangle in the window that shows one web page. Burrow uses one for its UI and one per tab.
+- **IPC** (inter-process communication) — messages passed between the main process and pages.
+- **Preload** — a small script that runs before a page loads and exposes a safe, limited API to it.
+- **contextIsolation / sandbox** — security settings that stop websites from touching your computer or Burrow's internals.
+- **Seed colour** — the one colour you pick; every other theme colour is calculated from it.
+
+---
+
+## 9. Progress log
+**2026-11-17 — Phase 1 done and tested**
+- Burrow launches: custom title bar, numbered tabs, address bar, Customize panel, new-tab page with Mochi.
+- Built a **self-test mode** (`main/selftest.js`): set `BURROW_SELFTEST=<folder>` and Burrow drives itself (opens a site, new tab, dark mode, panel, grid lines, closes a tab), saving screenshots to that folder. It uses a throwaway profile, so your real settings are never touched.
+- Bugs found by the self-test and fixed:
+  1. Pixel font didn't load on the new tab. Cause: browsers block fonts shared between different `burrow://` addresses unless the server says it's OK (a rule called CORS). Fix: Burrow now sends that permission for its own pages only.
+  2. Mochi had no eyes in dark mode (eyes and body were both light). Fix: Mochi always uses a dark "ink" colour for eyes and outline.
+  3. Long tab titles were cut mid-letter. Fix: they now end in "…".
+- Electron's 158 MB download was checked against Electron's official checksum before use.
+
+**2026-11-17 — Phase 2 done and tested (15/15 self-test checks pass)**
+- Added: workspaces, sidebar tabs, reopen closed tab, address suggestions, bookmarks, history, downloads, Mochi popping into the tab strip when a download finishes.
+- The self-test now checks each feature and prints PASS/FAIL. Downloads in the test go to a test folder, never your real Downloads.
+- Bugs found and fixed: suggestion list stayed open over the panel; sites without an icon left a blank gap before the tab title; a label wrapped onto two lines; a typo that stopped the app from starting.
+- Also confirmed: Burrow's interface refuses to run text as code (a security setting called CSP), which protects it if a malicious page title ever slipped through.
+
+**2026-11-17 — Your feedback round (29/29 self-test checks pass)**
+- Tab close/open motion, button press motion, menus pop in, panel slides in.
+- Bookmarks bar (Ctrl+Shift+B), ☰ menu, Settings (search engine, mode, colour, tabs, layout), new download icon, one-line tabs, search engine chooser.
+- How the tab animation works: tabs used to be redrawn from scratch on every change, so nothing could animate. Now each tab is a lasting element; a closed tab gets a "closing" style that shrinks it before it's removed.
+- Fixed while building: two scripts both defined a helper called `host`, which would have stopped the interface loading.
+
+**2026-11-17 — Editable quick links (36/36 self-test checks pass)**
+- New-tab links can be edited, added, removed and reordered.
+- Self-test screenshots now force a fresh paint first (background windows paint lazily, which had produced an out-of-date screenshot).
+
+**2026-11-17 — Workspace links, settings dropdowns, footer (43/43 checks pass)**
+- Bugs found by the self-test and fixed:
+  1. **Link names lost every letter "s"** ("Lectures" became "Lecture"). Cause: a missing backslash in the code that tidies up spaces in names, so it removed "s" instead of extra spaces. Two similar slips in "www." handling were fixed too, and all patterns were re-checked.
+  2. **A new tab sometimes didn't know its workspace.** Cause: the page asked for its settings while its scripts were still loading, and the answer could arrive before the quick-links code existed. Fix: the quick-links code now fetches its own copy once loaded.
+
+**2026-11-17 — Phase 3 done (62/62 self-test checks pass)**
+- Find in page, per-site zoom, private windows, picture-in-picture, tab speaker/mute.
+- The self-test now also proves privacy: private browsing adds nothing to history and its cookies don't appear in normal browsing.
+- Polish from screenshots: private windows hide the workspace arrow; untitled pages show their address instead of "New tab".
+- Repeated lesson: code generated through scripts lost backslashes twice more (in a test). Every regex is now checked with a syntax check before running.
+
+**2026-11-17 — Windows and tab dragging (73/73 self-test checks pass)**
+- Ctrl+N new windows, drag to reorder, pull tabs out, drop tabs onto other windows; every open window is restored on restart.
+- The self-test now uses **real mouse input** (press, move with the button held, release) instead of pretending.
+- Bug found: the new drag code silently didn't load because it reused a name (`tabEls`) already used by another interface script — all interface scripts share one space for names. Fixed, and the self-test now checks that **every interface script loaded**, so this kind of clash can't hide again.
+
+## 10. Known issues / next up
+- White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
+- Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
+- Tabs in other workspaces keep running in the background (uses memory) until tab sleeping is built.
+- Tabs can't be moved between workspaces yet (only between windows).
+- Quick links can only be reordered with the mouse (no keyboard reordering yet).
+- Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
+- **Next (phase 4):** Ctrl+K command palette, then split view, notes and reader mode.
+
+---
+
+## 11. Versions and updates (plan)
+
+**Version numbers** follow *semantic versioning*: `MAJOR.MINOR.PATCH` (e.g. 0.1.0).
+- PATCH (0.1.**1**) — bug fixes only.
+- MINOR (0.**2**.0) — new features.
+- MAJOR (**1**.0.0) — first "finished" release, or big breaking changes.
+The number lives in `package.json` only; the new-tab footer reads it from there.
+To bump it: `npm version patch` (or `minor` / `major`) — this edits package.json and makes a Git tag.
+
+**Recommended update system (simplest that really auto-updates):**
+1. Put the project on **GitHub** (a public repo, or a separate public repo just for releases).
+2. Add **electron-builder** — turns Burrow into a Windows installer (`Burrow-Setup-0.2.0.exe`).
+3. Add **electron-updater** — on launch, Burrow checks GitHub Releases; if there's a newer version it downloads it quietly and Mochi says "Update ready — restart to get v0.2.0".
+4. To release: `npm version minor` → `npm run release` (builds + uploads to GitHub Releases). Everyone's Burrow updates itself.
+
+**Things to know:**
+- Without a code-signing certificate (~$100–400/yr), Windows SmartScreen shows "Windows protected your PC" on first install (click *More info → Run anyway*). Updates still work. Fine for friends/college; buy a certificate later if Burrow goes public.
+- Private GitHub repos can't be used by the updater without putting a secret token inside the app, so the releases must be public.
+
+**Code signing — open decision (parked 2026-11-17, decide before the first public release):**
+- *Microsoft Store* (free for individuals; Store signs MSIX packages, no SmartScreen warning, Store handles updates; each version is reviewed). Recommended if Burrow stays closed-source.
+- *SignPath Foundation* (free, but Burrow must be open source with an OSI licence in a public repo; publisher shows as "SignPath Foundation"; builds run on GitHub Actions; works with GitHub Releases + auto-update).
+- Not suitable: Azure Artifact Signing (individuals only in USA/Canada, ~$9.99/mo); self-signed certificates (Windows doesn't trust them).

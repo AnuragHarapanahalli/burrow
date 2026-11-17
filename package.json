@@ -1,0 +1,21 @@
+{
+  "name": "burrow",
+  "productName": "Burrow",
+  "version": "0.1.0",
+  "description": "A Swiss-grid + pixel desktop browser with Mochi the companion",
+  "main": "main/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@fontsource/inter-tight": "^5.1.0",
+    "@fontsource/silkscreen": "^5.1.0"
+  },
+  "devDependencies": {
+    "electron": "^45.3.2"
+  },
+  "allowScripts": {
+    "electron@45.3.2": true
+  }
+}

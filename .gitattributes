@@ -1,0 +1,5 @@
+# Keep one line-ending style (LF) in the repository on every computer.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.woff2 binary

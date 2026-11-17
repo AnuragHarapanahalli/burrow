@@ -1,0 +1,226 @@
+/* Burrow chrome: Swiss grid + pixel. Rows separated by rules.
+   The page itself is transparent so menus can float over websites. */
+html, body { background: transparent; }
+body { overflow: hidden; user-select: none; }
+#chrome { background: var(--bg); position: relative; z-index: 2; }
+.dot { color: var(--accent-ink); }
+
+:root { --ease-out: cubic-bezier(.2, .8, .2, 1); --ease-in: cubic-bezier(.5, 0, .9, .4); }
+
+/* ---------- Icons: thin square-ended strokes, matching the grid ---------- */
+.tool svg, .new-tab svg, .close svg, .star svg {
+  width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: square; stroke-linejoin: miter; display: block;
+}
+
+/* ---------- Press + hover motion shared by every button ---------- */
+.tool, .new-tab, .brand, .close, .star, .bm, .bm-more, .side-new {
+  transition: background-color .12s, color .12s, transform .08s var(--ease-out);
+}
+.tool:active:not(:disabled), .new-tab:active, .brand:active, .close:active, .star:active, .bm:active, .bm-more:active, .side-new:active {
+  transform: translateY(1px) scale(.94);
+}
+
+/* ---------- Row 1: tab strip (also the window's drag area) ---------- */
+.strip {
+  height: 40px; display: flex; align-items: stretch;
+  border-bottom: var(--rule); -webkit-app-region: drag;
+}
+.brand {
+  -webkit-app-region: no-drag;
+  width: 132px; flex: none; padding: 5px 12px 0; display: flex; flex-direction: column; align-items: flex-start;
+  line-height: 1.1; border-right: var(--hair); text-align: left;
+}
+.brand:hover, .brand[aria-expanded="true"] { background: var(--hover); }
+.wordmark { font-weight: 800; font-size: 15px; letter-spacing: -0.3px; }
+.workspace { color: var(--muted); max-width: 108px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tabs { display: flex; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+body.side-tabs-on .tabs { display: none; }
+
+/* One tidy line per tab:  01  [icon]  Title  × */
+.tab {
+  -webkit-app-region: no-drag;
+  flex: 1 1 180px; min-width: 110px; max-width: 210px; overflow: hidden;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 6px 0 12px; border-right: var(--hair); cursor: default; white-space: nowrap;
+  transition: background-color .15s, color .15s;
+}
+.tab:hover { background: var(--hover); }
+.tab .num { color: var(--muted); flex: none; transition: color .15s; }
+.tab .fav:empty { display: none; }
+.tab .fav img { width: 14px; height: 14px; display: block; }
+.tab .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.tab .close {
+  flex: none; width: 22px; height: 22px; display: grid; place-items: center;
+  opacity: 0; transition: opacity .12s, background-color .12s, transform .08s;
+}
+.tab .close svg { width: 13px; height: 13px; }
+.tab:hover .close, .tab.active .close { opacity: 1; }
+.close:hover { background: var(--accent); color: var(--on-accent); }
+.tab.active { background: var(--fg); color: var(--bg); }
+.tab.active .num { color: var(--accent); }
+
+/* Loading: a small blinking pixel after the number. */
+.loading .num::after {
+  content: ''; display: inline-block; width: 5px; height: 5px; margin-left: 4px; vertical-align: 1px;
+  background: currentColor; animation: blink .6s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* New tabs slide open; closed tabs shrink away. */
+.tab.opening { animation: tab-in .2s var(--ease-out); }
+.tab.closing { animation: tab-out .16s var(--ease-in) forwards; pointer-events: none; }
+@keyframes tab-in { from { max-width: 0; min-width: 0; padding-left: 0; padding-right: 0; opacity: 0; } }
+@keyframes tab-out { to { max-width: 0; min-width: 0; padding-left: 0; padding-right: 0; opacity: 0; border-right-width: 0; } }
+
+.new-tab {
+  -webkit-app-region: no-drag; width: 40px; flex: none; display: grid; place-items: center;
+  border-right: var(--hair);
+}
+.new-tab:hover { background: var(--hover); }
+.new-tab:hover svg { transform: rotate(90deg); }
+.new-tab svg { transition: transform .2s var(--ease-out); }
+.caption-space { flex: 1 0 150px; display: flex; align-items: center; justify-content: flex-end; padding-right: 146px; min-width: 0; }
+
+/* Mochi pops into the empty strip space when something worth saying happens. */
+.strip-mochi {
+  -webkit-app-region: no-drag; display: flex; align-items: center; gap: 6px;
+  animation: pop-in .2s var(--ease-out); min-width: 0;
+}
+.strip-mochi[hidden] { display: none; }
+.strip-bubble {
+  border: var(--rule); background: var(--surface); padding: 2px 8px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;
+}
+.strip-mochi .mochi-svg { animation: bob 1.2s steps(2) infinite; }
+@keyframes bob { 50% { transform: translateY(-2px); } }
+
+/* ---------- Row 2: toolbar ---------- */
+.toolbar { height: 40px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: var(--rule); }
+body.bmbar-on .toolbar { border-bottom: var(--hair); }
+.tool { height: 30px; min-width: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 7px; position: relative; }
+.tool:hover:not(:disabled) { background: var(--hover); }
+.tool:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.tool[aria-expanded="true"] { background: var(--fg); color: var(--bg); }
+#back:hover:not(:disabled) svg { transform: translateX(-2px); }
+#forward:hover:not(:disabled) svg { transform: translateX(2px); }
+#back svg, #forward svg { transition: transform .15s var(--ease-out); }
+#reload .i-stop, #reload.is-loading .i-reload { display: none; }
+#reload.is-loading .i-stop { display: block; }
+#reload.spin .i-reload { animation: spin .45s var(--ease-out); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Downloads: appears once you have downloads; the arrow bounces while one is running. */
+.dl-btn[hidden] { display: none; }
+.dl-btn.busy .dl-arrow { animation: dl-bounce .8s var(--ease-out) infinite; }
+@keyframes dl-bounce { 50% { transform: translateY(2px); } }
+.dl-badge { font-size: 11px; }
+.dl-badge:empty { display: none; }
+.dl-btn.fresh .dl-badge { background: var(--accent); color: var(--on-accent); padding: 0 4px; }
+
+.address {
+  flex: 1; height: 30px; margin: 0 6px; display: flex; align-items: center;
+  border: 1px solid var(--line); background: var(--surface); transition: border-color .12s, box-shadow .15s;
+}
+.address:hover { border-color: var(--muted); }
+.address:focus-within { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.address input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; padding: 0 10px; font-size: 13.5px; user-select: text; }
+.address input::placeholder { color: var(--muted); }
+.address .hint { color: var(--muted); border: 1px solid var(--line); padding: 1px 5px; margin-right: 6px; }
+.address:focus-within .hint { display: none; }
+.star { width: 28px; height: 26px; display: grid; place-items: center; color: var(--muted); }
+.star:hover { color: var(--fg); }
+.star[aria-pressed="true"] { color: var(--accent-ink); }
+.star[aria-pressed="true"] svg { fill: currentColor; }
+.star[hidden] { display: none; }
+
+/* ---------- Row 3: bookmarks bar ---------- */
+.bmbar { height: 30px; display: flex; align-items: center; padding: 0 6px; border-bottom: var(--rule); }
+.bmbar[hidden] { display: none; }
+.bm-items { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+.bm {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; flex: none;
+  max-width: 180px; white-space: nowrap; font-weight: 500; font-size: 12.5px;
+}
+.bm[hidden] { display: none; }
+.bm:hover { background: var(--hover); }
+.bm span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.bm img { width: 14px; height: 14px; }
+.bm-dot { width: 14px; height: 14px; display: grid; place-items: center; background: var(--fg); color: var(--bg); font-size: 9px !important; line-height: 1; }
+.bm-empty { color: var(--muted); padding: 0 8px; font-size: 12.5px; }
+.bm-more { height: 24px; padding: 0 8px; font-size: 15px; }
+.bm-more:hover, .bm-more[aria-expanded="true"] { background: var(--hover); }
+.bm-more[hidden] { display: none; }
+
+/* ---------- One-shot animations (added by bump() in ui.js) ---------- */
+.pop { animation: pop .32s var(--ease-out); }
+@keyframes pop { 40% { transform: scale(1.3); } }
+.pop-in { animation: pop-in .14s var(--ease-out); }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.drop-in { animation: drop-in .18s var(--ease-out); }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-6px); } }
+
+/* ---------- Tab speaker (click to mute) ---------- */
+.snd { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 0; transition: background-color .12s, transform .08s; }
+.snd[hidden] { display: none; }
+.snd svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
+.snd svg path:first-child { fill: currentColor; }
+.snd .m { display: none; }
+.snd.muted .w { display: none; }
+.snd.muted .m { display: block; }
+.snd:hover { background: var(--accent); color: var(--on-accent); }
+.snd:active { transform: scale(.9); }
+.snd:not(.muted) .w { animation: sound 1s steps(2) infinite; }
+@keyframes sound { 50% { opacity: .35; } }
+
+/* ---------- Address-bar chips: zoom % and picture-in-picture ---------- */
+.addr-chip { height: 22px; min-width: 26px; padding: 0 6px; margin-right: 2px; display: grid; place-items: center; color: var(--muted); transition: background-color .12s, color .12s, transform .08s; }
+.addr-chip[hidden] { display: none; }
+.addr-chip:hover { background: var(--fg); color: var(--bg); }
+.addr-chip:active { transform: scale(.92); }
+.addr-chip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
+.addr-chip .pip-inner { fill: currentColor; }
+.zoom-chip { font-size: 11px; border: 1px solid var(--line); color: var(--fg); }
+
+/* ---------- Find bar ---------- */
+.findbar { height: 36px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; border-bottom: var(--hair); background: var(--bg); }
+.findbar[hidden] { display: none; }
+.find-label { color: var(--accent-ink); margin-right: 6px; }
+#findInput { width: min(360px, 40vw); height: 26px; border: 1px solid var(--line); background: var(--surface); padding: 0 8px; outline: 0; user-select: text; }
+#findInput:focus { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.findbar.no-match #findInput { border-color: var(--accent-ink); }
+.find-count { min-width: 52px; color: var(--muted); text-align: center; }
+.findbar.no-match .find-count { color: var(--accent-ink); }
+.find-case { font-weight: 700; font-size: 12px; }
+.find-case[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+#findClose { margin-left: auto; }
+.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* ---------- Private window: always dark, with a striped tab strip edge ---------- */
+body.private .strip { background-image: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--accent) 14%, transparent) 10px 12px); }
+body.private .workspace { color: var(--accent-ink); }
+body.private .brand { cursor: default; }
+body.private .brand:hover { background: none; }
+body.private .caret { display: none; }
+
+/* ---------- Dragging tabs ---------- */
+.tab.dragging, .side-tab.dragging {
+  position: relative; z-index: 5; cursor: grabbing;
+  box-shadow: 4px 4px 0 var(--fg); outline: 2px solid var(--fg); outline-offset: -2px;
+}
+.tab.shifting, .side-tab.shifting { transition: transform .16s var(--ease-out), background-color .15s; }
+body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
+body.tab-dragging .tab:hover:not(.dragging) { background: transparent; }
+body.tab-dragging .tab.active:not(.dragging) { background: var(--fg); }
+/* Lifted free: the tab floats like a card. The strip/sidebar must not clip it. */
+body.tab-tearing .tabs, body.tab-tearing .side-tabs, body.tab-tearing .sidebar { overflow: visible; }
+.tab-dragging .dragging { transition: none; }
+body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--fg); color: var(--bg); }
+.tear-hint {
+  position: fixed; z-index: 20; pointer-events: none; padding: 3px 7px;
+  background: var(--accent); color: var(--on-accent); animation: pop-in .14s var(--ease-out);
+}
+.tear-hint[hidden] { display: none; }

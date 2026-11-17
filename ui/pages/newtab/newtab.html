@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'; img-src 'self' burrow: data:">
+  <title>New tab</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="newtab.css">
+</head>
+<body>
+  <main class="grid">
+    <div class="when"><span class="pixel" id="date"></span> <span class="pixel clock" id="clock"></span></div>
+
+    <section class="hero">
+      <h1>What are we<br>looking for<span class="dot">?</span></h1>
+      <form id="search" class="search" autocomplete="off">
+        <input id="q" spellcheck="false" placeholder="Search or type a URL" aria-label="Search or type a URL" autofocus>
+        <span class="pixel hint">ENTER</span>
+      </form>
+      <div class="links-row">
+        <nav class="links" id="links" aria-label="Quick links"></nav>
+        <button class="links-edit" id="linksEdit" aria-pressed="false">Edit</button>
+      </div>
+      <form class="link-form" id="linkForm" hidden autocomplete="off">
+        <label><span class="pixel">NAME</span><input id="lfName" maxlength="24" placeholder="Moodle" spellcheck="false"></label>
+        <label class="grow"><span class="pixel">ADDRESS</span><input id="lfUrl" placeholder="moodle.college.edu" spellcheck="false"></label>
+        <div class="lf-scope" id="scopeSeg" role="radiogroup" aria-label="Show this link in">
+          <span class="pixel">SHOW IN</span>
+          <div class="lf-seg">
+            <button type="button" data-scope="all" role="radio">All workspaces</button>
+            <button type="button" data-scope="ws" role="radio" id="scopeWs">Only this workspace</button>
+          </div>
+        </div>
+        <button type="submit" class="lf-save">Save</button>
+        <button type="button" class="lf-cancel" id="lfCancel">Cancel</button>
+        <p class="lf-error" id="lfError" role="alert"></p>
+      </form>
+      <section class="chooser" id="chooser" hidden aria-labelledby="chooserTitle">
+        <div class="pixel chooser-label" id="chooserTitle">ONE QUICK THING &mdash; PICK YOUR SEARCH ENGINE</div>
+        <div class="chooser-grid" id="engineGrid" role="radiogroup" aria-labelledby="chooserTitle"></div>
+        <p class="chooser-note">You can change this any time in Menu &rarr; Settings.</p>
+      </section>
+    </section>
+
+    <footer class="foot">
+      <p class="stat" id="stat"></p>
+      <p class="made">Made with
+        <svg class="heart" viewBox="0 0 7 6" shape-rendering="crispEdges" role="img" aria-label="love"><path d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z"/></svg>
+        by Anurag <span class="pixel version" id="version"></span></p>
+    </footer>
+
+    <div class="mochi-spot">
+      <div class="bubble" id="bubble" hidden></div>
+      <button id="mochi" class="mochi-btn" aria-label="Mochi, your companion"></button>
+    </div>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/shared/mochi.js"></script>
+  <script src="newtab.js"></script>
+  <script src="quicklinks.js"></script>
+</body>
+</html>
