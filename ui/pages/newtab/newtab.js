@@ -83,7 +83,10 @@ function drawMochi() {
   const p = isPrivate && (pose === 'idle' || pose === 'blink') ? 'shades' : pose;
   $('mochi').innerHTML = window.Mochi.svg(tokens, p, 84);
 }
-function say(text, ms = 4000) {
+let mochiMode = 'lively';
+// `explicit` = you did something (clicked Mochi, picked an engine): shown even in Quiet mode.
+function say(text, ms = 4000, explicit = false) {
+  if (mochiMode === 'off' || (mochiMode === 'quiet' && !explicit)) return;
   const b = $('bubble');
   b.textContent = text;
   b.hidden = false;
@@ -99,7 +102,7 @@ setInterval(blink, 4200);
 
 $('mochi').addEventListener('click', () => {
   pose = 'happy'; drawMochi();
-  say(POKES[poke++ % POKES.length], 2500);
+  say(POKES[poke++ % POKES.length], 2500, true);
   setTimeout(() => { pose = 'idle'; drawMochi(); }, 900);
 });
 
@@ -126,7 +129,7 @@ function renderPrefs(prefs, ws) {
     $('engineGrid').innerHTML = prefs.engines.map((e) =>
       `<button role="radio" aria-checked="false" data-engine="${e.id}"><span class="n">${esc(e.name)}</span><span class="h">${esc(e.host)}</span></button>`).join('');
     chooser.hidden = false;
-    if (!askedEngine) { askedEngine = true; setTimeout(() => say('Which search engine do you like?', 5000), 900); }
+    if (!askedEngine) { askedEngine = true; setTimeout(() => say('Which search engine do you like?', 5000, true), 900); }
   } else if (!chooser.hidden) {
     chooser.classList.add('leaving');
     chooser.addEventListener('animationend', () => { chooser.hidden = true; chooser.classList.remove('leaving'); }, { once: true });
@@ -137,7 +140,7 @@ $('engineGrid').addEventListener('click', (e) => {
   if (!b) return;
   window.burrowPage.setSearchEngine(b.dataset.engine);
   pose = 'happy'; drawMochi();
-  say(`${b.querySelector('.n').textContent} it is!`, 2500);
+  say(`${b.querySelector('.n').textContent} it is!`, 2500, true);
   setTimeout(() => { pose = 'idle'; drawMochi(); }, 1200);
   $('q').focus();
 });
@@ -145,6 +148,8 @@ $('engineGrid').addEventListener('click', (e) => {
 // ---------- Theme ----------
 function applyTheme(payload) {
   if (!payload) return;
+  mochiMode = payload.prefs?.mochiMode || 'lively';
+  document.body.classList.toggle('mochi-off', mochiMode === 'off');
   if (payload.isPrivate && !isPrivate) {
     isPrivate = true;
     document.body.classList.add('private');

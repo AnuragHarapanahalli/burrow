@@ -224,3 +224,8 @@ body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--f
   background: var(--accent); color: var(--on-accent); animation: pop-in .14s var(--ease-out);
 }
 .tear-hint[hidden] { display: none; }
+
+/* Mochi walks into the tab strip before speaking */
+.strip-mochi.walking { animation: mochi-walk-in .62s linear; }
+.strip-mochi.walking .strip-bubble { visibility: hidden; }
+@keyframes mochi-walk-in { from { transform: translateX(140px); } }

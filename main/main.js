@@ -2,7 +2,7 @@
 // downloads, and routes messages from each window's interface to that window (main/window.js).
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog } = require('electron');
+const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog, webContents: WebContents } = require('electron');
 const Theme = require('../shared/theme');
 const { Store } = require('./store');
 const { Library } = require('./library');
@@ -115,6 +115,8 @@ function themePayload(isPrivate = false) {
     aiProvider: store.get('aiProvider'),
     askMode: store.get('askMode'),
     aiProviders: AI.list(),
+    sleep: store.get('sleep'),
+    mochiMode: store.get('mochiMode'),
     engines: Object.entries(ENGINES).map(([id, e]) => ({ id, name: e.name, host: new URL(e.url).host.replace(/^www\./, '') })),
   };
   return { settings, tokens, presets: Theme.PRESETS, prefs, isPrivate };
@@ -141,8 +143,53 @@ function setPrefs(patch) {
   if (patch && Object.hasOwn(AI.PROVIDERS, patch.aiProvider)) store.set('aiProvider', patch.aiProvider);
   if (['smart', 'search', 'ai'].includes(patch?.askMode)) store.set('askMode', patch.askMode);
   if (patch?.aiProvider) everyWindow((w) => w.onAIProviderChange?.());
+  if (['lively', 'quiet', 'off'].includes(patch?.mochiMode)) store.set('mochiMode', patch.mochiMode);
+  if (patch?.sleep && typeof patch.sleep === 'object') {
+    const cur = { ...store.get('sleep') };
+    if (typeof patch.sleep.on === 'boolean') cur.on = patch.sleep.on;
+    if ([15, 30, 60, 120].includes(Number(patch.sleep.minutes))) cur.minutes = Number(patch.sleep.minutes);
+    const host = String(patch.sleep.never || patch.sleep.allow || '');
+    if (/^[a-z0-9.-]+(:\d+)?$/i.test(host) && host.length < 256) {
+      const never = new Set(cur.never || []);
+      if (patch.sleep.never) never.add(host); else never.delete(host);
+      cur.never = [...never].slice(0, 200);
+    }
+    store.set('sleep', cur);
+  }
   broadcastTheme();
   everyWindow((w) => w.sendTabs());
+}
+
+// ---------------- Tab sleeping ----------------
+// Once a minute, tabs you haven't looked at for a while are unloaded (they stay in the tab strip).
+// `force` puts every eligible tab to sleep right now (Ctrl+K → "Put other tabs to sleep now").
+function sweepSleep(onlyWin, force = false) {
+  const cfg = store.get('sleep');
+  if (!cfg.on && !force) return [];
+  const idle = force ? 0 : cfg.minutes * 60000;
+  // Measure memory first, so we can say roughly how much sleeping freed.
+  const memBefore = new Map(app.getAppMetrics().map((m) => [m.pid, m.memory?.workingSetSize || 0]));
+  const results = [];
+  for (const w of onlyWin ? [onlyWin] : [...windows]) {
+    const slept = w.tabs.sleepIdle(idle);
+    if (slept.length) results.push({ w, slept });
+  }
+  if (!results.length) {
+    if (force && onlyWin) onlyWin.send('mochi-say', { text: 'Every other tab is already asleep or busy', pose: 'idle', essential: true });
+    return [];
+  }
+  // A process is only freed if no remaining page still uses it.
+  const alive = new Set(WebContents.getAllWebContents().filter((wc) => !wc.isDestroyed()).map((wc) => wc.getOSProcessId()));
+  for (const { w, slept } of results) {
+    const pids = new Set(slept.map((t) => t.pid).filter((p) => p && !alive.has(p)));
+    const mb = Math.round([...pids].reduce((sum, p) => sum + (memBefore.get(p) || 0), 0) / 1024);
+    if (slept.length >= 2 || force) {
+      const n = slept.length;
+      const text = `I tucked ${n} tab${n === 1 ? '' : 's'} into bed${mb >= 10 ? ` · about ${mb} MB freed` : ''}`;
+      w.send('mochi-say', { text, pose: 'sleepy', essential: true });
+    }
+  }
+  return results;
 }
 
 // ---------------- Windows ----------------
@@ -235,6 +282,8 @@ function registerIpc() {
     openWindow({ adoptTab: tab, bounds: { x: x - 160, y: y - 20, width: b.width, height: b.height } });
   });
   on('tab:mute', (w, id) => w.tabs.toggleMute(Number(id)));
+  on('tab:keepawake', (w, id) => w.tabs.keepAwake(Number(id)));
+  on('tabs:sleep-now', (w) => sweepSleep(w, true));
   handle('tab:pip', (w) => w.pip());
   on('nav:back', (w) => w.tabs.back());
   on('nav:forward', (w) => w.tabs.forward());
@@ -399,6 +448,8 @@ app.whenReady().then(() => {
   registerIpc();
   nativeTheme.on('updated', broadcastTheme);
   systemPreferences.on?.('accent-color-changed', broadcastTheme);
+  setInterval(() => sweepSleep(), 60 * 1000);
+
   // Bring back every window that was open last time (or one fresh window).
   const saved = savedWindows();
   Tabs.reserveWsIds(saved.flatMap((w) => w.workspaces.map((ws) => ws.id)));
@@ -409,7 +460,7 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep,
     });
   }
 });

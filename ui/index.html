@@ -187,6 +187,16 @@
             <button data-tabs="side" role="radio">Side</button>
           </div>
           <p class="sect-note">Auto keeps tabs on top and moves them to a sidebar past 8 tabs.</p>
+          <div class="pixel sect-sub">SLEEP TABS I HAVEN'T LOOKED AT FOR</div>
+          <div class="seg seg-5" id="sleepSeg" role="radiogroup" aria-label="Tab sleeping">
+            <button data-sleep="off" role="radio">Off</button>
+            <button data-sleep="15" role="radio">15m</button>
+            <button data-sleep="30" role="radio">30m</button>
+            <button data-sleep="60" role="radio">1h</button>
+            <button data-sleep="120" role="radio">2h</button>
+          </div>
+          <div class="never-list" id="neverList"></div>
+          <p class="sect-note">Sleeping tabs free memory and wake up where you left them when you click. Tabs playing sound never sleep. Add a site to "never sleep" from Ctrl+K.</p>
         </div>
       </details>
       <details class="sect" name="settings">
@@ -194,6 +204,18 @@
         <div class="sect-body">
           <label class="row"><input type="checkbox" id="bmbarToggle"> Show bookmarks bar <span class="pixel kbd">CTRL SHIFT B</span></label>
           <label class="row"><input type="checkbox" id="gridToggle"> Show grid lines on new tab</label>
+        </div>
+      </details>
+      <details class="sect" name="settings">
+        <summary><span class="pixel sect-n">07</span><span class="sect-t">Mochi</span><span class="sect-v" id="sumMochi"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <div class="seg" id="mochiSeg" role="radiogroup" aria-label="How chatty Mochi is">
+            <button data-mochi="lively" role="radio" title="All of Mochi's little reactions">Lively</button>
+            <button data-mochi="quiet" role="radio" title="Only important things: downloads, tabs put to sleep, problems">Quiet</button>
+            <button data-mochi="off" role="radio" title="No Mochi in the tab strip or on new tabs">Off</button>
+          </div>
+          <p class="sect-note" id="mochiNote"></p>
+          <div class="mochi-gallery" id="mochiGallery" aria-label="Mochi's poses"></div>
         </div>
       </details>
       </div>
@@ -253,5 +275,6 @@
   <script src="burrow://app/ui/drag.js"></script>
   <script src="burrow://app/ui/palette.js"></script>
   <script src="burrow://app/ui/panes.js"></script>
+  <script src="burrow://app/ui/mochi-react.js"></script>
 </body>
 </html>

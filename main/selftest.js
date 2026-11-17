@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -44,7 +44,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(2500);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     // --- Search engine chooser on the new tab ---
     const page = tabs.active.view.webContents;
@@ -166,7 +166,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("openPanel('settings')");
     await wait(500);
     check(await js("document.querySelectorAll('#engines .engine').length") === 6, 'settings lists search engines');
-    check(await js("document.querySelectorAll('#panel details.sect').length") === 6, 'settings has six dropdown sections');
+    check(await js("document.querySelectorAll('#panel details.sect').length") === 7, 'settings has seven dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
     await wait(400);
@@ -568,6 +568,104 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     setTheme({ mode: 'light', seed: '#E63027' });
     setPrefs({ aiProvider: 'claude' });
     await wait(300);
+
+    // ================= Phase 6: tab sleeping =================
+    const sleepy = tabs.create('https://example.com/', { activate: false });
+    await until(() => !sleepy.loading, 8000);
+    sleepy.view.webContents.loadURL('https://example.com/?second');
+    await until(() => sleepy.url.includes('?second') && !sleepy.loading, 8000);
+    sleepy.lastActive = 0; // pretend it's been out of sight for ages
+    sweepSleep();
+    await wait(300);
+    check(sleepy.asleep && !sleepy.view, 'a tab out of sight for a while goes to sleep (its page is unloaded)');
+    check(await until(() => js(`!!document.querySelector('[data-id="${sleepy.id}"].asleep')`)), 'a sleeping tab shows "zz" in the tab strip');
+    await shot('18-sleeping-tab');
+    tabs.activate(sleepy.id);
+    check(await until(() => !sleepy.asleep && sleepy.view && !sleepy.loading, 10000), 'clicking a sleeping tab wakes it');
+    check(sleepy.url.includes('?second') && sleepy.view.webContents.navigationHistory.canGoBack(), 'it wakes on the same page, with Back still working');
+    // Things that must stay awake
+    const loud = tabs.create('data:text/html,' + encodeURIComponent('<script>const a=new AudioContext();const o=a.createOscillator();const g=a.createGain();g.gain.value=0.02;o.connect(g).connect(a.destination);o.start();</script>'), { activate: false });
+    await until(() => loud.audible, 5000);
+    tabs.activate(tabs.visible[0].id);
+    await wait(200);
+    loud.lastActive = 0;
+    sleepy.lastActive = 0;
+    tabs.keepAwake(sleepy.id, true);
+    sweepSleep();
+    await wait(300);
+    check(!loud.asleep, 'a tab playing sound never sleeps');
+    check(!sleepy.asleep, '"Keep this tab awake" keeps it awake');
+    tabs.keepAwake(sleepy.id, false);
+    setPrefs({ sleep: { never: 'example.com' } });
+    sweepSleep();
+    await wait(300);
+    check(!sleepy.asleep, 'a "never sleep" site stays awake');
+    setPrefs({ sleep: { allow: 'example.com' } });
+    tabs.close(loud.id);
+    // Sleep now (Ctrl+K) — Mochi reports it
+    await js('mochiLastChat = 0, UI.mochiLog.length = 0');
+    sleepy.lastActive = Date.now(); // recent: only "sleep now" ignores the timer
+    await js('B.tabs.sleepNow()');
+    check(await until(() => sleepy.asleep), '"Put other tabs to sleep now" sleeps them right away');
+    check(await until(() => js("UI.mochiLog.some((m) => /tucked/.test(m.text) && m.pose === 'sleepy')")), 'Mochi says how many tabs it tucked into bed');
+    await shot('18b-sleep-now');
+    tabs.close(sleepy.id);
+    // Settings: Off stops sleeping
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.querySelector('#sleepSeg [data-sleep=off]').click()");
+    check(await until(() => store.get('sleep').on === false), 'Settings can turn tab sleeping off');
+    await js("document.querySelector('#sleepSeg [data-sleep=\"30\"]').click()");
+    await until(() => store.get('sleep').on === true);
+    // Restored windows load lazily: only the tab you see wakes up.
+    const lazy = openWindow({ snapshot: { current: 0, workspaces: [{ id: 0, name: 'Home', active: 1, tabs: [
+      { url: 'https://example.com/?a', title: 'Saved A' }, { url: 'https://example.com/?b', title: 'Saved B' }, 'https://example.com/?c'] }] } });
+    await wait(2500);
+    const lz = lazy.tabs.tabs;
+    check(lz.length === 3 && lz.filter((t) => t.view).length === 1 && lz[1].view, 'a restored window only loads the tab you see (the rest wait asleep)');
+    check(lz[0].title === 'Saved A' && lz[0].asleep, 'sleeping restored tabs keep their saved titles');
+    lazy.win.close();
+    await wait(600);
+
+    // ================= Phase 7: Mochi =================
+    const Mochi = require('../shared/mochi');
+    check(['sleepy', 'walk1', 'walk2', 'press', 'celebrate', 'oops'].every((p) => Mochi.POSES[p]), 'Mochi has new poses: sleepy, walking, press, celebrate, oops');
+    await js("closePanel()");
+    await wait(200);
+    await js("mochiLastChat = 0, document.getElementById('stripMochi').hidden = true");
+    await js("mochiSay('Testing, testing', { essential: true })");
+    await wait(150);
+    check(await js("!document.getElementById('stripMochi').hidden && document.getElementById('stripMochi').classList.contains('walking')"), 'Mochi walks into the tab strip before speaking');
+    await wait(900);
+    check(await js("document.querySelector('#stripSprite .mochi-svg').dataset.pose === 'happy' && !document.getElementById('stripMochi').classList.contains('walking')"), 'then stops and shows the right pose');
+    await shot('19-mochi-strip');
+    setPrefs({ mochiMode: 'quiet' });
+    await wait(300);
+    check(await js("mochiLastChat = 0, mochiSay('chatter') === false && mochiSay('important', { essential: true }) === true"), 'Quiet mode: Mochi only says important things');
+    setPrefs({ mochiMode: 'off' });
+    await wait(300);
+    check(await js("mochiSay('important', { essential: true }) === false"), 'Off: Mochi stays out of sight');
+    const offTab = tabs.create();
+    await wait(1500);
+    check(await offTab.view.webContents.executeJavaScript("document.body.classList.contains('mochi-off')"), 'Off also hides Mochi on the new tab');
+    tabs.close(offTab.id);
+    setPrefs({ mochiMode: 'lively' });
+    await wait(300);
+    // Bookmark reaction (Lively)
+    const bmTab = tabs.create('https://example.com/?mochi');
+    await until(() => !bmTab.loading, 8000);
+    // (Mochi never talks over an important message that's still showing, so clear the earlier one.)
+    await js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
+    await js("document.getElementById('star').click()");
+    check(await until(() => js("UI.mochiLog.some((m) => m.text === 'Saved for later!')")), 'bookmarking a page makes Mochi say "Saved for later!"');
+    tabs.close(bmTab.id);
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.querySelectorAll('#panel details.sect')[6].open = true");
+    await wait(400);
+    check(await js("document.querySelectorAll('#mochiGallery figure').length") === 7, 'Settings → Mochi shows the pose gallery');
+    await shot('19b-mochi-settings');
+    await js("closePanel()");
 
     // ================= Windows + dragging tabs =================
     const tabCenters = () => js("[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => [t, t.getBoundingClientRect()]).map(([t, r]) => ({ id: +t.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }))");

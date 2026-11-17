@@ -66,10 +66,13 @@ function updateTab(el, t, i) {
   const active = t.id === UI.state.activeId;
   el.classList.toggle('active', active);
   el.classList.toggle('loading', !!t.loading);
+  el.classList.toggle('asleep', !!t.asleep);
+  el.classList.toggle('kept-awake', !!t.keepAwake);
   el.setAttribute('aria-selected', String(active));
   el.querySelector('.num').textContent = pad(i + 1);
   el.querySelector('.title').textContent = t.title;
-  el.title = i < 8 ? `${t.title}  (Ctrl+${i + 1})` : t.title;
+  const note = t.asleep ? '  · asleep, click to wake' : t.keepAwake ? '  · kept awake' : '';
+  el.title = (i < 8 ? `${t.title}  (Ctrl+${i + 1})` : t.title) + note;
   el.querySelector('.close').setAttribute('aria-label', `Close ${t.title}`);
   // Speaker when the tab makes sound; click it to mute/unmute.
   const snd = el.querySelector('.snd');
@@ -183,7 +186,7 @@ $('star').onclick = () => B.library.toggleBookmark();
 $('zoomBtn').onclick = () => B.zoom(0);
 async function popOut() {
   const r = await B.tabs.pip();
-  if (r === 'none') stripMochi('No video to pop out on this page', 3500);
+  if (r === 'none') { UI.stripClickOpens = null; stripMochi('No video to pop out on this page', 3500, 'oops'); }
 }
 window.popOut = popOut;
 $('pipBtn').onclick = popOut;
@@ -200,19 +203,64 @@ B.tabs.onChange((s) => {
   window.renderWorkspaceMenu?.();
 });
 
-// ---------- Strip Mochi: pops up with a reason, then leaves ----------
-let stripTimer;
-function stripMochi(text, ms = 5000) {
-  if (!UI.theme) return;
-  if (UI.stripClickOpens === undefined) UI.stripClickOpens = 'downloads';
-  $('stripSprite').innerHTML = window.Mochi.svg(UI.theme.tokens, 'happy', 30);
+// ---------- Strip Mochi: walks in with something to say, then leaves ----------
+// Everything Mochi says in the tab strip goes through mochiSay(). Settings → Mochi decides how chatty:
+//   Lively: everything · Quiet: only important things ("essential") · Off: nothing.
+let stripTimer = 0;
+let stripStop = null;
+let mochiLastChat = 0;
+UI.mochiLog = []; // what Mochi said (the self-test reads this)
+function mochiSay(text, { pose = 'happy', essential = false, ms = 5000, opens = null } = {}) {
+  if (!UI.theme) return false;
+  const mode = UI.theme.prefs?.mochiMode || 'lively';
+  if (mode === 'off' || (mode === 'quiet' && !essential)) return false;
+  const box = $('stripMochi');
+  const now = Date.now();
+  if (!essential) {
+    if (now - mochiLastChat < 25000) return false;      // don't chatter
+    if (!box.hidden && UI.stripEssential) return false;   // don't talk over something important
+  }
+  mochiLastChat = now;
+  UI.stripEssential = essential;
+  UI.stripClickOpens = opens;
+  UI.mochiLog.push({ text, pose, essential, at: now });
+  const sprite = $('stripSprite');
+  const tokens = UI.theme.tokens;
+  const settle = () => {
+    stripStop?.(); stripStop = null;
+    box.classList.remove('walking');
+    sprite.innerHTML = window.Mochi.svg(tokens, pose, 30);
+  };
   $('stripBubble').textContent = text;
-  $('stripMochi').hidden = false;
   clearTimeout(stripTimer);
-  stripTimer = setTimeout(() => { $('stripMochi').hidden = true; }, ms);
+  if (box.hidden && !reducedMotion()) {
+    // Walk in from the right, then say it.
+    box.hidden = false;
+    box.classList.add('walking');
+    stripStop?.();
+    stripStop = window.Mochi.play(sprite, tokens, ['walk1', 'walk2'], { fps: 8, size: 30 });
+    setTimeout(settle, 620);
+  } else {
+    box.hidden = false;
+    settle();
+  }
+  stripTimer = setTimeout(() => { box.hidden = true; UI.stripEssential = false; }, ms + 620);
+  return true;
 }
-$('stripMochi').addEventListener('click', () => { $('stripMochi').hidden = true; if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens); });
-B.onMochiSay((text) => { UI.stripClickOpens = null; stripMochi(String(text || ''), 6000); });
+window.mochiSay = mochiSay;
+// Older calls: important messages (downloads, "couldn't find an article", …).
+function stripMochi(text, ms = 5000, pose = 'happy') {
+  return mochiSay(text, { essential: true, ms, pose, opens: UI.stripClickOpens || null });
+}
+$('stripMochi').addEventListener('click', () => {
+  $('stripMochi').hidden = true;
+  if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
+});
+// Messages from the main process (tabs put to sleep, "question copied", …).
+B.onMochiSay((msg) => {
+  const m = typeof msg === 'string' ? { text: msg } : (msg || {});
+  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: 6000 });
+});
 
 // ---------- Theme + preferences ----------
 B.theme.onChange((payload) => {

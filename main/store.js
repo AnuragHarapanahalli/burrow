@@ -11,7 +11,9 @@ const SETTINGS_DEFAULTS = {
   searchEngine: 'google',
   searchChosen: false,   // the user hasn't picked an engine yet (new tab asks once)
   bookmarksBar: true,
-  onboarded: false,      // the welcome tour has been finished or skipped
+  onboarded: false,
+  sleep: { on: true, minutes: 30, never: [] }, // tab sleeping: unload tabs you haven't looked at for a while
+  mochiMode: 'lively',   // lively (all of Mochi's reactions) | quiet (only important ones) | off      // the welcome tour has been finished or skipped
   aiProvider: 'claude',  // Ask AI: claude | chatgpt | gemini
   askMode: 'smart',      // smart (questions go to AI first) | search (search first) | ai (AI first)
   quickLinks: [

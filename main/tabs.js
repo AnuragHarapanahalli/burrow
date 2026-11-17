@@ -1,4 +1,6 @@
 // Tab manager. Each tab is a WebContentsView showing one website.
+// A tab can also be *asleep*: its page is unloaded to save memory (tab.view is null), and it keeps
+// its address, title, icon and back/forward history so it can wake up where it was.
 // Tabs belong to a workspace (Home, College, ...); only the current workspace's tabs are shown.
 const path = require('path');
 const { WebContentsView } = require('electron');
@@ -44,7 +46,26 @@ class Tabs {
   get active() { return this.get(this.activeId); }
   ws(id) { return this.workspaces.find((w) => w.id === id); }
 
-  create(url = NEWTAB, { activate = true, after, ws = this.currentWs } = {}) {
+  create(url = NEWTAB, { activate = true, after, ws = this.currentWs, asleep = false, title, favicon } = {}) {
+    const tab = {
+      id: nextTabId++, ws, view: null, title: title || 'New tab', url, favicon: favicon || null,
+      loading: !asleep, audible: false, media: false, playing: false, owner: this,
+      asleep: !!asleep, keepAwake: false, history: null, lastActive: Date.now(),
+    };
+    const at = after ? this.tabs.findIndex((t) => t.id === after) : -1;
+    if (at >= 0) this.tabs.splice(at + 1, 0, tab);
+    else this.tabs.push(tab);
+    if (!tab.asleep) {
+      this.attach(tab);
+      tab.view.webContents.loadURL(url).catch(() => {});
+    }
+    if (activate && ws === this.currentWs) this.activate(tab.id);
+    else this.emit();
+    return tab;
+  }
+
+  // Build the live page for a tab and wire up its events.
+  attach(tab) {
     const view = new WebContentsView({
       webPreferences: {
         preload: path.join(__dirname, '..', 'preload', 'tab-preload.js'),
@@ -52,7 +73,7 @@ class Tabs {
         ...(this.session ? { session: this.session } : {}),
       },
     });
-    const tab = { id: nextTabId++, ws, view, title: 'New tab', url, favicon: null, loading: true, audible: false, media: false, owner: this };
+    tab.view = view;
     const wc = view.webContents;
     // Listeners always talk to the tab's *current* owner, because a tab can be dragged to another window.
     const T = () => tab.owner;
@@ -69,8 +90,8 @@ class Tabs {
     });
     // Sound + video: a speaker on the tab, and the picture-in-picture button.
     wc.on('audio-state-changed', (e) => update({ audible: !!e.audible }));
-    wc.on('media-started-playing', () => update({ media: true }));
-    wc.on('media-paused', () => update({}));
+    wc.on('media-started-playing', () => update({ media: true, playing: true }));
+    wc.on('media-paused', () => update({ playing: false }));
     // Ctrl + mouse wheel zooms, like other browsers.
     wc.on('zoom-changed', (_e, dir) => T().stepZoom(dir === 'in' ? 1 : -1, tab));
     wc.on('found-in-page', (_e, r) => { if (tab.id === T().activeId) T().onFind?.(r); });
@@ -86,14 +107,69 @@ class Tabs {
       if (/^https?:/i.test(u)) T().create(u, { after: tab.id, ws: tab.ws });
       return { action: 'deny' };
     });
+    return view;
+  }
 
-    const at = after ? this.tabs.findIndex((t) => t.id === after) : -1;
-    if (at >= 0) this.tabs.splice(at + 1, 0, tab);
-    else this.tabs.push(tab);
-    wc.loadURL(url).catch(() => {});
-    if (activate && ws === this.currentWs) this.activate(tab.id);
-    else this.emit();
-    return tab;
+  // ---------------- Tab sleeping ----------------
+  // Sites you've marked "never sleep" (Settings → Tabs, or Ctrl+K).
+  neverSleeps(tab) {
+    const never = this.store.get('sleep')?.never || [];
+    try { return never.includes(new URL(tab.url).host); } catch { return false; }
+  }
+
+  // Asleep tabs can't make sound, aren't on screen, and aren't something you asked to keep awake.
+  canSleep(tab) {
+    if (!tab.view || tab.asleep || tab.keepAwake || this.shownTabs.includes(tab)) return false;
+    const wc = tab.view.webContents;
+    if (tab.audible || tab.playing || wc.isCurrentlyAudible()) return false;
+    return !this.neverSleeps(tab);
+  }
+
+  // Unload the page but keep the tab (and its back/forward history).
+  sleep(tab) {
+    if (!this.canSleep(tab)) return false;
+    const wc = tab.view.webContents;
+    try {
+      const nav = wc.navigationHistory;
+      tab.history = { entries: nav.getAllEntries(), index: nav.getActiveIndex() };
+    } catch { tab.history = null; }
+    tab.pid = wc.getOSProcessId();
+    try { this.win.contentView.removeChildView(tab.view); } catch { /* wasn't attached */ }
+    wc.close();
+    Object.assign(tab, { view: null, asleep: true, loading: false, readerable: false, audible: false, playing: false });
+    return true;
+  }
+
+  // Bring the page back, exactly where it was (history included).
+  wake(tab) {
+    if (!tab.asleep) return;
+    this.attach(tab);
+    tab.asleep = false;
+    tab.loading = true;
+    const wc = tab.view.webContents;
+    const h = tab.history;
+    tab.history = null;
+    const load = () => wc.loadURL(tab.url).catch(() => {});
+    if (h?.entries?.length) {
+      Promise.resolve()
+        .then(() => wc.navigationHistory.restore({ entries: h.entries, index: Math.max(0, h.index) }))
+        .catch(load);
+    } else load();
+  }
+
+  // Put tabs to sleep that have been out of sight for longer than `idleMs` (all of them if 0).
+  sleepIdle(idleMs = 0) {
+    const now = Date.now();
+    const slept = this.tabs.filter((t) => now - (t.lastActive || 0) >= idleMs && this.sleep(t));
+    if (slept.length) this.emit();
+    return slept;
+  }
+
+  keepAwake(id, on) {
+    const t = this.get(id);
+    if (!t) return;
+    t.keepAwake = on === undefined ? !t.keepAwake : !!on;
+    this.emit();
   }
 
   activate(id) {
@@ -101,7 +177,7 @@ class Tabs {
     if (!next) return;
     if (next.ws !== this.currentWs) return this.switchWorkspace(next.ws, id);
     const prev = this.active;
-    if (prev && prev !== next) prev.view.webContents.stopFindInPage('clearSelection');
+    if (prev && prev !== next) prev.view?.webContents.stopFindInPage('clearSelection');
     this.activeId = id;
     this.ws(this.currentWs).activeId = id;
     // A tab from the split pair brings its partner along; any other tab shows on its own.
@@ -114,10 +190,17 @@ class Tabs {
 
   // Attach exactly these pages to the window (and detach any others).
   show(list) {
+    const now = Date.now();
     for (const t of this.shownTabs) {
-      if (!list.includes(t)) { try { this.win.contentView.removeChildView(t.view); } catch { /* already gone */ } }
+      if (list.includes(t)) continue;
+      t.lastActive = now; // the sleep timer starts when a tab goes out of sight
+      if (t.view) { try { this.win.contentView.removeChildView(t.view); } catch { /* already gone */ } }
     }
-    for (const t of list) this.win.contentView.addChildView(t.view);
+    for (const t of list) {
+      if (t.asleep) this.wake(t);
+      t.lastActive = now;
+      this.win.contentView.addChildView(t.view);
+    }
     this.shownTabs = list;
     this.layoutViews();
   }
@@ -144,7 +227,7 @@ class Tabs {
   }
   // Open the active tab in reader view, or go back to the original page.
   async toggleReader(tab = this.active) {
-    if (!tab) return false;
+    if (!tab?.view) return false;
     const wc = tab.view.webContents;
     const original = readerOriginal(tab.url);
     if (original) {
@@ -221,7 +304,7 @@ class Tabs {
       if (neighbour) this.activate(neighbour.id);
       else this.show([]);
     } else if (wasShown) this.activate(this.activeId); // its split partner stays, on its own
-    tab.view.webContents.close();
+    tab.view?.webContents.close();
     if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
   }
@@ -265,7 +348,7 @@ class Tabs {
       else this.show([]);
     } else if (wasShown) this.activate(this.activeId);
     if (this.shownTabs.includes(tab)) this.show(this.shownTabs.filter((t) => t !== tab));
-    tab.view.webContents.stopFindInPage('clearSelection');
+    tab.view?.webContents.stopFindInPage('clearSelection');
     if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
     return tab;
@@ -303,7 +386,7 @@ class Tabs {
 
   // Navigate the tab that owns a given page (used by the new-tab search box).
   navigateFrom(webContents, input) {
-    const tab = this.tabs.find((t) => t.view.webContents === webContents);
+    const tab = this.tabs.find((t) => t.view?.webContents === webContents);
     if (tab) tab.view.webContents.loadURL(toUrl(input, this.store.get('searchEngine'))).catch(() => {});
   }
 
@@ -326,14 +409,14 @@ class Tabs {
   setZoom(tab, factor) {
     const host = this.hostOf(tab.url);
     // Same-site tabs follow along, like Chrome.
-    for (const t of this.tabs) if (t === tab || (host && this.hostOf(t.url) === host)) t.view.webContents.setZoomFactor(factor);
+    for (const t of this.tabs) if (t.view && (t === tab || (host && this.hostOf(t.url) === host))) t.view.webContents.setZoomFactor(factor);
     if (host) this.zoom.set(host, factor);
     this.emit();
   }
 
   toggleMute(id) {
     const t = this.get(id);
-    if (!t) return;
+    if (!t?.view) return;
     t.view.webContents.setAudioMuted(!t.view.webContents.isAudioMuted());
     this.emit();
   }
@@ -353,13 +436,13 @@ class Tabs {
 
   // Which workspace a page belongs to (so the new tab can show that workspace's links).
   workspaceOf(webContents) {
-    const tab = this.tabs.find((t) => t.view.webContents === webContents);
+    const tab = this.tabs.find((t) => t.view?.webContents === webContents);
     const w = tab && this.ws(tab.ws);
     return w ? { id: w.id, name: w.name } : null;
   }
 
   burrowPages() {
-    return this.tabs.map((t) => t.view.webContents).filter((wc) => !wc.isDestroyed() && wc.getURL().startsWith('burrow://'));
+    return this.tabs.filter((t) => t.view).map((t) => t.view.webContents).filter((wc) => !wc.isDestroyed() && wc.getURL().startsWith('burrow://'));
   }
 
   // ---------------- Workspaces ----------------
@@ -382,7 +465,7 @@ class Tabs {
       const other = this.workspaces.find((w) => w.id !== id);
       this.switchWorkspace(other.id);
     }
-    for (const t of this.tabs.filter((x) => x.ws === id)) { this.dropFromSplit(t.id); t.view.webContents.close(); }
+    for (const t of this.tabs.filter((x) => x.ws === id)) { this.dropFromSplit(t.id); t.view?.webContents.close(); }
     this.tabs = this.tabs.filter((t) => t.ws !== id);
     this.closed = this.closed.filter((c) => c.ws !== id);
     this.workspaces = this.workspaces.filter((w) => w.id !== id);
@@ -412,7 +495,8 @@ class Tabs {
       currentWs: this.currentWs,
       workspaces: this.workspaces.map((w) => ({ id: w.id, name: w.name, count: this.tabs.filter((t) => t.ws === w.id).length })),
       tabs: this.visible.map((t) => {
-        const nav = t.view.webContents.navigationHistory;
+        const wc = t.view?.webContents;
+        const nav = wc?.navigationHistory;
         return {
           id: t.id,
           // Pages without a title show their address instead of "New tab".
@@ -424,11 +508,13 @@ class Tabs {
           favicon: t.favicon,
           loading: t.loading,
           audible: t.audible,
-          muted: t.view.webContents.isAudioMuted(),
+          muted: wc ? wc.isAudioMuted() : false,
           media: t.media,
-          zoom: Math.round(t.view.webContents.getZoomFactor() * 100),
-          canBack: nav.canGoBack(),
-          canForward: nav.canGoForward(),
+          zoom: wc ? Math.round(wc.getZoomFactor() * 100) : 100,
+          canBack: nav ? nav.canGoBack() : false,
+          canForward: nav ? nav.canGoForward() : false,
+          asleep: !!t.asleep,
+          keepAwake: !!t.keepAwake,
         };
       }),
       canReopen: this.closed.length > 0,
@@ -445,7 +531,7 @@ class Tabs {
       current: this.currentWs,
       workspaces: this.workspaces.map((w) => {
         const tabs = this.tabs.filter((t) => t.ws === w.id);
-        return { id: w.id, name: w.name, tabs: tabs.map((t) => t.url), active: Math.max(0, tabs.findIndex((t) => t.id === w.activeId)) };
+        return { id: w.id, name: w.name, tabs: tabs.map((t) => ({ url: t.url, title: t.title, favicon: t.favicon })), active: Math.max(0, tabs.findIndex((t) => t.id === w.activeId)) };
       }),
     };
   }
@@ -484,8 +570,14 @@ class Tabs {
     // Create every workspace's tabs without showing them, then switch to the saved one.
     saved.forEach((w, i) => {
       const ws = this.workspaces[i];
-      const urls = (w.tabs || []).filter((u) => typeof u === 'string' && /^(https?|burrow):/i.test(u));
-      const made = urls.map((u) => this.create(u, { activate: false, ws: ws.id }));
+      // Saved tabs are { url, title, favicon } (older versions saved just the address).
+      const items = (w.tabs || []).map((t) => (typeof t === 'string' ? { url: t } : t))
+        .filter((t) => t && typeof t.url === 'string' && /^(https?|burrow):/i.test(t.url));
+      const made = items.map((t) => this.create(t.url, {
+        activate: false, ws: ws.id, asleep: true,
+        title: typeof t.title === 'string' ? t.title.slice(0, 300) : undefined,
+        favicon: /^https?:/i.test(t.favicon || '') ? t.favicon : null,
+      }));
       const pick = made[Math.min(Number(w.active) || 0, made.length - 1)];
       if (pick) ws.activeId = pick.id;
     });

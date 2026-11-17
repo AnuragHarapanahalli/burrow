@@ -167,7 +167,7 @@ B.downloads.onDone((d) => {
   renderDlBadge();
   bump($('dlBtn'), 'pop');
   UI.stripClickOpens = 'downloads';
-  stripMochi(`Saved ${d.filename}`);
+  stripMochi(`Saved ${d.filename}`, 5000, 'celebrate');
 });
 
 // ---------- Settings ----------
@@ -206,7 +206,24 @@ function renderSettingsPane() {
   $('sumAI').textContent = `${aiName} \u00b7 ${{ smart: 'Smart', search: 'Search first', ai: 'AI first' }[prefs.askMode]}`;
   $('sumTheme').textContent = cap(settings.mode);
   $('sumColour').innerHTML = `<span class="chip-s" style="background:${tokens.accent}"></span>${settings.useWindowsAccent ? 'Windows accent' : esc(preset ? preset.name : 'Custom')}`;
-  $('sumTabs').textContent = cap(prefs.tabsMode);
+  const sl = prefs.sleep || { on: true, minutes: 30, never: [] };
+  const sleepVal = sl.on ? String(sl.minutes) : 'off';
+  document.querySelectorAll('#sleepSeg [data-sleep]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.sleep === sleepVal)));
+  $('neverList').innerHTML = (sl.never || []).length
+    ? `<div class="pixel sect-sub">NEVER SLEEP</div>` + sl.never.map((h) => `<span class="never-chip">${esc(h)}<button data-allow="${esc(h)}" aria-label="Let ${esc(h)} sleep">&times;</button></span>`).join('')
+    : '';
+  const sleepLabel = sl.on ? ({ 15: '15m', 30: '30m', 60: '1h', 120: '2h' }[sl.minutes] || sl.minutes + 'm') : 'off';
+  const mm = prefs.mochiMode || 'lively';
+  document.querySelectorAll('#mochiSeg [data-mochi]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mochi === mm)));
+  $('sumMochi').textContent = cap(mm);
+  $('mochiNote').textContent = {
+    lively: 'Mochi reacts to bookmarks, new workspaces, split view and more, at most every 25 seconds.',
+    quiet: 'Mochi only speaks up for important things: finished downloads, tabs put to sleep, and problems.',
+    off: "Mochi stays out of sight. (Still shows up in the welcome tour.)",
+  }[mm];
+  $('mochiGallery').innerHTML = ['idle', 'wave', 'happy', 'celebrate', 'sleepy', 'press', 'oops'].map((p) =>
+    `<figure title="${p}">${window.Mochi.svg(tokens, p, 40)}<figcaption class="pixel">${p.toUpperCase()}</figcaption></figure>`).join('');
+  $('sumTabs').textContent = `${cap(prefs.tabsMode)} \u00b7 sleep ${sleepLabel}`;
   $('sumLayout').textContent = [prefs.bookmarksBar ? 'Bookmarks bar' : '', settings.grid ? 'Grid' : ''].filter(Boolean).join(', ') || 'Minimal';
 }
 window.renderSettingsPane = renderSettingsPane;
@@ -216,6 +233,21 @@ $('engines').addEventListener('click', (e) => {
   if (b) { B.setPrefs({ searchEngine: b.dataset.engine }); bump(b, 'pop'); }
 });
 $('bmbarToggle').addEventListener('change', (e) => B.setPrefs({ bookmarksBar: e.target.checked }));
+$('mochiSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mochi]');
+  if (!b) return;
+  B.setPrefs({ mochiMode: b.dataset.mochi });
+  if (b.dataset.mochi !== 'off') setTimeout(() => window.mochiSay?.(b.dataset.mochi === 'quiet' ? "I'll keep it short" : 'Yay, chatty me!', { pose: 'wave', essential: true, ms: 2500 }), 150);
+});
+$('sleepSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sleep]');
+  if (!b) return;
+  B.setPrefs({ sleep: b.dataset.sleep === 'off' ? { on: false } : { on: true, minutes: Number(b.dataset.sleep) } });
+});
+$('neverList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-allow]');
+  if (b) B.setPrefs({ sleep: { allow: b.dataset.allow } });
+});
 $('aiList').addEventListener('click', (e) => {
   const b = e.target.closest('[data-ai]');
   if (b) { B.setPrefs({ aiProvider: b.dataset.ai }); bump(b, 'pop'); }

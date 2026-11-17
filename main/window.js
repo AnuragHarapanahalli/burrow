@@ -150,7 +150,7 @@ class BurrowWindow {
     };
   }
 
-  ownsPage(wc) { return this.tabs.tabs.some((t) => t.view.webContents === wc); }
+  ownsPage(wc) { return this.tabs.tabs.some((t) => t.view?.webContents === wc); }
 
   relayout() {
     if (this.win.isDestroyed()) return;

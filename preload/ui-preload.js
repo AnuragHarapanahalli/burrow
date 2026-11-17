@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('burrow', {
     navigate: send('tab:navigate'),
     reopen: send('tab:reopen'),
     mute: send('tab:mute'),
+    keepAwake: send('tab:keepawake'),
+    sleepNow: send('tabs:sleep-now'),
     move: send('tab:move'),
     detach: send('tab:detach'),
     pip: () => ipcRenderer.invoke('tab:pip'),

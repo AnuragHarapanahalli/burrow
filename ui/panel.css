@@ -301,3 +301,24 @@ body.split-resizing .split-bar { transition: none; }
 .sp-row.sel { background: var(--fg); color: var(--bg); }
 .sp-row.sel .sp-n, .sp-row.sel .sp-h, .sp-row.sel .sp-plus { color: var(--accent); }
 .sp-i { width: 16px; height: 16px; display: grid; place-items: center; }
+
+/* ---------- Sleeping tabs ---------- */
+.tab.asleep .title, .side-tab.asleep .title { opacity: .55; }
+.tab.asleep .fav img, .side-tab.asleep .fav img { filter: grayscale(1); opacity: .6; }
+.tab.asleep .num::after, .side-tab.asleep .num::after {
+  content: 'zz'; margin-left: 4px; font-size: 9px; color: var(--accent-ink); vertical-align: 3px;
+}
+.tab.active.asleep .num::after { color: var(--accent); }
+.tab.kept-awake .num::after, .side-tab.kept-awake .num::after { content: '\25CF'; margin-left: 4px; font-size: 8px; color: var(--accent-ink); vertical-align: 2px; }
+.seg-5 { grid-template-columns: repeat(5, 1fr); }
+.never-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.never-list .sect-sub { flex-basis: 100%; margin: 0; }
+.never-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); padding: 2px 2px 2px 8px; font-size: 12.5px; }
+.never-chip button { width: 20px; height: 20px; font-size: 14px; }
+.never-chip button:hover { background: var(--accent); color: var(--on-accent); }
+
+/* Settings → Mochi pose gallery */
+.mochi-gallery { display: flex; flex-wrap: wrap; gap: 10px 14px; padding-top: 4px; }
+.mochi-gallery figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mochi-gallery figcaption { color: var(--muted); font-size: 11px; }
+.mochi-gallery figure:hover .mochi-svg { animation: bob .5s steps(2) infinite; }

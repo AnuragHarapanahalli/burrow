@@ -41,7 +41,7 @@ $('bugForm').addEventListener('submit', (e) => {
   $('bugForm').reset();
   closeBugForm();
   pose = 'happy'; drawMochi();
-  say('Thanks for helping squash bugs!', 3500);
+  say('Thanks for helping squash bugs!', 3500, true);
   setTimeout(() => { pose = 'idle'; drawMochi(); }, 1500);
 });
 

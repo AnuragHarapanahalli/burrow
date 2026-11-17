@@ -136,7 +136,7 @@ function renderReaderBtn() {
 }
 async function svToggleReader() {
   const ok = await B.reader();
-  if (!ok) { UI.stripClickOpens = null; stripMochi("Couldn't find an article on this page", 3500); }
+  if (!ok) { UI.stripClickOpens = null; stripMochi("Couldn't find an article on this page", 3500, 'oops'); }
 }
 window.toggleReader = svToggleReader;
 $('readerBtn').onclick = svToggleReader;
@@ -256,7 +256,7 @@ $('noteExport').onclick = async () => {
   ntSaveNow();
   const r = await B.notes.exportAll();
   UI.stripClickOpens = null;
-  if (r?.ok) stripMochi('Notes exported', 3500);
+  if (r?.ok) stripMochi('Notes exported', 3500, 'celebrate');
 };
 B.notes.onChange(() => { if (!panel.hidden && section === 'notes') ntRenderList(); });
 
@@ -290,6 +290,19 @@ palActions = function () {
   }
   const t = activeTab();
   if (t?.readerable || t?.inReader) list.push(A(t.inReader ? 'Leave reader view' : 'Reader view', svToggleReader, 'F9', 'article read clean'));
+  // Tab sleeping
+  list.push(A('Put other tabs to sleep now', () => B.tabs.sleepNow(), '', 'sleep memory free ram slow zz'));
+  if (t) {
+    list.push(A(t.keepAwake ? 'Let this tab sleep normally' : 'Keep this tab awake', () => B.tabs.keepAwake(t.id), '', 'sleep zz'));
+    let site = '';
+    try { site = /^https?:/.test(t.rawUrl || '') ? new URL(t.rawUrl).host : ''; } catch { site = ''; }
+    const never = UI.theme?.prefs.sleep?.never || [];
+    if (site) {
+      list.push(never.includes(site)
+        ? A(`Let ${site} sleep`, () => B.setPrefs({ sleep: { allow: site } }), '', 'sleep zz')
+        : A(`Never sleep ${site}`, () => B.setPrefs({ sleep: { never: site } }), '', 'sleep zz keep awake'));
+    }
+  }
   if (!UI.state.isPrivate) {
     list.push(A(aiState.open ? 'Close AI panel' : 'Open AI panel', () => B.ai.panel(), 'CTRL SHIFT A', 'claude chatgpt gemini assistant chat side'));
     list.push(A('Notes for this site', () => openPanel('notes'), 'CTRL SHIFT E', 'note write jot'));

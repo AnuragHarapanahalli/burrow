@@ -191,3 +191,5 @@ h1 { margin: 0 0 22px; font-size: clamp(34px, 5.4vw, 64px); font-weight: 800; le
 body.ask-mode .mode-seg [data-mode="ask"] { background: var(--accent); color: var(--on-accent); }
 body.ask-mode .search:focus-within { box-shadow: 4px 4px 0 var(--fg); }
 body.ask-mode #qHint { color: var(--accent-ink); border-color: var(--accent-ink); }
+
+body.mochi-off .mochi-spot { display: none; }

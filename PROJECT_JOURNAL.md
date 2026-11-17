@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | 5b ("Ask AI about this page") **postponed**; phases 6 and 7 done first | Keep the original order | Your call: sleeping tabs help every day |
+| 2026-11-17 | **Tab sleeping**: tabs out of sight for 30 min (Settings: off / 15m / 30m / 1h / 2h) are unloaded but stay in the strip with a "zz"; clicking wakes them on the same page **with Back/Forward history**. Never sleeps: the tab(s) you see, tabs playing sound/video, "Keep this tab awake", or "never sleep" sites. Ctrl+K → "Put other tabs to sleep now" | Discard tabs with no history; only a manual button | Frees memory without losing your place |
+| 2026-11-17 | **Restored tabs start asleep** and load only when you open them | Load every saved tab at startup | Much faster startup with many tabs (what Chrome/Edge do) |
+| 2026-11-17 | "Memory freed" is an honest estimate: memory of the page processes that actually went away, measured just before | A made-up number | Processes can be shared between pages, so only freed ones count |
+| 2026-11-17 | **Mochi**: new poses (sleepy, walking, press, celebrate, oops); walks into the tab strip before speaking; reactions to bookmarks, new workspaces, many tabs, split/reader first use, late nights. **Lively / Quiet / Off** in Settings → Mochi. Chatty reactions at most every 25 s and never over an important message | Mochi always on; reactions to everything | Personality without nagging; you decide how much |
 | 2026-11-17 | **Split view asks which tab** goes on the right: a small picker under the ◫ button (also Ctrl+\\, ☰, Ctrl+K) lists this workspace's tabs plus "New tab"; arrows/Enter or 1–9 to pick | Always use the next tab | You asked to choose; the next tab was often the wrong one |
 | 2026-11-17 | **Welcome tour** (first launch, replay from ☰ → Welcome tour or Ctrl+K): Mochi walks through 6 steps — Hello, Look (theme + colour, live), Search engine, AI (default + **Sign in** buttons), Keys (10 shortcuts), Go (summary). Skip any time | A static help page; no tour | First impressions matter; setting the essentials up front avoids surprises later |
 | 2026-11-17 | AI **Sign in** opens the service's *own* sign-in page in a normal tab (claude.ai/login, chatgpt.com/auth/login, gemini.google.com). Burrow never handles passwords and doesn't try to detect whether you signed in | Burrow-made login forms; reading login cookies to show "signed in" | Typing passwords into a browser's own form for another site would be a phishing pattern; peeking at cookies isn't Burrow's business |
@@ -180,6 +185,8 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Reader mode | ✅ done (tested with a local article containing hidden script tricks) |
 | Split view tab picker | ✅ done (tested) |
 | Welcome tour (first run + replay) | ✅ done (tested every step) |
+| Tab sleeping (timer, keep awake, never-sleep sites, sleep now, lazy restore) | ✅ done (tested) |
+| Mochi poses, walk-in, reactions, Lively/Quiet/Off | ✅ done (tested) |
 | Ctrl+K command palette | planned |
 | Split view, notes (+ .md export), reader mode | planned |
 | Tab sleeping | planned |
@@ -225,6 +232,7 @@ WOAHDAMN/
    ├─ drag.js             dragging tabs: reorder, pull out into a new window
    ├─ palette.js          the Ctrl+K command palette
    ├─ panes.js            split-view divider, reader button, AI panel, notes
+   ├─ mochi-react.js      Mochi's little reactions (bookmarks, workspaces, late nights…)
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
@@ -331,6 +339,11 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Note: your own Burrow will show the welcome tour once on its next launch (your profile hasn't seen it yet).
 - **Flaky checks fixed.** Two checks failed on busy runs ("typing a note saves it", "removing a link saves it") because they paused a fixed time before reading a saved value. The self-test now has an \`until()\` helper that keeps checking for up to 4 seconds; nine such checks use it. Burrow itself was fine.
 
+**2026-11-17 — Phases 6 + 7 done (150/150 self-test checks pass)**
+- Tab sleeping (with history kept) and lazy restore; Mochi's new poses, walk-in, reactions and Lively/Quiet/Off.
+- How sleeping works: the tab's page is closed, but Burrow keeps its address, title, icon and its whole Back/Forward list; waking rebuilds the page and restores that list.
+- Known limit: a page that held unsaved typing (a half-written message on some sites) loses it when it sleeps — those sites belong in "never sleep".
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
@@ -349,10 +362,10 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 1–3 | Tabs, workspaces, library, theming, find, zoom, private & multiple windows, tab dragging, bug reports | ✅ done |
 | 4 | Ctrl+K command palette + Ask AI in search | ✅ done |
 | 5 | Split view + AI side panel, notes, reader mode | ✅ done |
-| 5b | Ask AI about this page / selected text | next |
-| 6 | Tab sleeping | planned |
-| 7 | Mochi animations + reactions | planned |
-| 8 | Focus tools (time limits — Mochi closes the tab, focus sessions) | planned |
+| 5b | Ask AI about this page / selected text | postponed |
+| 6 | Tab sleeping | ✅ done |
+| 7 | Mochi animations + reactions | ✅ done |
+| 8 | Focus tools (time limits — Mochi closes the tab, focus sessions) | next |
 | 9 | New-tab stat + weekly report | planned |
 | 10 | Polish, accessibility, Windows installer | planned |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
