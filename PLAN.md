@@ -47,16 +47,18 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
 ```
 
 ## Phases
-1. Journal + scaffold: window, custom title bar, single tab navigation, theme engine with the Customize panel.
-2. Numbered tabs + overflow sidebar, workspaces, omnibox, shortcuts, session restore.
-3. Bookmarks, history, downloads, find, zoom, private window, PiP.
-4. Ctrl+K command palette.
-5. Split view (draggable divider), notes panel + .md export, reader mode.
+1. ✅ Journal + scaffold: window, custom title bar, single tab navigation, theme engine with the Customize panel.
+2. ✅ Numbered tabs + overflow sidebar, workspaces, omnibox, shortcuts, session restore.
+3. ✅ Bookmarks, history, downloads, find, zoom, private window, PiP (+ multiple windows, tab dragging, bug reports).
+4. Ctrl+K command palette **+ AI layer 1 "Ask AI"**: address bar, new tab (Search | Ask toggle), Ctrl+K rows and Settings offer Claude / ChatGPT / Gemini; questions go to AI first ("smart" default), everything else to search; opens the AI site with the question filled in where supported.
+5. Split view (draggable divider) **+ AI layer 2 side panel** (your AI chat docked beside the page, signed in, stays open across tabs); notes panel + .md export; reader mode.
+5b. **AI layer 3 "Ask about this page"**: right-click selected text → Ask AI; ☰ → Summarize page. Sends page content only when you click; off in private windows; shows exactly what is sent.
 6. Tab sleeping (`webContents` discard after N idle minutes, ZZ badge).
 7. Mochi: sprite engine, poses (idle, wave, happy, sleepy, walk, press, celebrate), reaction events, quiet mode.
 8. Focus tools: per-site daily limits (active time only), Mochi walks to the tab's × and presses it (2 snoozes/day), time's-up gate, mindful pause, focus sessions + focus mode schedule.
 9. New-tab stat line + weekly Burrow report.
 10. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
+11. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 
 ## Verification
 - `npm install` and `npm start` after every phase, then check that phase's features by hand.

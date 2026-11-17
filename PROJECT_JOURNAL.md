@@ -39,6 +39,10 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **AI in Burrow, in layers.** (1) "Ask AI" next to search — address bar, new tab, Ctrl+K, Settings — phase 4. (2) AI side panel docked beside the page — with split view, phase 5. (3) "Ask about this page / selected text" — after phase 5. (Later) Mochi answers with your own API key | AI built into Burrow from day one with an API key; a single "AI button" only | Many people now ask an AI instead of searching. Opening the AI sites you're already signed in to costs nothing, needs no keys, and works today; deeper features come step by step |
+| 2026-11-17 | AI services offered: **Claude, ChatGPT, Gemini** (you pick a default in Settings). Where a site supports it, your question is filled in for you; Gemini may just open the chat | Also Perplexity | Your choice |
+| 2026-11-17 | **Smart default:** text that looks like a question ("how…", "why…", ends in "?") offers Ask AI first; everything else offers search first. Both are always shown | Always search first; always AI first | Gets you to the right place in one keypress most of the time |
+| 2026-11-17 | Page content is only sent to an AI when **you click** (Ask about this / Summarize); never in private windows; you see what's sent | Automatic page summaries | Privacy: pages can contain personal information |
 | 2026-11-17 | **Git set up.** Repository on branch `main`, first commit `7ddfe98`. Commits use your GitHub "noreply" email, so your real email stays private. `.gitattributes` keeps one line-ending style | No version control | Every change can now be undone, compared, and backed up to GitHub |
 | 2026-11-17 | **GitHub repo: public** — github.com/AnuragHarapanahalli/burrow (you created it) | Private | Lets anyone report bugs, and keeps the free SignPath signing option open |
 | 2026-11-17 | **Report a bug**: a button beside the version opens a small form; submitting opens GitHub's *New issue* page already filled in (title, description, steps, "bug" label, Burrow version + system). The reporter presses Submit on GitHub | A relay server that files issues for them; a GitHub key inside the app | Free, nothing to run, and no secret key that someone could pull out of the app and misuse. Downside: reporters need a free GitHub account |
@@ -291,7 +295,21 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 4):** Ctrl+K command palette, then split view, notes and reader mode.
+- **Next (phase 4):** Ctrl+K command palette + "Ask AI" (Claude / ChatGPT / Gemini). Then phase 5: split view + AI side panel, notes, reader mode; then "Ask about this page".
+
+### Roadmap at a glance
+| Phase | What | Status |
+|---|---|---|
+| 1–3 | Tabs, workspaces, library, theming, find, zoom, private & multiple windows, tab dragging, bug reports | ✅ done |
+| 4 | Ctrl+K command palette + Ask AI in search | next |
+| 5 | Split view + AI side panel, notes, reader mode | planned |
+| 5b | Ask AI about this page / selected text | planned |
+| 6 | Tab sleeping | planned |
+| 7 | Mochi animations + reactions | planned |
+| 8 | Focus tools (time limits — Mochi closes the tab, focus sessions) | planned |
+| 9 | New-tab stat + weekly report | planned |
+| 10 | Polish, accessibility, Windows installer | planned |
+| later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 
 ---
 
