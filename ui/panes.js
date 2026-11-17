@@ -46,7 +46,61 @@ function renderSplit() {
   });
 }
 
-$('splitBtn').onclick = () => (UI.state.split ? B.split.off() : B.split.with());
+// Choosing what goes on the right: a small list of this workspace's tabs, plus "New tab".
+const svPick = $('splitPick');
+FLOATERS.splitPick = svPick;
+let svPickRows = [];
+let svPickSel = 0;
+function openSplitPicker() {
+  if (UI.state.split) { B.split.off(); return; }
+  svPickRows = [
+    ...UI.state.tabs.filter((t) => t.id !== UI.state.activeId).map((t) => ({ id: t.id, title: t.title, url: t.url, favicon: t.favicon })),
+    { id: 'new', title: 'New tab', url: '' },
+  ];
+  svPickSel = 0;
+  renderSplitPicker();
+  const r = $('splitBtn').getBoundingClientRect();
+  svPick.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+  svPick.style.top = (r.bottom + 4) + 'px';
+  showOverlay('splitPick');
+  $('splitBtn').setAttribute('aria-expanded', 'true');
+  svPick.focus();
+}
+window.openSplitPicker = openSplitPicker;
+function renderSplitPicker() {
+  const rows = svPickRows.map((t, i) => {
+    const icon = t.id === 'new' ? '<span class="sp-plus">+</span>'
+      : (/^(https?:|data:)/.test(t.favicon || '') ? `<img src="${esc(t.favicon)}" alt="">` : '<span class="sp-dot"></span>');
+    const host = (t.url || '').replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    return `<div class="sp-row${i === svPickSel ? ' sel' : ''}${t.id === 'new' ? ' sp-new' : ''}" role="option" aria-selected="${i === svPickSel}" data-i="${i}">
+      <span class="pixel sp-n">${t.id === 'new' ? '' : pad(i + 1)}</span><span class="sp-i">${icon}</span>
+      <span class="sp-t">${esc(t.title)}</span><span class="sp-h">${esc(host)}</span></div>`;
+  }).join('');
+  svPick.innerHTML = `<div class="menu-label pixel"><span>SPLIT VIEW WITH&hellip;</span><span>&crarr; PICK</span></div>${rows}`;
+}
+function pickSplit(i = svPickSel) {
+  const row = svPickRows[i];
+  hideOverlay();
+  if (row) B.split.with(row.id);
+}
+svPick.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    svPickSel = (svPickSel + (e.key === 'ArrowDown' ? 1 : -1) + svPickRows.length) % svPickRows.length;
+    renderSplitPicker();
+  } else if (e.key === 'Enter') { e.preventDefault(); pickSplit(); }
+  else if (/^[1-9]$/.test(e.key) && Number(e.key) <= svPickRows.length) pickSplit(Number(e.key) - 1);
+});
+svPick.addEventListener('mousemove', (e) => {
+  const row = e.target.closest('[data-i]');
+  if (row && Number(row.dataset.i) !== svPickSel) { svPickSel = Number(row.dataset.i); renderSplitPicker(); }
+});
+svPick.addEventListener('mousedown', (e) => {
+  const row = e.target.closest('[data-i]');
+  if (row) { e.preventDefault(); pickSplit(Number(row.dataset.i)); }
+});
+B.split.onPick(openSplitPicker);
+$('splitBtn').onclick = () => (svPick.hidden ? openSplitPicker() : hideOverlay());
 
 // Drag the divider to resize; double-click to swap sides.
 let svDrag = null;
@@ -229,7 +283,7 @@ palActions = function () {
     list.push(A('Close split view', () => B.split.off(), 'CTRL \\', 'unsplit side by side'));
     list.push(A('Swap split sides', () => B.split.swap(), '', 'side by side'));
   } else {
-    list.push(A('Split view', () => B.split.with(), 'CTRL \\', 'side by side two pages'));
+    list.push(A('Split view…', () => openSplitPicker(), 'CTRL \\', 'side by side two pages'));
     UI.state.tabs.forEach((t) => {
       if (t.id !== UI.state.activeId) list.push(A(`Split with ${t.title}`, () => B.split.with(t.id), '', 'side by side'));
     });

@@ -39,6 +39,9 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Split view asks which tab** goes on the right: a small picker under the ◫ button (also Ctrl+\\, ☰, Ctrl+K) lists this workspace's tabs plus "New tab"; arrows/Enter or 1–9 to pick | Always use the next tab | You asked to choose; the next tab was often the wrong one |
+| 2026-11-17 | **Welcome tour** (first launch, replay from ☰ → Welcome tour or Ctrl+K): Mochi walks through 6 steps — Hello, Look (theme + colour, live), Search engine, AI (default + **Sign in** buttons), Keys (10 shortcuts), Go (summary). Skip any time | A static help page; no tour | First impressions matter; setting the essentials up front avoids surprises later |
+| 2026-11-17 | AI **Sign in** opens the service's *own* sign-in page in a normal tab (claude.ai/login, chatgpt.com/auth/login, gemini.google.com). Burrow never handles passwords and doesn't try to detect whether you signed in | Burrow-made login forms; reading login cookies to show "signed in" | Typing passwords into a browser's own form for another site would be a phishing pattern; peeking at cookies isn't Burrow's business |
 | 2026-11-17 | **Split view** (Ctrl+\\, toolbar ◫, menu, palette "Split with …"): the current tab on the left, the next tab (or a new one) on the right. The pair stays together — click either tab to see both; any other tab shows alone. Drag the divider to resize, double-click to swap. Clicking into a side makes it the active tab (an accent bar marks it) | Split into a separate window; fixed 50/50 | Feels like one window with two pages; the pair remembers itself |
 | 2026-11-17 | **AI side panel** (Ctrl+Shift+A, toolbar ✦ AI): your chosen AI docked on the right, signed in with your normal session, stays open across tabs. Switch Claude/ChatGPT/Gemini in its header, drag its edge to resize, ↗ opens it in a tab. With the panel open, Ask AI goes to the panel. Off in private windows. Only one right-side panel at a time (AI or Bookmarks/History/…) | A panel per tab | Chat next to what you're reading, without losing it when you switch tabs |
 | 2026-11-17 | **Notes**, one per website (by host, e.g. moodle.college.edu), saved as you type; list of all notes; export everything as one Markdown file (you choose where). Off in private windows | Notes per page address; notes synced online | Per-site is what you usually want ("notes for this course site"); Markdown opens anywhere |
@@ -175,6 +178,8 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | AI side panel | ✅ done (tested; test never contacts AI sites) |
 | Notes per site + Markdown export | ✅ done (tested) |
 | Reader mode | ✅ done (tested with a local article containing hidden script tricks) |
+| Split view tab picker | ✅ done (tested) |
+| Welcome tour (first run + replay) | ✅ done (tested every step) |
 | Ctrl+K command palette | planned |
 | Split view, notes (+ .md export), reader mode | planned |
 | Tab sleeping | planned |
@@ -223,7 +228,8 @@ WOAHDAMN/
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
-   └─ pages/reader/       the reader view (reader.html / .css / .js, with its own sanitiser)
+   ├─ pages/reader/       the reader view (reader.html / .css / .js, with its own sanitiser)
+   └─ pages/welcome/      Mochi's welcome tour (welcome.html / .css / .js)
 ```
 
 **`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
@@ -317,6 +323,13 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Split view, AI side panel, notes with Markdown export, reader mode.
 - The self-test starts its own tiny web server with a fake article that hides a script, a booby-trapped image and a `javascript:` link — and checks none of it survives or runs in reader view.
 - Fixed while testing: the panel's section tabs wrapped onto two lines with five sections; a test helper threw away results of self-contained snippets.
+
+**2026-11-17 — Split picker + welcome tour (130/130 self-test checks pass)**
+- Split view lets you pick the tab; first launch shows Mochi's 6-step welcome tour (replayable).
+- The self-test walks through every tour step, and records the AI sign-in pages instead of really opening them.
+- Bug found from a screenshot: in the split picker a tab whose icon failed to load had its title squeezed to "E…" (the missing icon shifted the columns). Icons now sit in a fixed slot.
+- Note: your own Burrow will show the welcome tour once on its next launch (your profile hasn't seen it yet).
+- **Flaky checks fixed.** Two checks failed on busy runs ("typing a note saves it", "removing a link saves it") because they paused a fixed time before reading a saved value. The self-test now has an \`until()\` helper that keeps checking for up to 4 seconds; nine such checks use it. Burrow itself was fine.
 
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.

@@ -316,7 +316,7 @@ class BurrowWindow {
     else if (ctrl && input.shift && k === 'b') ctx.setPrefs({ bookmarksBar: !ctx.store.get('bookmarksBar') });
     else if (ctrl && !input.shift && k === 'f') { this.ui.webContents.focus(); this.send('find-open'); }
     else if (ctrl && !input.shift && k === 'k') { this.ui.webContents.focus(); this.send('palette-open'); }
-    else if (ctrl && !input.shift && (k === '\\' || input.code === 'Backslash')) (tabs.split ? tabs.unsplit() : tabs.splitWith());
+    else if (ctrl && !input.shift && (k === '\\' || input.code === 'Backslash')) (tabs.split ? tabs.unsplit() : (this.ui.webContents.focus(), this.send('split-pick')));
     else if (ctrl && input.shift && k === 'a') this.setAI();
     else if (ctrl && input.shift && k === 'e') this.openPanel('notes');
     else if (input.key === 'F9') tabs.toggleReader();

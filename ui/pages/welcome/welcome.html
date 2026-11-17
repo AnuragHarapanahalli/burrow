@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'; img-src 'self' burrow: data:">
+  <title>Welcome to Burrow</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <main class="wl">
+    <aside class="steps" aria-label="Setup steps">
+      <div class="brand">Burrow<span class="dot">.</span></div>
+      <ol id="stepList"></ol>
+      <button class="skip" id="skip">Skip tour</button>
+    </aside>
+
+    <section class="stage">
+      <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+
+      <div class="step" data-step="0" aria-labelledby="h0">
+        <p class="pixel kicker">01 &mdash; HELLO</p>
+        <h1 id="h0">Hi. I'm Mochi<span class="dot">.</span></h1>
+        <p class="lead">Welcome to Burrow &mdash; a calm, quick browser with a few tricks. Let's set it up together. It takes about a minute.</p>
+        <p class="hint pixel">PRESS ENTER OR &rarr; TO CONTINUE</p>
+      </div>
+
+      <div class="step" data-step="1" aria-labelledby="h1" hidden>
+        <p class="pixel kicker">02 &mdash; LOOK</p>
+        <h1 id="h1">Make it yours<span class="dot">.</span></h1>
+        <p class="lead">Pick light or dark, and a colour. Every other colour in Burrow is made from this one.</p>
+        <div class="seg" id="modeSeg" role="radiogroup" aria-label="Theme">
+          <button data-mode="light" role="radio">Light</button>
+          <button data-mode="dark" role="radio">Dark</button>
+          <button data-mode="system" role="radio">Follow Windows</button>
+        </div>
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="Colour"></div>
+      </div>
+
+      <div class="step" data-step="2" aria-labelledby="h2" hidden>
+        <p class="pixel kicker">03 &mdash; SEARCH</p>
+        <h1 id="h2">Where should searches go<span class="dot">?</span></h1>
+        <p class="lead">When you type something that isn't a question or an address, Burrow searches here.</p>
+        <div class="cards cards-3" id="engines" role="radiogroup" aria-label="Search engine"></div>
+      </div>
+
+      <div class="step" data-step="3" aria-labelledby="h3" hidden>
+        <p class="pixel kicker">04 &mdash; AI</p>
+        <h1 id="h3">Your AI, one keypress away<span class="dot">.</span></h1>
+        <p class="lead">Type a question anywhere and Burrow sends it to your AI &mdash; or keep it docked beside the page with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>A</kbd>. Sign in once and you stay signed in.</p>
+        <div class="cards ai-cards" id="ais"></div>
+        <p class="note">Sign in opens the service's own page in a tab. You sign in on their site &mdash; Burrow never sees your password.</p>
+      </div>
+
+      <div class="step" data-step="4" aria-labelledby="h4" hidden>
+        <p class="pixel kicker">05 &mdash; KEYS</p>
+        <h1 id="h4">Shortcuts worth knowing<span class="dot">.</span></h1>
+        <div class="keys" id="keys"></div>
+      </div>
+
+      <div class="step" data-step="5" aria-labelledby="h5" hidden>
+        <p class="pixel kicker">06 &mdash; GO</p>
+        <h1 id="h5">You're all set<span class="dot">.</span></h1>
+        <dl class="summary" id="summary"></dl>
+        <button class="go" id="go">Start browsing &rarr;</button>
+        <p class="note">Replay this any time from &#9776; &rarr; Welcome tour, or <kbd>Ctrl</kbd> <kbd>K</kbd> &rarr; "welcome".</p>
+      </div>
+
+      <footer class="nav">
+        <button class="back" id="back">&larr; Back</button>
+        <span class="pixel count" id="count">01 / 06</span>
+        <button class="next" id="next">Next &rarr;</button>
+      </footer>
+    </section>
+
+    <div class="mochi-spot">
+      <div class="bubble" id="bubble"></div>
+      <div id="mochi"></div>
+    </div>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/shared/mochi.js"></script>
+  <script src="welcome.js"></script>
+</body>
+</html>

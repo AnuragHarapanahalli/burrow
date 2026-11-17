@@ -60,7 +60,7 @@ function servePath(url) {
   const u = new URL(url);
   const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
   let base, file;
-  if (u.host === 'newtab' || u.host === 'reader') {
+  if (['newtab', 'reader', 'welcome'].includes(u.host)) {
     base = path.join(ROOT, 'ui', 'pages', u.host);
     file = path.join(base, rel || `${u.host}.html`);
   } else if (u.host === 'app') {
@@ -243,7 +243,7 @@ function registerIpc() {
   on('zoom:step', (w, dir) => w.tabs.stepZoom(Math.sign(Number(dir) || 0)));
   on('find:query', (w, q) => w.find(q));
   // Split view
-  on('split:with', (w, id) => w.tabs.splitWith(Number(id) || undefined));
+  on('split:with', (w, id) => w.tabs.splitWith(id === 'new' ? 'new' : (Number(id) || undefined)));
   on('split:off', (w) => w.tabs.unsplit());
   on('split:swap', (w) => w.tabs.swapSplit());
   on('split:ratio', (w, r) => w.tabs.setSplitRatio(r));
@@ -343,6 +343,23 @@ function registerIpc() {
     if (!e.sender.getURL().startsWith('burrow://reader') || !winOfPage(e.sender)) return null;
     return Reader.get(key);
   });
+  // The welcome tour (burrow://welcome only) can set up the basics and open AI sign-in pages.
+  ipcMain.on('page:welcome', (e, action, value) => {
+    const w = e.sender.getURL().startsWith('burrow://welcome') && winOfPage(e.sender);
+    if (!w) return;
+    if (action === 'mode') setTheme({ mode: String(value) });
+    else if (action === 'seed') setTheme({ seed: String(value), useWindowsAccent: false });
+    else if (action === 'search') setPrefs({ searchEngine: String(value) });
+    else if (action === 'ai') setPrefs({ aiProvider: String(value) });
+    else if (action === 'signin') {
+      // Opens the AI's own sign-in page in a normal tab — you sign in on their site; Burrow never sees it.
+      const p = AI.PROVIDERS[String(value)];
+      if (p?.login) w.tabs.create(p.login);
+    } else if (action === 'done') {
+      store.set('onboarded', true);
+      w.tabs.navigateFrom(e.sender, NEWTAB);
+    }
+  });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);
     if (w) w.tabs.navigateFrom(e.sender, String(text || ''));
@@ -387,6 +404,8 @@ app.whenReady().then(() => {
   Tabs.reserveWsIds(saved.flatMap((w) => w.workspaces.map((ws) => ws.id)));
   if (saved.length) saved.forEach((snapshot) => openWindow({ snapshot }));
   else openWindow();
+  // First time: Mochi's welcome tour (the self-test opens it itself).
+  if (!store.get('onboarded') && !SELFTEST) mainWin.tabs.create('burrow://welcome/');
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,

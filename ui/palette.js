@@ -51,6 +51,7 @@ function palActions() {
     A('Switch to light theme', () => B.theme.set({ mode: 'light' }), '', 'mode'),
     A('Switch to dark theme', () => B.theme.set({ mode: 'dark' }), '', 'mode night'),
     A('Follow system theme', () => B.theme.set({ mode: 'system' }), '', 'mode auto'),
+    A('Welcome tour', () => B.tabs.navigate('burrow://welcome/'), '', 'help shortcuts keys tutorial guide onboarding'),
     A('Report a bug', () => B.tabs.navigate('burrow://newtab/#report-bug'), '', 'issue problem feedback'),
   ];
   if (t) {

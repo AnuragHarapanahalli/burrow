@@ -10,6 +10,8 @@ if (location.protocol === 'burrow:') {
     setSearchEngine: (id) => ipcRenderer.send('page:search-engine', String(id || '')),
     ask: (text) => ipcRenderer.send('page:ask', String(text || '')),
     readerArticle: (key) => ipcRenderer.invoke('page:reader', String(key || '')),
+    // Welcome tour only (the main process ignores these from any other page).
+    welcome: (action, value) => ipcRenderer.send('page:welcome', String(action || ''), String(value || '')),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),
     reportBug: (report) => ipcRenderer.send('page:report-bug', {
       title: String(report?.title || ''), what: String(report?.what || ''),

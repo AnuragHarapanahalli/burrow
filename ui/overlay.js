@@ -96,6 +96,7 @@ const MENU = [
   { cmd: 'bmbar', label: 'Show bookmarks bar', key: 'CTRL SHIFT B', check: () => !!UI.theme?.prefs.bookmarksBar },
   null,
   { cmd: 'settings', label: 'Settings', key: 'THEME, SEARCH' },
+  { cmd: 'welcome', label: 'Welcome tour' },
   { cmd: 'bug', label: 'Report a bug' },
 ];
 const zoomRow = () => `<div class="mm-zoom" role="group" aria-label="Zoom">
@@ -131,9 +132,10 @@ mainMenu.addEventListener('click', (e) => {
   else if (cmd === 'private') B.openPrivate();
   else if (cmd === 'window') B.openWindow();
   else if (cmd === 'bug') B.tabs.navigate('burrow://newtab/#report-bug');
+  else if (cmd === 'welcome') B.tabs.navigate('burrow://welcome/');
   else if (cmd === 'find') window.openFind();
   else if (cmd === 'pip') window.popOut();
-  else if (cmd === 'split') (UI.state.split ? B.split.off() : B.split.with());
+  else if (cmd === 'split') window.openSplitPicker();
   else if (cmd === 'reader') window.toggleReader();
   else if (cmd === 'ai') B.ai.panel();
   else if (cmd === 'reopen') B.tabs.reopen();

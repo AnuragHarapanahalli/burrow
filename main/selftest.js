@@ -5,6 +5,12 @@ const fs = require('fs');
 const path = require('path');
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// Keep checking for up to `ms` instead of guessing one fixed pause — saves happen in the
+// background and can take longer when the computer is busy.
+async function until(fn, ms = 4000) {
+  for (let t = 0; t < ms; t += 100) { if (await fn()) return true; await wait(100); }
+  return !!(await fn());
+}
 
 async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes }) {
   fs.mkdirSync(dir, { recursive: true });
@@ -49,7 +55,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await shot('00-chooser', true);
     await pjs("document.querySelector('[data-engine=duckduckgo]').click()");
     await wait(700);
-    check(store.get('searchEngine') === 'duckduckgo' && store.get('searchChosen'), 'picking an engine saves it');
+    check(await until(async () => store.get('searchEngine') === 'duckduckgo' && store.get('searchChosen')), 'picking an engine saves it');
     check(await pjs("document.getElementById('q').placeholder").then((p) => p.includes('DuckDuckGo')), 'search box names the chosen engine');
     check(!(await js("document.getElementById('dlBtn').hidden")) === false, 'downloads button hidden until you download something');
 
@@ -91,30 +97,26 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(200);
     check(await pjs("document.querySelectorAll('#links .ql').length") === 4, 'Edit shows editable links');
     await pjs("document.querySelector('[data-edit=\"0\"]').click(); document.getElementById('lfName').value='Gmail'; document.getElementById('lfUrl').value='mail.google.com'; document.getElementById('linkForm').requestSubmit()");
-    await wait(400);
-    check(store.get('quickLinks')[0].name === 'Gmail', 'renaming a link saves it');
+    check(await until(() => store.get('quickLinks')[0].name === 'Gmail'), 'renaming a link saves it');
     await pjs("document.querySelector('[data-add]').click(); document.getElementById('lfName').value=''; document.getElementById('lfUrl').value='not a url'; document.getElementById('linkForm').requestSubmit()");
     await wait(200);
     check((await pjs("document.getElementById('lfError').textContent")).length > 0, 'a bad address shows an error');
     await pjs("document.getElementById('lfName').value='Moodle'; document.getElementById('lfUrl').value='moodle.org'; document.getElementById('linkForm').requestSubmit()");
-    await wait(400);
-    check(store.get('quickLinks').length === 5 && store.get('quickLinks')[4].url === 'https://moodle.org/', 'adding a link saves it');
+    check(await until(() => store.get('quickLinks').length === 5 && store.get('quickLinks')[4].url === 'https://moodle.org/'), 'adding a link saves it');
     await shot('00b-links-edit', true);
     await pjs("document.querySelector('[data-rm=\"1\"]').click()");
-    await wait(600);
-    check(store.get('quickLinks').length === 4 && !store.get('quickLinks').some((l) => l.name === 'Drive'), 'removing a link saves it');
+    check(await until(() => store.get('quickLinks').length === 4 && !store.get('quickLinks').some((l) => l.name === 'Drive')), 'removing a link saves it');
     await pjs("window.burrowPage.setQuickLinks([{ name: 'evil', url: 'javascript:alert(1)' }, { name: 'ok', url: 'https://ok.example/' }])");
-    await wait(400);
-    check(store.get('quickLinks').length === 1 && store.get('quickLinks')[0].name === 'ok', 'non-web links (javascript:) are refused');
+    check(await until(() => store.get('quickLinks').length === 1 && store.get('quickLinks')[0].name === 'ok'), 'non-web links (javascript:) are refused');
     await pjs("document.getElementById('linksEdit').click()");
 
     // --- Browsing + history + bookmarks ---
     tabs.navigate('example.com');
     await wait(4000);
-    check(library.searchHistory('example').length > 0, 'visit is recorded in history');
+    check(await until(async () => library.searchHistory('example').length > 0), 'visit is recorded in history');
     await js("document.getElementById('star').click()");
     await wait(500);
-    check(library.isBookmarked('https://example.com/'), 'star button bookmarks the page');
+    check(await until(async () => library.isBookmarked('https://example.com/')), 'star button bookmarks the page');
     check(await js("document.getElementById('star').getAttribute('aria-pressed')") === 'true', 'star shows as filled');
 
     // --- Address suggestions ---
@@ -372,7 +374,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await shot('12-palette');
     await paletteKey('Enter');
     await wait(400);
-    check(store.get('theme').mode === 'dark' && await js("document.getElementById('palette').hidden"), 'Enter runs the action and closes the palette');
+    check(await until(async () => store.get('theme').mode === 'dark' && await js("document.getElementById('palette').hidden")), 'Enter runs the action and closes the palette');
     setTheme({ mode: 'light' });
     mainWin.send('palette-open');
     await wait(500);
@@ -432,7 +434,14 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(!tabs.split && tabs.shownTabs.length === 1 && tabs.shownTabs[0].view.getBounds().width === tabs.bounds.width, 'closing split view shows one full-width page');
     ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: '\\', modifiers: ['control'] });
     await wait(500);
-    check(!!tabs.split, 'Ctrl+\\ turns split view on');
+    const pickRows = await js("document.querySelectorAll('#splitPick .sp-row').length");
+    check(await js("!document.getElementById('splitPick').hidden") && pickRows === tabs.visible.length, `Ctrl+\\ opens a picker of tabs to split with (${pickRows} choices)`);
+    await shot('13b-split-picker');
+    const wantId = await js("(() => { const r = document.querySelectorAll('#splitPick .sp-row'); return r.length > 1 ? 2 : 1; })()");
+    await js(`document.getElementById('splitPick').dispatchEvent(new KeyboardEvent('keydown', { key: '${wantId}', bubbles: true }))`);
+    await wait(600);
+    const expectRight = tabs.visible.filter((t) => t.id !== tabs.activeId)[wantId - 1];
+    check(!!tabs.split && tabs.split.b === expectRight?.id, 'picking a tab puts that tab on the right');
     const pairB = tabs.split.b;
     tabs.close(pairB);
     await wait(400);
@@ -477,9 +486,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(500);
     check((await js("document.getElementById('noteHost').textContent")) === '127.0.0.1:' + server.address().port, 'Notes opens for the current site');
     await js("(() => { const t = document.getElementById('noteText'); t.value = 'Remember: magma is hot'; t.dispatchEvent(new Event('input')); })()");
-    await wait(800);
+    // Notes save 0.4 s after you stop typing; on a busy computer that can take longer, so keep checking.
     const notesSvc = getNotes();
-    check(notesSvc.get('127.0.0.1:' + server.address().port) === 'Remember: magma is hot', 'typing a note saves it');
+    const noteHost = '127.0.0.1:' + server.address().port;
+    check(await until(() => notesSvc.get(noteHost) === 'Remember: magma is hot'), 'typing a note saves it');
     await shot('15-notes');
     const mdPath = path.join(dir, 'notes-export.md');
     await notesSvc.exportTo(mdPath);
@@ -507,6 +517,56 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(!mainWin.aiOpen && tabs.bounds.width === fullWidth, 'closing the AI panel gives the page its width back');
     mainWin.loadAI = realLoadAI;
     tabs.close(art.id);
+    await wait(300);
+
+    // ================= Welcome tour =================
+    check(store.get('onboarded') === false, 'a fresh install has not seen the welcome tour');
+    const wt = tabs.create('burrow://welcome/');
+    await wait(1800);
+    const wjs = (code) => wt.view.webContents.executeJavaScript(code);
+    check((await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith("Hi. I'm Mochi"), 'the tour opens with Mochi saying hello');
+    check(await wjs("document.querySelectorAll('#stepList li').length") === 6, 'the tour has six steps');
+    await shot('17-welcome-hello', true);
+    await wjs("document.getElementById('next').click()");
+    await wait(300);
+    await wjs("document.querySelector('#modeSeg [data-mode=dark]').click()");
+    await wait(300);
+    await wjs("document.querySelector('#swatches [data-seed=\"#138A82\"]').click()");
+    await wait(500);
+    check(await until(async () => store.get('theme').mode === 'dark' && store.get('theme').seed === '#138A82'), 'step 2 sets the theme and colour live');
+    await shot('17b-welcome-look', true);
+    await wjs("document.getElementById('next').click()");
+    await wait(300);
+    await wjs("document.querySelector('#engines [data-engine=bing]').click()");
+    await wait(300);
+    check(await until(async () => store.get('searchEngine') === 'bing' && store.get('searchChosen')), 'step 3 picks the search engine');
+    await wjs("document.getElementById('next').click()");
+    await wait(300);
+    // Sign-in buttons open the AI's own sign-in page (recorded here instead of really opening it)
+    const signinOpened = [];
+    const realCreateW = tabs.create.bind(tabs);
+    tabs.create = (url, opts) => { if (/^https:/.test(url)) { signinOpened.push(url); return null; } return realCreateW(url, opts); };
+    await wjs("document.querySelector('#ais [data-ai=chatgpt]').click()");
+    await wait(300);
+    await wjs("document.querySelector('#ais [data-signin=chatgpt]').click()");
+    await wait(300);
+    tabs.create = realCreateW;
+    check(store.get('aiProvider') === 'chatgpt', 'step 4 sets the default AI');
+    check(signinOpened.includes('https://chatgpt.com/auth/login'), "Sign in opens ChatGPT's own sign-in page");
+    await shot('17c-welcome-ai', true);
+    await wjs("document.getElementById('next').click()");
+    await wait(300);
+    check(await wjs("document.querySelectorAll('#keys .key').length") === 10, 'step 5 lists ten shortcuts');
+    await shot('17d-welcome-keys', true);
+    await wjs("document.getElementById('next').click()");
+    await wait(300);
+    check((await wjs("document.getElementById('summary').textContent")).includes('Bing'), 'the last step sums up your choices');
+    await wjs("document.getElementById('go').click()");
+    await wait(1200);
+    check(await until(async () => store.get('onboarded') === true && wt.url.startsWith('burrow://newtab')), 'Start browsing finishes the tour and opens a new tab');
+    tabs.close(wt.id);
+    setTheme({ mode: 'light', seed: '#E63027' });
+    setPrefs({ aiProvider: 'claude' });
     await wait(300);
 
     // ================= Windows + dragging tabs =================

@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('burrow', {
     off: send('split:off'),
     swap: send('split:swap'),
     ratio: send('split:ratio'),
+    onPick: listen('split-pick'),
   },
   reader: () => ipcRenderer.invoke('reader:toggle'),
   ai: {

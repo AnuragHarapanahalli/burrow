@@ -287,3 +287,17 @@ body.split-resizing .split-bar { transition: none; }
 .panel-nav { grid-template-columns: 1fr 1fr 1fr; }
 .panel-nav button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 7px 8px; font-size: 12.5px; }
 .panel-nav button .pixel { margin-right: 3px; }
+
+/* Split view picker */
+.split-pick { width: 320px; max-height: 60vh; overflow-y: auto; padding-bottom: 4px; outline: none; }
+.sp-row { display: grid; grid-template-columns: 22px 16px 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; cursor: pointer; }
+.sp-row img { width: 16px; height: 16px; }
+.sp-dot { width: 10px; height: 10px; background: var(--line); }
+.sp-plus { font-size: 16px; line-height: 1; font-weight: 700; color: var(--accent-ink); }
+.sp-n { color: var(--muted); }
+.sp-t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.sp-h { color: var(--muted); font-size: 12px; max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-new { border-top: var(--hair); }
+.sp-row.sel { background: var(--fg); color: var(--bg); }
+.sp-row.sel .sp-n, .sp-row.sel .sp-h, .sp-row.sel .sp-plus { color: var(--accent); }
+.sp-i { width: 16px; height: 16px; display: grid; place-items: center; }

@@ -23,7 +23,7 @@ function toUrl(input, engine = DEFAULT_ENGINE) {
 
 // What the address bar should show for a URL (Burrow's own pages show nothing).
 function displayUrl(url) {
-  if (!url || url.startsWith('burrow://newtab')) return '';
+  if (!url || url.startsWith('burrow://newtab') || url.startsWith('burrow://welcome')) return '';
   return url;
 }
 

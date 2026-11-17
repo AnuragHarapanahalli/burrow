@@ -164,7 +164,7 @@ class Tabs {
   splitWith(otherId) {
     const a = this.active;
     if (!a) return;
-    let b = this.get(otherId);
+    let b = otherId === 'new' ? this.create(NEWTAB, { activate: false, after: a.id }) : this.get(otherId);
     if (!b || b === a || b.ws !== a.ws) {
       const vis = this.visible;
       const i = vis.indexOf(a);
