@@ -46,6 +46,9 @@ app.userAgentFallback = app.userAgentFallback.replace(/\s(Electron|burrow)\/\S+/
 // Developer self-test uses a throwaway profile so it never touches your real settings.
 const SELFTEST = process.env.BURROW_SELFTEST;
 if (SELFTEST) {
+  // Always start from a clean slate: a profile left over from an earlier run would make the
+  // "first launch" checks fail (search engine already chosen, tour already seen, …).
+  for (const d of ['profile', 'downloads']) require('fs').rmSync(path.join(SELFTEST, d), { recursive: true, force: true });
   app.setPath('userData', path.join(SELFTEST, 'profile'));
   app.setPath('downloads', path.join(SELFTEST, 'downloads'));
   require('fs').mkdirSync(path.join(SELFTEST, 'downloads'), { recursive: true });
