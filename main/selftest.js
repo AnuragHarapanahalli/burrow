@@ -56,6 +56,36 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await pjs("document.getElementById('version').textContent") === 'v' + app.getVersion(), `footer shows the version (v${app.getVersion()})`);
     check((await pjs("document.querySelector('.made').textContent")).includes('Anurag'), 'footer says Made with love by Anurag');
     await pjs("document.getElementById('linksEdit').click()");
+
+    // --- Report a bug ---
+    await pjs("document.getElementById('bugBtn').click()");
+    await wait(200);
+    check(await pjs("!document.getElementById('bugScrim').hidden"), 'Report a bug opens the form');
+    await shot('00c-bug-form', true);
+    await pjs("document.getElementById('bugForm').requestSubmit()");
+    await wait(200);
+    check((await pjs("document.getElementById('bugError').textContent")).length > 0, 'submitting without a title shows an error');
+    // Record the address Burrow opens (GitHub may then redirect to its sign-in page).
+    let issueUrl = '';
+    let issueTab = null;
+    const realCreate = tabs.create.bind(tabs);
+    tabs.create = (url, opts) => { issueUrl = url; issueTab = realCreate(url, opts); return issueTab; };
+    await pjs("document.getElementById('bugTitle').value='Test: tabs flicker'; document.getElementById('bugWhat').value='They flicker & blink'; document.getElementById('bugForm').requestSubmit()");
+    await wait(600);
+    tabs.create = realCreate;
+    const u = issueUrl ? new URL(issueUrl) : null;
+    check(u && u.origin + u.pathname === 'https://github.com/AnuragHarapanahalli/burrow/issues/new', 'submitting opens GitHub\'s New issue page for Burrow');
+    check(u && u.searchParams.get('title') === 'Test: tabs flicker' && u.searchParams.get('labels') === 'bug', 'the issue is prefilled with the title and the bug label');
+    check(u && u.searchParams.get('body').includes('They flicker & blink') && u.searchParams.get('body').includes('Burrow v' + app.getVersion()), 'the issue body has the description and Burrow version');
+    if (issueTab) tabs.close(issueTab.id);
+    await wait(300);
+    tabs.activate(tabs.tabs[0].id);
+    // From the menu
+    const menuTab = tabs.create('burrow://newtab/#report-bug');
+    await wait(1500);
+    check(await menuTab.view.webContents.executeJavaScript("!document.getElementById('bugScrim').hidden"), 'Menu \u2192 Report a bug opens the form directly');
+    tabs.close(menuTab.id);
+    await wait(300);
     await wait(200);
     check(await pjs("document.querySelectorAll('#links .ql').length") === 4, 'Edit shows editable links');
     await pjs("document.querySelector('[data-edit=\"0\"]').click(); document.getElementById('lfName').value='Gmail'; document.getElementById('lfUrl').value='mail.google.com'; document.getElementById('linkForm').requestSubmit()");

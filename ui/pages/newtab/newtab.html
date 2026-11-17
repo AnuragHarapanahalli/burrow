@@ -46,7 +46,10 @@
       <p class="stat" id="stat"></p>
       <p class="made">Made with
         <svg class="heart" viewBox="0 0 7 6" shape-rendering="crispEdges" role="img" aria-label="love"><path d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z"/></svg>
-        by Anurag <span class="pixel version" id="version"></span></p>
+        by Anurag <span class="pixel version" id="version"></span>
+        <button class="bug-btn" id="bugBtn" aria-haspopup="dialog">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5h6v7H5zM8 5v7M3 7h2M11 7h2M3 10h2M11 10h2M6 5l-1-2M10 5l1-2"/></svg>
+          Report a bug</button></p>
     </footer>
 
     <div class="mochi-spot">
@@ -55,9 +58,33 @@
     </div>
   </main>
 
+  <div class="bug-scrim" id="bugScrim" hidden>
+    <form class="bug-form" id="bugForm" role="dialog" aria-modal="true" aria-labelledby="bugTitleH" autocomplete="off" novalidate>
+      <div class="bug-head">
+        <h2 id="bugTitleH">Report a bug<span class="dot">.</span></h2>
+        <button type="button" class="bug-x" id="bugClose" aria-label="Close">&times;</button>
+      </div>
+      <label><span class="pixel">01 SHORT TITLE</span>
+        <input id="bugTitle" maxlength="120" placeholder="Tabs flicker when I switch workspace" required></label>
+      <label><span class="pixel">02 WHAT HAPPENED</span>
+        <textarea id="bugWhat" rows="4" maxlength="3000" placeholder="What did you see, and what did you expect instead?"></textarea></label>
+      <label><span class="pixel">03 STEPS TO MAKE IT HAPPEN (OPTIONAL)</span>
+        <textarea id="bugSteps" rows="3" maxlength="1500" placeholder="1. Open two workspaces&#10;2. Switch quickly with Ctrl+Shift+1 / 2"></textarea></label>
+      <label class="bug-check"><input type="checkbox" id="bugSystem" checked>
+        Include Burrow version and system info <span class="bug-note">(no personal data)</span></label>
+      <p class="bug-error" id="bugError" role="alert"></p>
+      <div class="bug-actions">
+        <p class="bug-note">You'll finish on GitHub: check it, then press <b>Submit new issue</b>. Needs a free GitHub account.</p>
+        <button type="button" class="bug-cancel" id="bugCancel">Cancel</button>
+        <button type="submit" class="bug-go">Continue on GitHub &nearr;</button>
+      </div>
+    </form>
+  </div>
+
   <script src="burrow://app/shared/theme.js"></script>
   <script src="burrow://app/shared/mochi.js"></script>
   <script src="newtab.js"></script>
   <script src="quicklinks.js"></script>
+  <script src="bugreport.js"></script>
 </body>
 </html>

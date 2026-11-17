@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Git set up.** Repository on branch `main`, first commit `7ddfe98`. Commits use your GitHub "noreply" email, so your real email stays private. `.gitattributes` keeps one line-ending style | No version control | Every change can now be undone, compared, and backed up to GitHub |
+| 2026-11-17 | **GitHub repo: public** — github.com/AnuragHarapanahalli/burrow (you created it) | Private | Lets anyone report bugs, and keeps the free SignPath signing option open |
+| 2026-11-17 | **Report a bug**: a button beside the version opens a small form; submitting opens GitHub's *New issue* page already filled in (title, description, steps, "bug" label, Burrow version + system). The reporter presses Submit on GitHub | A relay server that files issues for them; a GitHub key inside the app | Free, nothing to run, and no secret key that someone could pull out of the app and misuse. Downside: reporters need a free GitHub account |
+| 2026-11-17 | The bug report never includes the page you were on or anything personal — only Burrow/Windows/Electron versions, and that's a checkbox you can untick | Attach the current page address automatically | Privacy: page addresses can contain personal info |
+| 2026-11-17 | New features get their own **branch** (first one: `feature/bug-report`) and are merged into `main` when done | Commit straight to main | Keeps `main` always working |
 | 2026-11-17 | **Ctrl+N opens a new window**; any number of normal windows, each with its own tabs and workspaces. All windows open at quit come back next time; closing one of several windows forgets its tabs | One window only; or restore every window ever closed | Same behaviour as Chrome, which people already expect |
 | 2026-11-17 | **Drag tabs to reorder** (strip and sidebar); the others slide aside | Reorder with keyboard only | You asked; it's how every browser works |
 | 2026-11-17 | **Pull a tab down to open it in a new window**; drop it on another window's tabs to move it there. The *same live page* moves (video keeps playing, forms keep their text). Private tabs can be reordered but not pulled out; a window's last tab stays put | Reload the page in the new window | Moving the live page is faster and loses nothing |
@@ -150,6 +155,8 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | New window (Ctrl+N) + restore all windows | ✅ done (tested) |
 | Drag tabs to reorder | ✅ done (tested with real mouse drags) |
 | Pull a tab out into a new window / onto another window | ✅ done (tested) |
+| Git + GitHub repo | ✅ set up |
+| Report a bug (opens a prefilled GitHub issue) | ✅ done (tested) |
 | Ctrl+K command palette | planned |
 | Split view, notes (+ .md export), reader mode | planned |
 | Tab sleeping | planned |
@@ -191,7 +198,8 @@ WOAHDAMN/
    ├─ find.js             the find-in-page bar
    ├─ drag.js             dragging tabs: reorder, pull out into a new window
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
-      └─ quicklinks.js    the editable quick links
+      ├─ quicklinks.js    the editable quick links
+      └─ bugreport.js     the "Report a bug" form
 ```
 
 **`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
@@ -264,6 +272,17 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Ctrl+N new windows, drag to reorder, pull tabs out, drop tabs onto other windows; every open window is restored on restart.
 - The self-test now uses **real mouse input** (press, move with the button held, release) instead of pretending.
 - Bug found: the new drag code silently didn't load because it reused a name (`tabEls`) already used by another interface script — all interface scripts share one space for names. Fixed, and the self-test now checks that **every interface script loaded**, so this kind of clash can't hide again.
+
+**2026-11-17 — Git + Report a bug (79/79 self-test checks pass)**
+- Git repository created; GitHub repo connected.
+- "Report a bug" button + form (also in the ☰ menu). Where reports go is set in `package.json` → `bugs.url`.
+- Fixes found by the self-test: the title box used the browser's built-in "required" bubble instead of Burrow's own message; the test now records the address Burrow opens, because GitHub redirects signed-out visitors to its sign-in page first.
+
+### How to use Git day to day
+- See what changed: `git status` and `git diff`.
+- Save a checkpoint: `git add -A` then `git commit -m "what you changed"`.
+- Back up to GitHub: `git push`.
+- Undo uncommitted changes to a file: `git restore path/to/file`.
 
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.

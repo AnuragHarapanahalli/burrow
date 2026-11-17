@@ -17,5 +17,12 @@
   },
   "allowScripts": {
     "electron@45.3.2": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AnuragHarapanahalli/burrow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AnuragHarapanahalli/burrow/issues"
   }
 }

@@ -9,5 +9,9 @@ if (location.protocol === 'burrow:') {
     navigate: (text) => ipcRenderer.send('page:navigate', String(text || '')),
     setSearchEngine: (id) => ipcRenderer.send('page:search-engine', String(id || '')),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),
+    reportBug: (report) => ipcRenderer.send('page:report-bug', {
+      title: String(report?.title || ''), what: String(report?.what || ''),
+      steps: String(report?.steps || ''), includeSystem: !!report?.includeSystem,
+    }),
   });
 }

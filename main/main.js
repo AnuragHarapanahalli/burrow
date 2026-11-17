@@ -12,6 +12,23 @@ const { Tabs } = require('./tabs');
 const { NEWTAB, ENGINES } = require('./url');
 
 const ROOT = path.join(__dirname, '..');
+const PKG = require('../package.json');
+
+// Bug reports open GitHub's "New issue" page, already filled in. The reporter submits it there.
+function bugReportUrl({ title, what, steps, includeSystem }) {
+  const base = String(PKG.bugs?.url || '');
+  if (!/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues$/.test(base)) return null;
+  const clip = (t, n) => String(t || '').trim().slice(0, n);
+  const body = [
+    '**What happened**', clip(what, 3000) || '_(not filled in)_', '',
+    '**Steps to reproduce**', clip(steps, 1500) || '_(not filled in)_', '',
+  ];
+  if (includeSystem) {
+    body.push('---', `Burrow v${app.getVersion()} · ${process.platform} ${require('os').release()} · Electron ${process.versions.electron} · Chromium ${process.versions.chrome}`);
+  }
+  const q = new URLSearchParams({ title: clip(title, 120), body: body.join('\n'), labels: 'bug' });
+  return `${base}/new?${q}`;
+}
 
 // burrow:// is Burrow's own address space (new tab, later settings, reader, report...).
 protocol.registerSchemesAsPrivileged([
@@ -271,6 +288,13 @@ function registerIpc() {
   });
   ipcMain.on('page:search-engine', (e, id) => {
     if (isBurrowPage(e.sender) && winOfPage(e.sender)) setPrefs({ searchEngine: String(id || '') });
+  });
+  // The new tab's bug form: open the prefilled GitHub page in a new tab of the same window.
+  ipcMain.on('page:report-bug', (e, report) => {
+    const w = isBurrowPage(e.sender) && winOfPage(e.sender);
+    if (!w || !String(report?.title || '').trim()) return;
+    const url = bugReportUrl(report || {});
+    if (url) w.tabs.create(url);
   });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);

@@ -90,6 +90,7 @@ const MENU = [
   { cmd: 'bmbar', label: 'Show bookmarks bar', key: 'CTRL SHIFT B', check: () => !!UI.theme?.prefs.bookmarksBar },
   null,
   { cmd: 'settings', label: 'Settings', key: 'THEME, SEARCH' },
+  { cmd: 'bug', label: 'Report a bug' },
 ];
 const zoomRow = () => `<div class="mm-zoom" role="group" aria-label="Zoom">
     <span class="mm-check"></span><span>Zoom</span>
@@ -122,6 +123,7 @@ mainMenu.addEventListener('click', (e) => {
   if (cmd === 'newtab') B.tabs.create();
   else if (cmd === 'private') B.openPrivate();
   else if (cmd === 'window') B.openWindow();
+  else if (cmd === 'bug') B.tabs.navigate('burrow://newtab/#report-bug');
   else if (cmd === 'find') window.openFind();
   else if (cmd === 'pip') window.popOut();
   else if (cmd === 'reopen') B.tabs.reopen();
