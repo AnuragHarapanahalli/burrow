@@ -39,6 +39,10 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Phase 9 plan** (details in PLAN.md): weekly report records active time on **all sites** (not just limited ones), on your PC only, kept 5 weeks; private windows never recorded; a switch and "Clear my stats" in Settings → Focus | Only limited sites; ask at the first report | Your choice. "Top sites" needs every site; 5 weeks is enough for week-on-week comparisons without building a long history |
+| 2026-11-17 | Weekly report arrives as a **Mochi nudge** on the first new tab of the week, opening a report page (also in ☰ and Ctrl+K) | Report opens by itself; no reminder | Noticeable but never in the way |
+| 2026-11-17 | New-tab stat line **rotates to the most relevant kind fact** (time left, focus session, streak, focus done, memory saved), or shows nothing | Always screen time; streak only; no line | Keeps the "one gentle stat" rule from the design review; constant screen-time totals feel guilt-trippy |
+| 2026-11-17 | Report extras: **compare to last week** and **Mochi's highlights**. Not now: save as image, suggesting limits | All four | Your pick |
 | 2026-11-17 | **Time only counts when you're really there**: a limited site counts only while it's on screen, in the focused window, and you've touched the keyboard or mouse in the last minute | Count time a tab is open | A paused tab in the background shouldn't eat your budget |
 | 2026-11-17 | When time's up, **every tab of that site closes**, in every window (private ones too) | Close only the tab you're looking at | Otherwise a second tab of the same site is an instant loophole |
 | 2026-11-17 | The gate's breathing countdown is **checked by Burrow itself**, not just shown by the page | Trust the page's timer | A page can be tricked; the main process refuses an unlock that comes too early |
@@ -202,7 +206,10 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Focus sessions (25 min focus / 5 min break, bar + timer) | ✅ done (tested) |
 | Per-tab volume 0–200% + remember per site | ✅ done (tested; boost refused for audio from other sites) |
 | ☰ control-centre menu | ✅ done (tested) |
-| Weekly Burrow report | planned |
+| Weekly report (time per site, 5 weeks, on this PC; private windows never recorded) | ✅ done (tested) |
+| New-tab stat line (time left / focus session / streak / focus done / memory saved) | ✅ done (tested every case) |
+| Monday nudge from Mochi + ☰ Report tile + Ctrl+K "Weekly report" | ✅ done (tested) |
+| Settings → Focus: "Keep a weekly report" switch + "Clear my stats" | ✅ done (tested) |
 | Windows installer | planned |
 
 ---
@@ -216,6 +223,7 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ stats.js            weekly report data: time per site per day + daily counts, kept 5 weeks (stats.json)
 │  ├─ focus.js            focus tools: daily limits, time counting, warnings, "1 more minute", gate unlock, focus sessions (focus.json)
 │  ├─ volume.js           per-tab volume: sets the page's audio/video volume, boosts above 100% where allowed
 │  ├─ notes.js            notes, one per website (notes.json); Markdown export
@@ -252,7 +260,9 @@ WOAHDAMN/
       └─ bugreport.js     the "Report a bug" form
    ├─ pages/reader/       the reader view (reader.html / .css / .js, with its own sanitiser)
    ├─ pages/welcome/      Mochi's welcome tour (welcome.html / .css / .js)
-   └─ pages/gate/         the Burrow gate shown when a site is closed (gate.html / .css / .js)
+   ├─ pages/gate/         the Burrow gate shown when a site is closed (gate.html / .css / .js)
+   └─ pages/report/       the weekly report (report.html / .css / .js)
+scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen parts) and prints a summary
 ```
 
 **`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
@@ -267,7 +277,7 @@ WOAHDAMN/
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
-- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, windows. Several work too: `npm test -- phase7 phase8`.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
@@ -375,6 +385,13 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Fixed: Mochi's "1 more minute" bubble ran under the window's minimise/maximise/close buttons. It's now measured and kept left of them, and the self-test checks it.
 - Fixed: closing a window before its interface finished loading showed a "JavaScript error in the main process" box.
 
+**2026-11-17 — Phase 9 done (239/239 self-test checks pass, ~2 min)**
+- Weekly report page, the new-tab stat line, Mochi's Monday nudge, and the report switch / "Clear my stats" in Settings → Focus.
+- How the numbers are made: the same once-a-second timer that counts limits now also adds a second to every site on screen in the window you're using (never private windows). Each day is one small record; days older than 5 weeks are deleted.
+- The self-test fills in two made-up weeks and checks every number on the report page (totals, "30 min less than last week", days within limits, top sites, highlights), each stat-line case, and that the nudge comes only once a week.
+- Self-test fix: when you used the computer during a run, the test window sat behind your other windows and Windows/Chromium slowed it down (no screenshots, stalled animations, failed mouse drags). In test mode Burrow now keeps full speed when covered. Your normal Burrow is unchanged.
+- Another self-test fix: the split-view picker check assumed three tabs were open, which was only true in a full run. Now the split section opens its own third tab, so the part also passes on its own.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
@@ -382,7 +399,8 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 9):** new-tab stat + weekly report. Phase 5b ("Ask AI about this page") is still postponed.
+- **Next (phase 10):** polish, accessibility check, Windows installer. Phase 5b ("Ask AI about this page") is still postponed.
+- The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
 - Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
 - Time limits use the site's address (youtube.com covers m.youtube.com too) — apps on other domains (e.g. youtu.be short links) redirect first, so they're caught when they land.
 - Split view isn't remembered after a restart yet (the two tabs come back as normal tabs).
@@ -399,7 +417,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 6 | Tab sleeping | ✅ done |
 | 7 | Mochi animations + reactions | ✅ done |
 | 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | ✅ done |
-| 9 | New-tab stat + weekly report | planned |
+| 9 | New-tab stat + weekly report | ✅ done |
 | 10 | Polish, accessibility, Windows installer | planned |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 

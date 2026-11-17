@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'; img-src 'self' burrow: data:">
+  <title>Your week in Burrow</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="report.css">
+</head>
+<body>
+  <main class="report">
+    <header class="head">
+      <div class="head-text">
+        <p class="pixel kicker">YOUR WEEK IN BURROW</p>
+        <h1 id="range">This week<span class="dot">.</span></h1>
+        <nav class="weeks" aria-label="Choose a week">
+          <button id="earlier" aria-label="Earlier week">&larr; Earlier</button>
+          <span class="pixel" id="whichWeek"></span>
+          <button id="later" aria-label="Later week">Later &rarr;</button>
+        </nav>
+      </div>
+      <div class="mochi-say">
+        <div class="mochi" id="mochi" aria-hidden="true"></div>
+        <p class="bubble" id="headline"></p>
+      </div>
+    </header>
+
+    <section class="empty" id="empty" hidden>
+      <p class="big">Nothing here yet.</p>
+      <p id="emptyText">Browse as usual. Mochi counts the time each site is on screen, and your first full week shows up here next Monday.</p>
+    </section>
+
+    <div id="content">
+      <section class="numbers" aria-label="Totals">
+        <div class="num"><span class="pixel lbl">TIME BROWSING</span><b id="nTotal"></b><span class="delta" id="dTotal"></span></div>
+        <div class="num"><span class="pixel lbl">WITHIN LIMITS</span><b id="nWithin"></b><span class="delta" id="dWithin"></span></div>
+        <div class="num"><span class="pixel lbl">FOCUS SESSIONS</span><b id="nFocus"></b><span class="delta" id="dFocus"></span></div>
+        <div class="num"><span class="pixel lbl">TABS MOCHI ATE</span><b id="nEaten"></b><span class="delta" id="dEaten"></span></div>
+      </section>
+
+      <section class="block">
+        <h2><span class="pixel n">01</span>Day by day</h2>
+        <div class="chart" id="chart" role="img"></div>
+        <p class="legend"><span class="sw all"></span>All browsing <span class="sw lim"></span>Sites with a limit</p>
+      </section>
+
+      <section class="block">
+        <h2><span class="pixel n">02</span>Top sites</h2>
+        <ol class="top" id="top"></ol>
+      </section>
+
+      <section class="block">
+        <h2><span class="pixel n">03</span>Mochi&rsquo;s highlights</h2>
+        <ul class="highlights" id="highlights"></ul>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <p>Kept on this computer for 5 weeks. Private windows are never recorded.
+        <button class="link" id="settings">Switch off or clear in Settings &rarr; Focus</button></p>
+    </footer>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/shared/mochi.js"></script>
+  <script src="report.js"></script>
+</body>
+</html>

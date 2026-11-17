@@ -250,6 +250,7 @@ async function renderFocusSettings() {
   $('limitSuggest').innerHTML = info.suggested.length
     ? '<span class="pixel">SUGGESTIONS</span>' + info.suggested.map((sname) => `<button data-suggest="${esc(sname)}">+ ${esc(sname)}</button>`).join('')
     : '';
+  $('reportOn').checked = info.reportOn !== false;
   $('focusStart').textContent = info.session ? 'End the focus session' : 'Start a 25-minute focus session';
   $('sumFocus').textContent = info.limits.length ? `${info.limits.length} limit${info.limits.length === 1 ? '' : 's'}${info.streak ? ` \u00b7 ${info.streak}-day streak` : ''}` : 'Off';
 }
@@ -273,6 +274,24 @@ $('limitSite').addEventListener('input', () => { $('limitErr').hidden = true; })
 $('limitSuggest').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-suggest]');
   if (b) { await B.focus.setLimit(b.dataset.suggest, 30); renderFocusSettings(); }
+});
+$('reportOn').addEventListener('change', (e) => B.setPrefs({ reportOn: e.target.checked }));
+$('reportOpen').addEventListener('click', () => B.openReport());
+let statsClearArmed = 0;
+$('statsClear').addEventListener('click', () => {
+  const b = $('statsClear');
+  if (!statsClearArmed) { // two clicks, so it can't happen by accident
+    statsClearArmed = setTimeout(() => { statsClearArmed = 0; b.textContent = 'Clear my stats'; b.classList.remove('armed'); }, 4000);
+    b.textContent = 'Click again to clear everything';
+    b.classList.add('armed');
+    return;
+  }
+  clearTimeout(statsClearArmed);
+  statsClearArmed = 0;
+  B.stats.clear();
+  b.textContent = 'Cleared';
+  b.classList.remove('armed');
+  setTimeout(() => { b.textContent = 'Clear my stats'; }, 2000);
 });
 $('focusStart').addEventListener('click', () => { B.focus.session(UI.focus?.session ? 'end' : 'start'); setTimeout(renderFocusSettings, 300); });
 

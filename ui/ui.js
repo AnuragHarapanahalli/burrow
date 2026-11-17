@@ -254,12 +254,13 @@ function stripMochi(text, ms = 5000, pose = 'happy') {
 }
 $('stripMochi').addEventListener('click', () => {
   $('stripMochi').hidden = true;
-  if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
+  if (UI.stripClickOpens === 'report') B.openReport();
+  else if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
 });
 // Messages from the main process (tabs put to sleep, "question copied", …).
 B.onMochiSay((msg) => {
   const m = typeof msg === 'string' ? { text: msg } : (msg || {});
-  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: 6000 });
+  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: m.ms || 6000, opens: m.opens === 'report' ? 'report' : null });
 });
 
 // ---------- Theme + preferences ----------

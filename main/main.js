@@ -9,6 +9,7 @@ const { Library } = require('./library');
 const { Downloads } = require('./downloads');
 const { Notes } = require('./notes');
 const { Focus, pretty: sitePretty } = require('./focus');
+const { Stats } = require('./stats');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -48,9 +49,14 @@ if (SELFTEST) {
   app.setPath('userData', path.join(SELFTEST, 'profile'));
   app.setPath('downloads', path.join(SELFTEST, 'downloads'));
   require('fs').mkdirSync(path.join(SELFTEST, 'downloads'), { recursive: true });
+  // Keep running at full speed even when the test window is behind other windows (you may be
+  // using the computer meanwhile): no paused paints, no slowed-down timers.
+  app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-background-timer-throttling');
 }
 
-let store, library, downloads, notes, focus;
+let store, library, downloads, notes, focus, stats;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -61,7 +67,7 @@ function servePath(url) {
   const u = new URL(url);
   const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
   let base, file;
-  if (['newtab', 'reader', 'welcome', 'gate'].includes(u.host)) {
+  if (['newtab', 'reader', 'welcome', 'gate', 'report'].includes(u.host)) {
     base = path.join(ROOT, 'ui', 'pages', u.host);
     file = path.join(base, rel || `${u.host}.html`);
   } else if (u.host === 'app') {
@@ -118,6 +124,7 @@ function themePayload(isPrivate = false) {
     aiProviders: AI.list(),
     sleep: store.get('sleep'),
     mochiMode: store.get('mochiMode'),
+    reportOn: store.get('reportOn') !== false,
     engines: Object.entries(ENGINES).map(([id, e]) => ({ id, name: e.name, host: new URL(e.url).host.replace(/^www\./, '') })),
   };
   return { settings, tokens, presets: Theme.PRESETS, prefs, isPrivate };
@@ -145,6 +152,7 @@ function setPrefs(patch) {
   if (['smart', 'search', 'ai'].includes(patch?.askMode)) store.set('askMode', patch.askMode);
   if (patch?.aiProvider) everyWindow((w) => w.onAIProviderChange?.());
   if (['lively', 'quiet', 'off'].includes(patch?.mochiMode)) store.set('mochiMode', patch.mochiMode);
+  if (typeof patch?.reportOn === 'boolean') store.set('reportOn', patch.reportOn);
   if (patch?.sleep && typeof patch.sleep === 'object') {
     const cur = { ...store.get('sleep') };
     if (typeof patch.sleep.on === 'boolean') cur.on = patch.sleep.on;
@@ -184,6 +192,7 @@ function sweepSleep(onlyWin, force = false) {
   for (const { w, slept } of results) {
     const pids = new Set(slept.map((t) => t.pid).filter((p) => p && !alive.has(p)));
     const mb = Math.round([...pids].reduce((sum, p) => sum + (memBefore.get(p) || 0), 0) / 1024);
+    if (!w.isPrivate) { stats?.event('slept', slept.length); stats?.event('freedMB', mb); }
     if (slept.length >= 2 || force) {
       const n = slept.length;
       const text = `I tucked ${n} tab${n === 1 ? '' : 's'} into bed${mb >= 10 ? ` · about ${mb} MB freed` : ''}`;
@@ -201,8 +210,11 @@ function windowsShowing(site) {
     .sort((a, b) => Number(b.win.isFocused()) - Number(a.win.isFocused()));
 }
 function startFocus() {
+  stats = new Stats(() => store.get('reportOn') !== false);
   focus = new Focus({
     getWindows: () => [...windows],
+    onCount: (seen, hasLimits) => stats.count(seen, hasLimits),
+    onEvent: (name) => stats.event(name),
     onWarn: (site, mins) => {
       for (const w of windowsShowing(site)) {
         w.send('mochi-say', { text: `${mins} min left on ${sitePretty(site)} today`, pose: mins <= 1 ? 'oops' : 'wave', essential: true });
@@ -232,6 +244,39 @@ function startFocus() {
     },
   });
 }
+
+// ---------------- New-tab stat line + weekly report ----------------
+const mins = (sec) => Math.max(1, Math.round(sec / 60));
+function statLine(w) {
+  if (w.isPrivate || store.get('mochiMode') === 'off') return null;
+  // 1. A limited site you used today with 10 minutes or less left
+  const low = Object.keys(focus.limits)
+    .filter((site) => (focus.used[site] || 0) > 0 && focus.remaining(site) > 0 && focus.remaining(site) <= 600)
+    .sort((a, b) => focus.remaining(a) - focus.remaining(b))[0];
+  if (low) return `${mins(focus.remaining(low))} min left on ${sitePretty(low)} today`;
+  // 2. A focus session
+  if (focus.session) {
+    const left = mins((focus.session.endsAt - Date.now()) / 1000);
+    return focus.session.phase === 'focus' ? `Focus session \u00b7 ${left} min to go` : `On a break \u00b7 ${left} min left`;
+  }
+  // 3. A streak of days within your limits
+  if (Object.keys(focus.limits).length && focus.streak.days >= 2) return `${focus.streak.days}-day streak within your limits`;
+  if (store.get('reportOn') === false) return null;
+  const today = stats.day();
+  // 4. Focus sessions finished today
+  if (today.focus) return `${today.focus} focus session${today.focus === 1 ? '' : 's'} done today. Nice.`;
+  // 5. Memory saved by sleeping tabs
+  if (today.freedMB >= 50) return `Sleeping tabs saved about ${today.freedMB} MB today`;
+  return null;
+}
+// Once a week, the first new tab brings Mochi with "Your week in Burrow is ready".
+function maybeNudge(w) {
+  if (w.isPrivate || !stats.nudgeDue()) return;
+  stats.markNudged();
+  setTimeout(() => w.send('mochi-say', { text: 'Your week in Burrow is ready! Click me to see it', pose: 'celebrate', opens: 'report', ms: 12000 }), 900);
+}
+const REPORT = 'burrow://report/';
+const reportPage = (e) => (e.sender.getURL().startsWith('burrow://report') ? winOfPage(e.sender) : null);
 
 // ---------------- Windows ----------------
 // Every open normal window is saved, so they all come back after a restart.
@@ -339,7 +384,9 @@ function registerIpc() {
   on('focus:eaten', (_w, site) => focus.eaten(String(site || '')));
   on('focus:session', (_w, what) => (what === 'start' ? focus.startSession() : focus.endSession()));
   handle('focus:limit', (_w, site, minutes) => focus.setLimit(site, minutes));
-  handle('focus:info', () => focus.info());
+  handle('focus:info', () => ({ ...focus.info(), reportOn: store.get('reportOn') !== false }));
+  on('stats:clear', () => stats.clear());
+  on('report:open', (w) => w.tabs.create(REPORT));
   // Split view
   on('split:with', (w, id) => w.tabs.splitWith(id === 'new' ? 'new' : (Number(id) || undefined)));
   on('split:off', (w) => w.tabs.unsplit());
@@ -491,6 +538,33 @@ function registerIpc() {
     else if (action === 'open' && /^https?:\/\//i.test(String(value || ''))) g.w.tabs.navigateFrom(wc, String(value));
     else if (action === 'continue' && g.original && !focus.gateFor(g.original)) g.w.tabs.navigateFrom(wc, g.original);
   });
+  // ---- New tab: the stat line (and the weekly nudge) ----
+  ipcMain.handle('page:statline', (e) => {
+    const w = isBurrowPage(e.sender) && e.sender.getURL().startsWith('burrow://newtab') && winOfPage(e.sender);
+    if (!w) return null;
+    maybeNudge(w);
+    return statLine(w);
+  });
+  // ---- The weekly report (burrow://report only) ----
+  ipcMain.handle('page:report', (e, offset) => {
+    const w = reportPage(e);
+    if (!w) return null;
+    const n = Math.max(0, Math.min(4, Math.floor(Number(offset) || 0)));
+    const wk = stats.week(n);
+    const name = (site) => sitePretty(site);
+    return {
+      ...wk,
+      top: wk.top.map((t) => ({ ...t, name: name(t.site) })),
+      on: store.get('reportOn') !== false,
+      streak: focus.streak.days,
+      limits: Object.keys(focus.limits).length,
+      lastHasData: stats.week(1).hasData,
+    };
+  });
+  ipcMain.on('page:report-action', (e, action) => {
+    const w = reportPage(e);
+    if (w && action === 'settings') w.send('open-panel', 'settings');
+  });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);
     if (w) w.tabs.navigateFrom(e.sender, String(text || ''));
@@ -543,11 +617,11 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine,
     });
   }
 });
 
-function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); focus?.flush(); }
+function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); focus?.flush(); stats?.flush(); }
 app.on('before-quit', flushAll);
 app.on('window-all-closed', () => { flushAll(); app.quit(); });

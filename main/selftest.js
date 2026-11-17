@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -440,7 +440,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     if (section('phase5')) {
     // ================= Phase 5: split view, reader, AI panel, notes =================
     // --- Split view ---
-    while (tabs.visible.length < 2) tabs.create('https://example.com/', { activate: false });
+    while (tabs.visible.length < 3) tabs.create('https://example.com/', { activate: false }); // (the picker check needs 3)
     tabs.activate(tabs.visible[0].id);
     await wait(500);
     mainWin.send('noop');
@@ -920,6 +920,152 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(vt.id);
     srv8.close();
 
+    }
+    if (section('phase9')) {
+    // ================= Phase 9: weekly report + new-tab stat line =================
+    const focus = getFocus();
+    const stats = getStats();
+    const { keyOf, mondayOf, addDays } = require('./stats');
+    const http9 = require('http');
+    const srv9 = http9.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>Stats test</title><p>Reading.</p>'); });
+    await new Promise((r) => srv9.listen(0, '127.0.0.1', r));
+    const host9 = '127.0.0.1:' + srv9.address().port;
+    const url9 = 'http://' + host9 + '/';
+    stats.clear();
+    focus.isIdle = () => false;
+
+    // --- Recording: only the window you're using, never private windows ---
+    const st = tabs.create(url9);
+    await ready(st);
+    const pw9 = openWindow({ isPrivate: true });
+    await until(() => pw9.tabs.active, 5000);
+    const pt9 = pw9.tabs.create(url9);
+    await ready(pt9);
+    focus.winActive = (w) => w === pw9; // you're looking at the private window
+    stats.clear();
+    await wait(2300);
+    check(!stats.day().sites[host9], 'private windows are never recorded');
+    focus.winActive = (w) => w === mainWin;
+    check(await until(() => (stats.day().sites[host9] || 0) >= 2, 5000), 'time on a site is recorded while it is on screen');
+    check(stats.day().total >= 2 && stats.day().limited === 0, 'the day total grows; nothing counted as limited');
+    pw9.win.close();
+    setPrefs({ reportOn: false });
+    const frozen = stats.day().sites[host9];
+    await wait(2200);
+    check(stats.day().sites[host9] === frozen, 'switching the weekly report off stops recording');
+    setPrefs({ reportOn: true });
+    delete focus.winActive;
+    tabs.close(st.id);
+    // 5-week memory
+    const old = keyOf(addDays(new Date(), -40));
+    stats.days[old] = { sites: { 'old.example': 60 }, total: 60, limited: 0, focus: 0, eaten: 0, snoozes: 0, unlocks: 0, slept: 0, freedMB: 0 };
+    stats.prune();
+    check(!stats.days[old], 'days older than 5 weeks are forgotten');
+
+    // --- The new-tab stat line: the most relevant kind fact, or nothing ---
+    stats.clear();
+    const savedLimits = { ...focus.limits };
+    for (const k of Object.keys(focus.limits)) delete focus.limits[k];
+    const savedStreak = focus.streak;
+    check(statLine(mainWin) === null, 'nothing worth saying → no stat line (the greeting stays)');
+    stats.day().freedMB = 120;
+    check(/saved about 120 MB/.test(statLine(mainWin)), 'memory saved by sleeping tabs');
+    stats.day().focus = 2;
+    check(statLine(mainWin) === '2 focus sessions done today. Nice.', 'focus sessions finished today beat memory');
+    focus.limits['streak.example'] = 30;
+    focus.streak = { days: 3, last: null };
+    check(statLine(mainWin) === '3-day streak within your limits', 'a streak beats focus sessions');
+    focus.session = { phase: 'focus', endsAt: Date.now() + 12 * 60000 };
+    check(/^Focus session \u00b7 12 min to go$/.test(statLine(mainWin)), 'a running focus session beats the streak');
+    focus.session = null;
+    focus.limits['youtube.com'] = 30;
+    focus.used['youtube.com'] = 26 * 60;
+    check(statLine(mainWin) === '4 min left on YouTube today', 'time left on a limited site comes first');
+    const sl = tabs.create();
+    await ready(sl);
+    check(await until(async () => (await sl.view.webContents.executeJavaScript("document.getElementById('stat').textContent")) === '4 min left on YouTube today'), 'the new tab shows the stat line under the search box');
+    await shot('28-newtab-stat', true);
+    tabs.close(sl.id);
+    setPrefs({ mochiMode: 'off' });
+    await wait(200);
+    check(statLine(mainWin) === null, 'no stat line when Mochi is off');
+    setPrefs({ mochiMode: 'lively' });
+    delete focus.used['youtube.com'];
+    for (const k of Object.keys(focus.limits)) delete focus.limits[k];
+    Object.assign(focus.limits, savedLimits);
+    focus.streak = savedStreak;
+
+    // --- Seed two weeks of history, then the Monday nudge and the report ---
+    stats.clear();
+    const lastMon = addDays(mondayOf(new Date()), -7);
+    const day = (o) => ({ sites: {}, total: 0, limited: 0, hadLimits: false, hit: false, focus: 0, eaten: 0, snoozes: 0, unlocks: 0, slept: 0, freedMB: 0, ...o });
+    stats.days[keyOf(lastMon)] = day({ sites: { 'youtube.com': 3600, 'github.com': 1800 }, total: 5400, limited: 3600, hadLimits: true, focus: 2, slept: 3, freedMB: 240 });
+    stats.days[keyOf(addDays(lastMon, 1))] = day({ sites: { 'github.com': 1800 }, total: 1800, hadLimits: true, hit: true, eaten: 1, snoozes: 2 });
+    stats.days[keyOf(addDays(lastMon, -7))] = day({ sites: { 'youtube.com': 9000 }, total: 9000, limited: 9000, hadLimits: true });
+    const w1 = stats.week(1);
+    check(w1.total === 7200 && w1.prevTotal === 9000 && w1.within === 1 && w1.limitDays === 2 && w1.focus === 2 && w1.eaten === 1, 'last week adds up (2 h, 1 of 2 days within limits, 2 focus, 1 eaten)');
+    check(w1.top[0].site === 'youtube.com' && w1.top[0].prev === 9000 && w1.top[1].site === 'github.com' && w1.top[1].prev === 0, 'top sites with last week\'s numbers');
+    check(w1.earlier === true && stats.week(0).hasData === false, 'you can step back a week; this week is empty');
+
+    // Monday nudge: once a week, on the first new tab
+    stats.store.set('reportSeen', null);
+    await js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
+    const n1 = tabs.create();
+    await ready(n1);
+    check(await until(() => js("UI.mochiLog.some((m) => /^Your week in Burrow is ready/.test(m.text) && m.pose === 'celebrate')")), 'the first new tab of the week brings Mochi: "Your week in Burrow is ready"');
+    const n2 = tabs.create();
+    await ready(n2);
+    await wait(1200);
+    check(await js("UI.mochiLog.filter((m) => /Your week/.test(m.text)).length") === 1, 'only once a week');
+    await shot('29-report-nudge');
+    await js("document.getElementById('stripMochi').click()");
+    check(await until(() => tabs.active && tabs.active.url.startsWith('burrow://report')), 'clicking Mochi opens the weekly report');
+    const rp = tabs.active;
+    await ready(rp);
+    const rjs = (code) => rp.view.webContents.executeJavaScript(code);
+    check(await until(async () => (await rjs("document.getElementById('whichWeek').textContent")) === 'LAST WEEK'), 'it opens on last week');
+    check(await rjs("document.getElementById('nTotal').textContent") === '2 h', 'the report shows 2 h browsing');
+    check((await rjs("document.getElementById('dTotal').textContent")) === '30 min less than last week' && await rjs("document.getElementById('dTotal').classList.contains('good')"), 'with "30 min less than last week" marked as good');
+    check(await rjs("document.getElementById('nWithin').textContent") === '1 / 2', 'days within limits: 1 / 2');
+    check(await rjs("document.querySelectorAll('#chart .day').length") === 7 && await rjs("document.querySelector('#chart .day .lim').style.height !== '0px'"), 'a 7-day chart with the limited part in the accent colour');
+    check((await rjs("document.querySelector('#top li b').textContent")) === 'YouTube' && (await rjs("document.querySelectorAll('#top li')[1].textContent")).includes('new this week'), 'top sites: YouTube first, github.com new this week');
+    check((await rjs("document.getElementById('highlights').textContent")).includes('240 MB') && (await rjs("document.getElementById('highlights').textContent")).includes('eaten by Mochi'), "Mochi's highlights mention memory freed and tabs eaten");
+    check(['celebrate', 'happy'].includes(await rjs("document.getElementById('mochi').dataset.pose")), 'Mochi looks happy about a calmer week');
+    await shot('30-report', true);
+    await rjs('window.scrollTo(0, document.body.scrollHeight)');
+    await wait(300);
+    await capture(rp.view.webContents, path.join(dir, '30b-report-bottom.png'));
+    await rjs('window.scrollTo(0, 0)');
+    await rjs("document.getElementById('earlier').click()");
+    check(await until(async () => (await rjs("document.getElementById('whichWeek').textContent")) === '2 WEEKS AGO' && (await rjs("document.getElementById('nTotal').textContent")) === '2 h 30 m'), '"Earlier" shows the week before');
+    await rjs("document.getElementById('later').click()");
+    await rjs("document.getElementById('later').click()");
+    check(await until(async () => (await rjs("document.getElementById('whichWeek').textContent")) === 'THIS WEEK SO FAR' && !(await rjs("document.getElementById('empty').hidden"))), 'this week so far starts empty, with a friendly note');
+    // A website can't read the report
+    const rpPriv = await rjs("typeof burrowPage.report");
+    check(rpPriv === 'function', 'the report page has its bridge');
+    tabs.close(rp.id);
+    tabs.close(n1.id);
+    tabs.close(n2.id);
+
+    // --- Settings → Focus: switch and Clear my stats; ☰ → Report ---
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('focusSect').open = true");
+    check(await until(() => js("document.getElementById('reportOn').checked")), 'Settings shows "Keep a weekly report" switched on');
+    await js("document.getElementById('statsClear').click()");
+    check(Object.keys(stats.days).length > 0, 'one click on "Clear my stats" asks again');
+    await js("document.getElementById('statsClear').click()");
+    check(await until(() => Object.keys(stats.days).length === 0), 'the second click clears every day');
+    await shot('31-report-settings');
+    await js("closePanel()");
+    await js("document.getElementById('menuBtn').click()");
+    await wait(300);
+    check(await js("document.querySelectorAll('#mainMenu .cc-lib button').length") === 4, 'the menu has a Report tile next to the library');
+    await js("document.querySelector('#mainMenu [data-cmd=report]').click()");
+    check(await until(() => tabs.active && tabs.active.url.startsWith('burrow://report')), '☰ → Report opens the report');
+    tabs.close(tabs.active.id);
+    srv9.close();
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld('burrow', {
     onTimeUp: listen('focus-timeup'),
     onState: listen('focus-state'),
   },
+  stats: { clear: send('stats:clear') },
+  openReport: send('report:open'),
   zoom: send('zoom:step'),
   find: {
     query: send('find:query'),

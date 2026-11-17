@@ -64,7 +64,23 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
    - **Per-tab volume**: click a tab's speaker → slider 0–200% + mute + "remember for this site". Works on video/audio elements (YouTube, Netflix, Spotify Web, Twitch…); Web Audio-only sites (games) can still be muted. **Above 100%** routes sound through Web Audio, which some sites forbid (a boosted video would go silent) — so the boost only turns on when the page allows it, otherwise the slider stops at 100%.
    - **☰ menu → control centre**: search field (opens Ctrl+K), row of New tab / Window / Private, zoom row, icon grid (Find, Split, Reader, PiP, Notes), library tiles (Bookmarks, History, Downloads), small links (Settings · Tour · Report a bug). Nothing removed; 5 compact rows instead of ~17 lines.
    - *Not in phase 8:* "What are you here for?" pause; focus-mode schedule (later).
-9. New-tab stat line + weekly Burrow report.
+9. **New-tab stat line + weekly Burrow report** (decided 2026-11-17):
+   - **Stats store** (`main/stats.js`, `stats.json`): active time per site per day for **every** http(s) site, counted the same way as limits (on screen, focused window, active in the last minute). **Private windows are never recorded here** (their time still counts toward limits, as in phase 8). Also per day: focus sessions finished, tabs Mochi ate, "1 more minute"s and unlocks used, tabs put to sleep and memory freed. Kept **5 weeks**, older days deleted. Stays on your PC.
+   - **Settings → Focus**: "Keep a weekly report" switch (off = nothing new recorded) and "Clear my stats" (two clicks).
+   - **New-tab stat line** — one kind line under the search box, the most relevant of: time left on a limited site you used today (≤ 10 min) → focus session running → streak of days within limits (≥ 2) → focus sessions finished today → memory saved by sleeping tabs today. Nothing worth saying → no line. Not in private windows; hidden when Mochi is Off.
+   - **Weekly report** (`burrow://report`): a Monday-to-Sunday page in the Swiss grid style:
+     - Headline from Mochi (pose matches the week: celebrate / happy / gentle "new week, fresh start")
+     - Total active time, with **↑/↓ vs last week**
+     - Pixel bar chart by day; the part spent on limited sites in the accent colour
+     - Top 5 sites with time and change vs last week
+     - Limits: days within limits, streak, "1 more minute"s and unlocks used
+     - Focus sessions finished
+     - **Mochi's highlights**: tabs eaten, memory saved, best day, longest run of focus sessions
+     - ← / → to earlier weeks (up to 5), "This week so far"
+     - Empty state for the first week ("Come back Monday")
+   - **Delivery**: on the first new tab of a new week (if last week has data), Mochi walks in: "Your week in Burrow is ready" + Open button — once per week. Also ☰ (library row → Report) and Ctrl+K "Weekly report" any time.
+   - *Not in phase 9:* save the report as an image; "limit this site?" suggestions.
+   - Self-test: counting (idle stubbed), private windows not recorded, 5-week pruning, stat-line choice for each case, report numbers from seeded data (totals, vs-last-week, top sites, empty state), Monday nudge appears once, switch off stops recording, Clear my stats.
 10. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
 11. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 

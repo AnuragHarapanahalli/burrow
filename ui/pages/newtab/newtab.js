@@ -23,6 +23,10 @@ function greeting() {
   return 'Good evening. Welcome to Burrow.';
 }
 $('stat').textContent = greeting();
+// One gentle stat instead of the greeting, when there's something worth saying.
+window.burrowPage.statLine?.().then((line) => {
+  if (line && !isPrivate) { $('stat').textContent = line; $('stat').classList.add('has-stat'); }
+}).catch(() => {});
 
 // ---------- Search ----------
 // ---------- Search | Ask ----------

@@ -426,3 +426,13 @@ body.split-resizing .split-bar { transition: none; }
 .suggest-chips button { border: 1px dashed var(--muted); padding: 3px 8px; font-size: 12.5px; transition: background-color .12s; }
 .suggest-chips button:hover { background: var(--fg); color: var(--bg); border-style: solid; }
 .eater-bubble b { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Settings → Focus: weekly report */
+.report-set { border-top: var(--hair); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.switch-row { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.switch-row input { margin-top: 3px; accent-color: var(--accent); }
+.switch-row small { color: var(--muted); font-size: 12px; }
+.report-btns { display: flex; gap: 14px; flex-wrap: wrap; }
+.text-btn.danger.armed { color: var(--accent-ink); font-weight: 600; }
+/* control centre: four library tiles, icon over label */
+.cc-lib button { flex-direction: column; gap: 4px; font-size: 12px; padding: 9px 4px 8px; }

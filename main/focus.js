@@ -3,6 +3,7 @@
 // its window is focused, and you've been active in the last minute.
 const { powerMonitor } = require('electron');
 const { Store } = require('./store');
+const { hostOf } = require('./stats');
 
 const SUGGESTED = ['youtube.com', 'instagram.com', 'x.com', 'reddit.com', 'tiktok.com', 'facebook.com'];
 const BUDGETS = [15, 30, 45, 60, 90];          // minutes a day you can pick
@@ -123,15 +124,19 @@ class Focus {
     this.tickSession();
     const idle = this.isIdle();
     const counted = new Set();
+    const seen = new Map(); // for the weekly report: host → is it limited? (never private windows)
     if (!idle) {
       for (const w of this.h.getWindows()) {
-        if (w.win.isDestroyed() || !w.win.isFocused() || w.win.isMinimized()) continue;
+        if (!this.winActive(w)) continue;
         for (const t of w.tabs.shownTabs) {
           const site = this.siteOf(t.url);
           if (site && !counted.has(site)) counted.add(site);
+          const host = !w.isPrivate && hostOf(t.url);
+          if (host) seen.set(host, !!site || !!seen.get(host));
         }
       }
     }
+    if (seen.size) this.h.onCount?.(seen, Object.keys(this.limits).length > 0);
     for (const site of counted) {
       this.used[site] = (this.used[site] || 0) + 1;
       this.checkWarnings(site);
@@ -142,6 +147,8 @@ class Focus {
   }
 
   isIdle() { return powerMonitor.getSystemIdleTime() >= IDLE_SECONDS; }
+  // Only the window you're using counts.
+  winActive(w) { return !w.win.isDestroyed() && w.win.isFocused() && !w.win.isMinimized(); }
 
   checkWarnings(site) {
     const left = this.remaining(site);
@@ -157,6 +164,7 @@ class Focus {
   timeUp(site) {
     if (this.eating.has(site)) return;
     this.hit[site] = true;
+    this.h.onEvent?.('hit');
     const snoozesLeft = SNOOZES_PER_DAY - (this.snoozes[site] || 0);
     this.eating.set(site, setTimeout(() => this.eaten(site), 12000));
     this.save();
@@ -168,6 +176,7 @@ class Focus {
     clearTimeout(this.eating.get(site));
     this.eating.delete(site);
     this.snoozes[site] = (this.snoozes[site] || 0) + 1;
+    this.h.onEvent?.('snoozes');
     this.extra[site] = (this.extra[site] || 0) + Math.max(0, -this.remaining(site)) + 60;
     this.warned[site] = []; // the 1-minute warning can come again
     this.save();
@@ -176,8 +185,10 @@ class Focus {
 
   // The tab was eaten: close every tab of that site, in every window.
   eaten(site) {
+    if (!this.eating.has(site)) return; // already eaten (or never due)
     clearTimeout(this.eating.get(site));
     this.eating.delete(site);
+    this.h.onEvent?.('eaten');
     for (const w of this.h.getWindows()) {
       for (const t of [...w.tabs.tabs]) if (this.siteOf(t.url) === site) w.tabs.close(t.id);
     }
@@ -206,6 +217,7 @@ class Focus {
     if (this.blocked(site) !== 'limit') return false;
     this.gateStarts.delete(pageId);
     this.unlocks[site] = (this.unlocks[site] || 0) + 1;
+    this.h.onEvent?.('unlocks');
     this.extra[site] = (this.extra[site] || 0) + Math.max(0, -this.remaining(site)) + UNLOCK_MINUTES * 60;
     this.warned[site] = [];
     this.save();
@@ -234,6 +246,7 @@ class Focus {
     if (!s || Date.now() < s.endsAt) return;
     if (s.phase === 'focus') {
       this.session = { phase: 'break', endsAt: Date.now() + BREAK_MIN * 60000 };
+      this.h.onEvent?.('focus');
       this.h.onSession?.('focus-done');
     } else {
       this.session = null;

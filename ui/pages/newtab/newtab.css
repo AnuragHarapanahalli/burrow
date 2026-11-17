@@ -193,3 +193,5 @@ body.ask-mode .search:focus-within { box-shadow: 4px 4px 0 var(--fg); }
 body.ask-mode #qHint { color: var(--accent-ink); border-color: var(--accent-ink); }
 
 body.mochi-off .mochi-spot { display: none; }
+.stat.has-stat { color: var(--fg); }
+.stat.has-stat::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 0; background: var(--accent); }

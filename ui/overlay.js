@@ -86,6 +86,7 @@ const CC_ICON = {
   "bookmarks": "<path d=\"M8 2l1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3 4.3 13.3l.8-4.1L2 6.3l4.2-.5z\"/>",
   "history": "<path d=\"M8 2.5a5.5 5.5 0 1 1-5.2 3.8M2.5 2.5v3.5H6M8 5v3.5l2.5 1.5\"/>",
   "downloads": "<path d=\"M8 2v7M5 6.5 8 9.5l3-3M2.5 10.5v3h11v-3\"/>",
+  "report": "<path d=\"M2 14h12M3.5 14V9h2v5M7 14V4h2v10M10.5 14V7h2v7\"/>",
   "newtab": "<path d=\"M8 3v10M3 8h10\"/>",
   "window": "<path d=\"M2 3h12v10H2zM2 6h12\"/>",
   "private": "<path d=\"M2 7c1.5-2 3.5-3 6-3s4.5 1 6 3M3.5 9.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM8.5 9.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0z\"/>"
@@ -126,6 +127,7 @@ function openMainMenu() {
       <button data-cmd="bookmarks" title="Bookmarks (Ctrl+Shift+O)">${ccIcon('bookmarks')}<span>Bookmarks</span></button>
       <button data-cmd="history" title="History (Ctrl+H)">${ccIcon('history')}<span>History</span></button>
       <button data-cmd="downloads" title="Downloads (Ctrl+J)">${ccIcon('downloads')}<span>Downloads</span></button>
+      ${priv ? '' : `<button data-cmd="report" title="Your week in Burrow">${ccIcon('report')}<span>Report</span></button>`}
     </div>
     <div class="cc-foot">
       <button data-cmd="settings">Settings</button><span>&middot;</span>
@@ -161,6 +163,7 @@ mainMenu.addEventListener('click', (e) => {
   else if (cmd === 'reopen') B.tabs.reopen();
   else if (cmd === 'bmbar') B.setPrefs({ bookmarksBar: !UI.theme?.prefs.bookmarksBar });
   else if (cmd === 'focus') B.focus.session(UI.focus?.session ? 'end' : 'start');
+  else if (cmd === 'report') B.openReport();
   else window.openPanel(cmd);
 });
 

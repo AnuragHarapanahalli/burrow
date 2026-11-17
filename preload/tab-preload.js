@@ -10,6 +10,10 @@ if (location.protocol === 'burrow:') {
     setSearchEngine: (id) => ipcRenderer.send('page:search-engine', String(id || '')),
     ask: (text) => ipcRenderer.send('page:ask', String(text || '')),
     readerArticle: (key) => ipcRenderer.invoke('page:reader', String(key || '')),
+    // New tab: the one stat line. Weekly report page: its numbers.
+    statLine: () => ipcRenderer.invoke('page:statline'),
+    report: (offset) => ipcRenderer.invoke('page:report', Number(offset) || 0),
+    reportAction: (action) => ipcRenderer.send('page:report-action', String(action || '')),
     // Welcome tour only (the main process ignores these from any other page).
     // The Burrow gate only (the main process ignores these from any other page).
     gateInfo: () => ipcRenderer.invoke('page:gate-info'),
