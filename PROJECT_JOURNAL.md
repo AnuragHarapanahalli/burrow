@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Phase 8 plan** (details in PLAN.md): daily per-site limits; Mochi warns (10/5/1 or 5/1 or 2/1 min left, by budget); at zero Mochi **eats the tab** (after a 5-s "1 more minute", twice a day); reopening shows the **Burrow gate** | Mochi presses the tab's × (original idea); no warnings | Your idea — eating the tab is more memorable and more Mochi |
+| 2026-11-17 | Gate unlock = **friction, not a lock**: type a sentence + breathing countdown (10 s → 30 s → 60 s) for 5 more minutes | Hard lock until midnight; plain "continue" button | Never trapped, but never mindless |
+| 2026-11-17 | Phase 8 extras: **focus sessions** (25/5), **private windows count** toward limits, **volume up to 200%** | "What are you here for?" pause (left out for now) | Your choice. Private windows would otherwise be an easy loophole |
+| 2026-11-17 | Volume boost above 100% only where the page allows it | Always allow | Boosting routes sound through Web Audio, which some sites forbid — the video would go silent |
+| 2026-11-17 | ☰ menu becomes a **control centre** (search, button rows, icon grid, tiles) | Grouped list; minimal menu + Ctrl+K | The 17-line list got crowded; a grid shows everything in 5 rows |
 | 2026-11-17 | 5b ("Ask AI about this page") **postponed**; phases 6 and 7 done first | Keep the original order | Your call: sleeping tabs help every day |
 | 2026-11-17 | **Tab sleeping**: tabs out of sight for 30 min (Settings: off / 15m / 30m / 1h / 2h) are unloaded but stay in the strip with a "zz"; clicking wakes them on the same page **with Back/Forward history**. Never sleeps: the tab(s) you see, tabs playing sound/video, "Keep this tab awake", or "never sleep" sites. Ctrl+K → "Put other tabs to sleep now" | Discard tabs with no history; only a manual button | Frees memory without losing your place |
 | 2026-11-17 | **Restored tabs start asleep** and load only when you open them | Load every saved tab at startup | Much faster startup with many tabs (what Chrome/Edge do) |
@@ -365,7 +370,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 5b | Ask AI about this page / selected text | postponed |
 | 6 | Tab sleeping | ✅ done |
 | 7 | Mochi animations + reactions | ✅ done |
-| 8 | Focus tools (time limits — Mochi closes the tab, focus sessions) | next |
+| 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | next (planned) |
 | 9 | New-tab stat + weekly report | planned |
 | 10 | Polish, accessibility, Windows installer | planned |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |

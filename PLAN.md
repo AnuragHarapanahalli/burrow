@@ -50,12 +50,20 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
 1. ✅ Journal + scaffold: window, custom title bar, single tab navigation, theme engine with the Customize panel.
 2. ✅ Numbered tabs + overflow sidebar, workspaces, omnibox, shortcuts, session restore.
 3. ✅ Bookmarks, history, downloads, find, zoom, private window, PiP (+ multiple windows, tab dragging, bug reports).
-4. Ctrl+K command palette **+ AI layer 1 "Ask AI"**: address bar, new tab (Search | Ask toggle), Ctrl+K rows and Settings offer Claude / ChatGPT / Gemini; questions go to AI first ("smart" default), everything else to search; opens the AI site with the question filled in where supported.
-5. Split view (draggable divider) **+ AI layer 2 side panel** (your AI chat docked beside the page, signed in, stays open across tabs); notes panel + .md export; reader mode.
-5b. **AI layer 3 "Ask about this page"**: right-click selected text → Ask AI; ☰ → Summarize page. Sends page content only when you click; off in private windows; shows exactly what is sent.
-6. Tab sleeping (`webContents` discard after N idle minutes, ZZ badge).
-7. Mochi: sprite engine, poses (idle, wave, happy, sleepy, walk, press, celebrate), reaction events, quiet mode.
-8. Focus tools: per-site daily limits (active time only), Mochi walks to the tab's × and presses it (2 snoozes/day), time's-up gate, mindful pause, focus sessions + focus mode schedule.
+4. ✅ Ctrl+K command palette **+ AI layer 1 "Ask AI"**: address bar, new tab (Search | Ask toggle), Ctrl+K rows and Settings offer Claude / ChatGPT / Gemini; questions go to AI first ("smart" default), everything else to search; opens the AI site with the question filled in where supported.
+5. ✅ Split view (draggable divider) **+ AI layer 2 side panel** (your AI chat docked beside the page, signed in, stays open across tabs); notes panel + .md export; reader mode. (+ split tab picker, welcome tour)
+5b. *(postponed)* **AI layer 3 "Ask about this page"**: right-click selected text → Ask AI; ☰ → Summarize page. Sends page content only when you click; off in private windows; shows exactly what is sent.
+6. ✅ Tab sleeping (unload after N idle minutes, keep Back/Forward history, "zz" badge, lazy restore).
+7. ✅ Mochi: poses (idle, wave, happy, sleepy, walk, press, celebrate, oops), walk-in, reactions, Lively / Quiet / Off.
+8. **Focus tools + per-tab volume + menu redesign** (decided 2026-11-17):
+   - **Daily time limits per site** — Settings → Focus: limited sites with a daily budget (15/30/45/60/90 min); suggestions YouTube, Instagram, X, Reddit, TikTok, Facebook; add any site. Counts only while the site is on screen, the window focused and you active in the last minute. One budget per site across all tabs and windows, **private windows included** (their time isn't saved anywhere else). Resets at midnight. Countdown chip in the address bar in the last 5 minutes.
+   - **Mochi warnings** (important, so also in Quiet mode): budget ≥ 30 min → 10, 5 and 1 min left; 15–29 min → 5 and 1; under 15 → 2 and 1.
+   - **Time's up — Mochi eats the tab** (~2.5 s): walks along the strip to the tab, tab wobbles, three chomps (new chomp poses) as the tab shrinks into Mochi with pixel crumbs, "Nom! That's YouTube for today", walks off. Before the chomp, a 5-second **"1 more minute"** offer (2 per site per day). Tab in another workspace: closes quietly with a message. Reduced motion: fade + message.
+   - **The Burrow gate** — any way back to a used-up site (address bar, bookmark, link, Ctrl+Shift+T, any window) shows a calm full page: Mochi asleep by a closed burrow door, time spent today, streak of days within limits, alternatives (go back, quick links, start a focus session, 2-minute stretch break). **Friction unlock**: type "I'm choosing more time on <site>" + breathing countdown → 5 more minutes; waits grow 10 s → 30 s → 60 s through the day.
+   - **Focus sessions**: 25 min focus / 5 min break; limited sites go straight to the gate during a session; thin progress bar under the toolbar; Mochi celebrates the end.
+   - **Per-tab volume**: click a tab's speaker → slider 0–200% + mute + "remember for this site". Works on video/audio elements (YouTube, Netflix, Spotify Web, Twitch…); Web Audio-only sites (games) can still be muted. **Above 100%** routes sound through Web Audio, which some sites forbid (a boosted video would go silent) — so the boost only turns on when the page allows it, otherwise the slider stops at 100%.
+   - **☰ menu → control centre**: search field (opens Ctrl+K), row of New tab / Window / Private, zoom row, icon grid (Find, Split, Reader, PiP, Notes), library tiles (Bookmarks, History, Downloads), small links (Settings · Tour · Report a bug). Nothing removed; 5 compact rows instead of ~17 lines.
+   - *Not in phase 8:* "What are you here for?" pause; focus-mode schedule (later).
 9. New-tab stat line + weekly Burrow report.
 10. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
 11. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
@@ -63,7 +71,8 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
 ## Verification
 - `npm install` and `npm start` after every phase, then check that phase's features by hand.
 - Theme: try every preset + a few custom colours in light and dark mode, check text stays readable, and confirm the setting survives a restart.
-- Mochi limit flow: a debug "limit in seconds" setting with YouTube set to 20 s. Mochi warns at 80%, walks to the right tab's × even with many tabs, presses it, and the tab closes. Snooze works twice, then is refused. Reopening shows the gate.
+- Mochi limit flow (self-test, with a local test site and a seconds-long budget): warnings fire at the right moments; Mochi walks to the right tab (even with many tabs), eats it, the tab closes; "1 more minute" works twice then is refused; reopening by address, bookmark, link and Ctrl+Shift+T all show the gate; the friction unlock grants 5 minutes and the next wait is longer; time in private windows counts; time only counts while the tab is visible.
+- Volume: slider changes a test page's video volume; 0–100% on any page; the boost above 100% only appears where the page allows it.
 - Tab sleeping: lower the debug threshold and confirm memory drops and the tab reloads when you click it.
 - Command palette finds tabs, history, bookmarks and actions using only the keyboard.
 - `npm run dist` produces an installer that installs and runs.
