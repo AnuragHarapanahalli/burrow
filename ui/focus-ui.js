@@ -28,6 +28,7 @@ const fuEater = $('eater');
 const fuSprite = $('eaterSprite');
 const fuBubble = $('eaterBubble');
 let fuStop = null;
+const FU_CAPTION_SPACE = 158; // Windows' minimise / maximise / close buttons (146 px) plus a gap
 let fuBusy = false;
 UI.eatLog = []; // what happened (the self-test reads this)
 
@@ -60,18 +61,25 @@ B.focus.onTimeUp(async ({ site, name, snoozesLeft, tabIds }) => {
 
 // Step 1: "Time's up!" with a 5-second "1 more minute" button. Resolves true if you took it.
 async function fuOffer(site, name, snoozesLeft) {
-  const startX = Math.max(160, window.innerWidth - 470);
-  fuEater.style.left = (window.innerWidth - 180) + 'px';
+  const button = snoozesLeft > 0 ? `<button class="eat-snooze" id="eatSnooze">1 more minute <span class="pixel">(${snoozesLeft} LEFT)</span></button>` : '';
+  const bubble = (s) => `<b>Time's up for ${esc(name)}!</b> ${button}<span class="pixel eat-count">${s}</span>`;
+  // Measure Mochi + the bubble first, so the bubble ends left of the window's minimise/maximise/close buttons.
+  fuEater.style.left = '0px';
   fuEater.style.top = '4px';
+  fuEater.style.visibility = 'hidden';
   fuEater.hidden = false;
+  fuPose('walk1'); // Mochi's sprite counts towards the width too
+  fuSay(bubble(5));
+  const startX = Math.max(160, window.innerWidth - FU_CAPTION_SPACE - fuEater.offsetWidth);
   fuSay('');
+  fuEater.style.left = (window.innerWidth - FU_CAPTION_SPACE) + 'px';
+  fuEater.style.visibility = '';
   if (!reducedMotion()) await fuWalkTo(startX);
   else fuEater.style.left = startX + 'px';
   fuPose('wave');
   let choice = null;
-  const button = snoozesLeft > 0 ? `<button class="eat-snooze" id="eatSnooze">1 more minute <span class="pixel">(${snoozesLeft} LEFT)</span></button>` : '';
   for (let s = 5; s > 0 && !choice; s--) {
-    fuSay(`<b>Time's up for ${esc(name)}!</b> ${button}<span class="pixel eat-count">${s}</span>`);
+    fuSay(bubble(s));
     const btn = $('eatSnooze');
     if (btn) btn.onclick = () => { choice = 'snooze'; };
     for (let i = 0; i < 10 && !choice; i++) await fuWait(100);
@@ -92,6 +100,7 @@ async function fuOffer(site, name, snoozesLeft) {
 async function fuEat(site, name, tabIds) {
   const el = tabIds.map((id) => document.querySelector(`#tabs [data-id="${id}"], #sideTabs [data-id="${id}"]`)).find(Boolean);
   if (!el || reducedMotion()) {
+    UI.eatLog.push({ site, at: Date.now(), step: 'no-animation', foundTab: !!el, tabIds, reduced: reducedMotion() });
     if (el) el.classList.add('eaten-fade');
     await fuWait(el ? 400 : 0);
     B.focus.eaten(site);

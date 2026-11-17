@@ -6,7 +6,8 @@
   "main": "main/main.js",
   "private": true,
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node scripts/selftest.js"
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5.1.0",

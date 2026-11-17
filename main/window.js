@@ -77,7 +77,7 @@ class BurrowWindow {
     uwc.on('before-input-event', (e, input) => this.handleInput(e, input));
     uwc.setWindowOpenHandler(() => ({ action: 'deny' }));
     uwc.on('will-navigate', (e) => e.preventDefault()); // the UI page never navigates away
-    uwc.once('did-finish-load', () => this.win.show());
+    uwc.once('did-finish-load', () => { if (!this.win.isDestroyed()) this.win.show(); }); // (it may have been closed already)
     uwc.loadURL('burrow://app/ui/index.html');
 
     const { store, library } = ctx;

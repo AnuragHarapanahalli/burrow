@@ -265,6 +265,11 @@ WOAHDAMN/
 2. In this folder, run `npm install` once (downloads Electron, ~100 MB).
 3. Run `npm start` to open Burrow.
 
+**Checking nothing broke (the self-test):**
+- `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, windows. Several work too: `npm test -- phase7 phase8`.
+- It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
+
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
 
 **Shortcuts so far:** Ctrl+\\ split view · Ctrl+Shift+A AI panel · Ctrl+Shift+E notes · F9 reader view · Ctrl+K command palette · Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
@@ -364,6 +369,11 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - The self-test runs a tiny local "doomscroll" site with a short limit and goes through the whole day: warning → two snoozes → eaten → every way back in (new tab, Ctrl+Shift+T, typing, links) lands on the gate → unlock refused too early → unlock after breathing → private window gated too → focus session.
 - Fixed while testing: the gate's countdown timer was created after its first tick (harmless, but fragile).
 - Note: one older check (dragging the split divider) failed once while the test window was covered by another window. It passed on the other runs.
+
+**2026-11-17 — Faster self-test + two fixes (204/204 checks pass, 107 s)**
+- The self-test used to pause a fixed time after each step (about 110 s of pauses, ~4–5 minutes per run). It now waits only until each page has actually loaded, is split into parts you can run on their own, and has an `npm test` command. Full run: ~107 s.
+- Fixed: Mochi's "1 more minute" bubble ran under the window's minimise/maximise/close buttons. It's now measured and kept left of them, and the self-test checks it.
+- Fixed: closing a window before its interface finished loading showed a "JavaScript error in the main process" box.
 
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.

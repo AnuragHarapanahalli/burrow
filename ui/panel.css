@@ -425,3 +425,4 @@ body.split-resizing .split-bar { transition: none; }
 .suggest-chips .pixel { flex-basis: 100%; color: var(--muted); }
 .suggest-chips button { border: 1px dashed var(--muted); padding: 3px 8px; font-size: 12.5px; transition: background-color .12s; }
 .suggest-chips button:hover { background: var(--fg); color: var(--bg); border-style: solid; }
+.eater-bubble b { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }

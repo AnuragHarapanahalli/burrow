@@ -26,6 +26,28 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     if (r.e) throw new Error(`UI script "${code.slice(0, 60)}" threw: ${r.e}`);
     return r.v;
   };
+  // Wait until a tab's page has finished loading (and, if given, its address contains `part`),
+  // instead of pausing a fixed time and hoping.
+  const ready = async (t, part) => {
+    const ok = await until(() => t && t.view && !t.view.webContents.isDestroyed() && !t.view.webContents.isLoading() && !t.loading && (!part || (t.url || '').includes(part)), 12000);
+    await wait(150); // let the page's own scripts run
+    return ok;
+  };
+  // Sections: BURROW_SELFTEST_ONLY=phase8,windows runs just those. Each section's time is logged.
+  const only = (process.env.BURROW_SELFTEST_ONLY || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const started = Date.now();
+  let current = null;
+  const endSection = () => {
+    if (current) note(`    (${current.name}: ${((Date.now() - current.at) / 1000).toFixed(1)}s)`);
+    current = null;
+  };
+  const section = (name) => {
+    endSection();
+    if (only.length && !only.includes(name)) return false;
+    current = { name, at: Date.now() };
+    note(`--- ${name}`);
+    return true;
+  };
 
   async function capture(wc, file) {
     wc.invalidate(); // background windows paint lazily; force a fresh frame
@@ -41,11 +63,13 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
   };
 
   try {
-    await wait(2500);
+    await until(async () => tabs.active && !tabs.active.loading && (await js('(window.__loaded || []).length')) >= 11, 10000);
+    await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
     check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
+    if (section('basics')) {
     // --- Search engine chooser on the new tab ---
     const page = tabs.active.view.webContents;
     const pjs = (code) => page.executeJavaScript(code);
@@ -90,7 +114,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.activate(tabs.tabs[0].id);
     // From the menu
     const menuTab = tabs.create('burrow://newtab/#report-bug');
-    await wait(1500);
+    await ready(menuTab);
+    await until(() => menuTab.view.webContents.executeJavaScript("!document.getElementById('bugScrim').hidden"));
     check(await menuTab.view.webContents.executeJavaScript("!document.getElementById('bugScrim').hidden"), 'Menu \u2192 Report a bug opens the form directly');
     tabs.close(menuTab.id);
     await wait(300);
@@ -112,7 +137,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Browsing + history + bookmarks ---
     tabs.navigate('example.com');
-    await wait(4000);
+    await ready(tabs.active, 'example.com');
     check(await until(async () => library.searchHistory('example').length > 0), 'visit is recorded in history');
     await js("document.getElementById('star').click()");
     await wait(500);
@@ -123,7 +148,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.create();
     await wait(60);
     check(await js("!!document.querySelector('.tab.opening')"), 'new tab slides open');
-    await wait(1200);
+    await ready(tabs.active);
     await js("const a=document.getElementById('address'); a.focus(); a.value='examp'; a.dispatchEvent(new Event('input'))");
     await wait(800);
     const rows = await js("document.querySelectorAll('#suggest .sg').length");
@@ -156,7 +181,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Downloads ---
     tabs.active.view.webContents.downloadURL('https://example.com/');
-    await wait(5000);
+    await until(() => downloads.state().some((d) => d.state === 'completed'), 15000);
     const done = downloads.state().find((d) => d.state === 'completed');
     check(!!done, `download completes (${done ? done.filename : 'none'})`);
     await js("openPanel('downloads')");
@@ -192,7 +217,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(800);
     check(tabs.visible.length === 1 && tabs.workspaces.length === 2, 'new workspace starts with one tab');
     // Quick link only for this workspace
-    await wait(1200);
+    await ready(tabs.active);
     const cpage = tabs.active.view.webContents;
     const cjs = (code) => cpage.executeJavaScript(code);
     await cjs("document.getElementById('linksEdit').click(); document.querySelector('[data-add]').click()");
@@ -209,7 +234,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // A new tab in Home must not show it.
     tabs.switchWorkspaceIndex(0);
     const homeNew = tabs.create();
-    await wait(1500);
+    await ready(homeNew);
     check((await homeNew.view.webContents.executeJavaScript("document.getElementById('links').textContent")).includes('Lectures') === false, 'Home new tab does not show the College-only link');
     tabs.close(homeNew.id);
     tabs.switchWorkspace(collegeId);
@@ -232,10 +257,12 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(800);
     check(tabs.visible.length === before, 'Ctrl+Shift+T reopens the closed tab');
 
+    }
+    if (section('phase3')) {
     // ================= Phase 3 =================
     // --- Find in page ---
     const ex = tabs.create('https://example.com/');
-    await wait(4000);
+    await ready(ex);
     mainWin.send('find-open');
     await wait(300);
     check(await js("!document.getElementById('findbar').hidden"), 'Ctrl+F opens the find bar');
@@ -259,7 +286,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await js("document.getElementById('zoomBtn').textContent") === '110%', 'address bar shows 110%');
     check((store.get('zoom') || {})['example.com'] === 1.1, 'zoom is remembered for example.com');
     const ex2 = tabs.create('https://example.com/');
-    await wait(3500);
+    await ready(ex2);
+    await until(() => Math.abs(ex2.view.webContents.getZoomFactor() - 1.1) < 0.01);
     check(Math.abs(ex2.view.webContents.getZoomFactor() - 1.1) < 0.01, 'another example.com tab opens at 110%');
     tabs.stepZoom(0);
     await wait(300);
@@ -274,7 +302,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       const a=new AudioContext();const o=a.createOscillator();const g=a.createGain();g.gain.value=0.02;o.connect(g).connect(a.destination);o.start();
     </script></body>`);
     const mt = tabs.create(media);
-    await wait(3000);
+    await ready(mt);
+    await until(() => { const x = tabs.state().tabs.find((t) => t.id === mt.id); return x.media && x.audible; }, 5000);
     const ms = tabs.state().tabs.find((t) => t.id === mt.id);
     check(ms.media, 'playing video shows the picture-in-picture button');
     check(ms.audible, 'tab playing sound shows a speaker');
@@ -291,7 +320,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // --- Private window ---
     const histBefore = library.history.length;
     const pw = openWindow({ isPrivate: true });
-    await wait(2500);
+    await until(() => pw.tabs.active, 5000);
+    await ready(pw.tabs.active);
     check(windows.size === 2 && pw.tabs.visible.length === 1, 'Ctrl+Shift+N opens a private window');
     const pPage = pw.tabs.active.view.webContents;
     check((await pPage.executeJavaScript("document.querySelector('h1').textContent")).includes('privately'), 'private new tab says "Browsing privately"');
@@ -300,7 +330,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await capture(pw.ui.webContents, path.join(dir, '09-private-ui.png'));
     await capture(pPage, path.join(dir, '09-private-page.png'));
     pw.tabs.navigate('https://example.com/');
-    await wait(3500);
+    await ready(pw.tabs.active, 'example.com');
+    await wait(300);
     check(library.history.length === histBefore, 'private browsing adds nothing to history');
     await pPage.session.cookies.set({ url: 'https://example.com/', name: 'burrow_private_test', value: '1' });
     const leaked = await session.defaultSession.cookies.get({ name: 'burrow_private_test' });
@@ -309,6 +340,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(800);
     check(windows.size === 1, 'closing the private window leaves the main window open');
 
+    }
+    if (section('phase4')) {
     // ================= Phase 4: Ask AI + Ctrl+K palette =================
     const AI = require('../shared/ai');
     const { clipboard } = require('electron');
@@ -339,7 +372,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // New tab: Search | Ask
     const nt = tabs.create();
-    await wait(1500);
+    await ready(nt);
     const ntjs = (code) => nt.view.webContents.executeJavaScript(code);
     await ntjs("(() => { const q = document.getElementById('q'); q.value = 'why is the sky blue'; q.dispatchEvent(new Event('input')); })()");
     await wait(200);
@@ -391,6 +424,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await paletteKey('Escape');
     await wait(200);
 
+    }
     // Real mouse input, the same path your mouse takes.
     const mouse = async (wc, type, x, y) => {
       const held = type !== 'mouseUp' ? ['leftButtonDown'] : [];
@@ -403,6 +437,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       await mouse(wc, 'mouseUp', to.x, to.y);
       await wait(600);
     };
+    if (section('phase5')) {
     // ================= Phase 5: split view, reader, AI panel, notes =================
     // --- Split view ---
     while (tabs.visible.length < 2) tabs.create('https://example.com/', { activate: false });
@@ -462,11 +497,12 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
     const articleUrl = `http://127.0.0.1:${server.address().port}/article`;
     const art = tabs.create(articleUrl);
-    await wait(3000);
+    await ready(art);
+    await until(() => tabs.state().tabs.find((t) => t.id === art.id)?.readerable, 5000);
     check(tabs.state().tabs.find((t) => t.id === art.id)?.readerable, 'an article page gets the reader button');
     check(!(await js("document.getElementById('readerBtn').hidden")), 'the reader button shows in the address bar');
     const opened = await tabs.toggleReader(art);
-    await wait(2000);
+    await ready(art, 'burrow://reader');
     check(opened && art.url.startsWith('burrow://reader'), 'reader view opens');
     const rwc = art.view.webContents;
     check((await rwc.executeJavaScript("document.querySelector('h1').textContent")) === 'Volcanoes explained', 'reader shows the article title');
@@ -476,7 +512,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check((await js("document.getElementById('address').value")) === articleUrl, 'address bar shows the original page in reader view');
     await shot('14-reader', true);
     await tabs.toggleReader(art);
-    await wait(1500);
+    await ready(art, '127.0.0.1');
     check(art.url === articleUrl, 'leaving reader view goes back to the page');
 
     // --- Notes ---
@@ -519,10 +555,13 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(art.id);
     await wait(300);
 
+    }
+    if (section('welcome')) {
     // ================= Welcome tour =================
     check(store.get('onboarded') === false, 'a fresh install has not seen the welcome tour');
     const wt = tabs.create('burrow://welcome/');
-    await wait(1800);
+    await ready(wt);
+    await wait(300);
     const wjs = (code) => wt.view.webContents.executeJavaScript(code);
     check((await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith("Hi. I'm Mochi"), 'the tour opens with Mochi saying hello');
     check(await wjs("document.querySelectorAll('#stepList li').length") === 6, 'the tour has six steps');
@@ -562,13 +601,14 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     check((await wjs("document.getElementById('summary').textContent")).includes('Bing'), 'the last step sums up your choices');
     await wjs("document.getElementById('go').click()");
-    await wait(1200);
     check(await until(async () => store.get('onboarded') === true && wt.url.startsWith('burrow://newtab')), 'Start browsing finishes the tour and opens a new tab');
     tabs.close(wt.id);
     setTheme({ mode: 'light', seed: '#E63027' });
     setPrefs({ aiProvider: 'claude' });
     await wait(300);
 
+    }
+    if (section('phase6')) {
     // ================= Phase 6: tab sleeping =================
     const sleepy = tabs.create('https://example.com/', { activate: false });
     await until(() => !sleepy.loading, 8000);
@@ -620,13 +660,16 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // Restored windows load lazily: only the tab you see wakes up.
     const lazy = openWindow({ snapshot: { current: 0, workspaces: [{ id: 0, name: 'Home', active: 1, tabs: [
       { url: 'https://example.com/?a', title: 'Saved A' }, { url: 'https://example.com/?b', title: 'Saved B' }, 'https://example.com/?c'] }] } });
-    await wait(2500);
+    await until(() => lazy.tabs.tabs.length === 3 && lazy.tabs.tabs[1].view, 5000);
+    await ready(lazy.tabs.tabs[1]);
     const lz = lazy.tabs.tabs;
     check(lz.length === 3 && lz.filter((t) => t.view).length === 1 && lz[1].view, 'a restored window only loads the tab you see (the rest wait asleep)');
     check(lz[0].title === 'Saved A' && lz[0].asleep, 'sleeping restored tabs keep their saved titles');
     lazy.win.close();
     await wait(600);
 
+    }
+    if (section('phase7')) {
     // ================= Phase 7: Mochi =================
     const Mochi = require('../shared/mochi');
     check(['sleepy', 'walk1', 'walk2', 'press', 'celebrate', 'oops'].every((p) => Mochi.POSES[p]), 'Mochi has new poses: sleepy, walking, press, celebrate, oops');
@@ -646,7 +689,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     check(await js("mochiSay('important', { essential: true }) === false"), 'Off: Mochi stays out of sight');
     const offTab = tabs.create();
-    await wait(1500);
+    await ready(offTab);
     check(await offTab.view.webContents.executeJavaScript("document.body.classList.contains('mochi-off')"), 'Off also hides Mochi on the new tab');
     tabs.close(offTab.id);
     setPrefs({ mochiMode: 'lively' });
@@ -668,6 +711,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("closePanel()");
 
 
+    }
+    if (section('phase8')) {
     // ================= Phase 8: focus tools, per-tab volume, control centre =================
     const focus = getFocus();
     const http8 = require('http');
@@ -730,7 +775,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       focus.used[site] = focus.budgetSec(site) + (focus.extra[site] || 0);
       focus.timeUp(site);
       check(await until(() => js("!!document.getElementById('eatSnooze')"), 4000), 'time\'s up: Mochi offers "1 more minute" (' + n + ')');
-      if (n === 1) await shot('22-times-up');
+      if (n === 1) {
+        await shot('22-times-up');
+        const eb = await js("(() => { const r = document.getElementById('eater').getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), w: window.innerWidth, vis: getComputedStyle(document.getElementById('eater')).visibility }; })()");
+        check(eb.right <= eb.w - 146, 'the "1 more minute" bubble stays clear of the window buttons (' + JSON.stringify(eb) + ')');
+      }
       await js("document.getElementById('eatSnooze').click()");
       check(await until(async () => (await eatSteps()).split(',').filter((x) => x === 'snoozed').length === n), '"1 more minute" gives a minute (' + n + ' of 2)');
       check(focus.remaining(site) > 0 && tabs.get(feed.id), 'the tab stays open after the snooze');
@@ -742,6 +791,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     focus.timeUp(site);
     check(await until(() => js("document.getElementById('eaterBubble').textContent.includes('Time\\'s up') && !document.getElementById('eatSnooze')"), 4000), 'after two snoozes there is no "1 more minute" button');
     check(await until(() => js("!!document.querySelector('#tabs .being-eaten, #sideTabs .being-eaten')"), 12000), 'Mochi walks over and starts eating the tab');
+    if (!(await js("UI.eatLog.some((e) => e.step === 'eaten')"))) await wait(4000);
+    note('    eat log: ' + JSON.stringify(await js('UI.eatLog.slice(-3)')));
     await shot('23-mochi-eats');
     check(await until(() => !tabs.get(feed.id), 6000), 'the eaten tab is closed');
     check(await until(() => js("UI.eatLog.some((e) => e.step === 'eaten')")), 'Mochi says "Nom!"');
@@ -771,6 +822,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Friction unlock: the wait is enforced by Burrow, not the page ---
     const gwc = gt.view.webContents;
+    check((await gwc.executeJavaScript("document.getElementById('breatheBtn').textContent")).includes('10 seconds'), 'the first unlock asks for 10 seconds of breathing');
+    focus.unlockWait = () => 2; // (test only: a shorter countdown)
     await gwc.executeJavaScript("document.getElementById('needMore').click()");
     await gwc.executeJavaScript("{ const i = document.getElementById('phraseInput'); i.value = 'let me in'; i.dispatchEvent(new Event('input')) }");
     check(await gwc.executeJavaScript("document.getElementById('breatheBtn').disabled"), 'the wrong sentence keeps the button locked');
@@ -779,10 +832,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await gwc.executeJavaScript("!document.getElementById('breatheBtn').disabled"), 'typing the sentence unlocks "Breathe"');
     check(await gwc.executeJavaScript("burrowPage.gateUnlock()") === false, 'unlocking without the countdown is refused');
     await gwc.executeJavaScript("document.getElementById('breatheBtn').click()");
-    await wait(1500);
-    check(await gwc.executeJavaScript("burrowPage.gateUnlock()") === false, 'unlocking before the 10 seconds are up is refused');
+    await wait(500);
+    check(await gwc.executeJavaScript("burrowPage.gateUnlock()") === false, 'unlocking before the countdown is up is refused');
     await shot('25-gate-breathe', true);
-    check(await until(() => gwc.executeJavaScript("!document.getElementById('openBtn').hidden"), 12000), 'after 10 seconds of breathing the open button appears');
+    check(await until(() => gwc.executeJavaScript("!document.getElementById('openBtn').hidden"), 12000), 'after the breathing countdown the open button appears');
+    delete focus.unlockWait;
     await gwc.executeJavaScript("document.getElementById('openBtn').click()");
     check(await until(() => gt.url === feedUrl && !gt.loading, 8000), 'the site opens again');
     check(focus.remaining(site) > 280 && focus.remaining(site) <= 300, 'with 5 more minutes (' + focus.remaining(site) + 's)');
@@ -792,7 +846,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     focus.isIdle = () => true;
     focus.used[site] = focus.budgetSec(site) + focus.extra[site];
     const pw8 = openWindow({ isPrivate: true });
-    await wait(1200);
+    await until(() => pw8.tabs.active, 5000);
     const pt = pw8.tabs.create(feedUrl);
     check(await gated(pt), 'a private window shows the gate too');
     pw8.win.close();
@@ -866,13 +920,17 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(vt.id);
     srv8.close();
 
+    }
+    if (section('windows')) {
     // ================= Windows + dragging tabs =================
     const tabCenters = () => js("[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => [t, t.getBoundingClientRect()]).map(([t, r]) => ({ id: +t.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }))");
 
     // --- Ctrl+N opens a new normal window ---
-    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'N', modifiers: ['control'] });
-    await wait(2000);
     const normals = () => [...windows].filter((w) => !w.isPrivate);
+    const winsAtStart = normals().length;
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'N', modifiers: ['control'] });
+    await until(() => normals().length === winsAtStart + 1, 5000);
+    await wait(500);
     check(normals().length === 2, 'Ctrl+N opens a new window');
     const w2 = normals().find((w) => w !== mainWin);
     check(w2 && w2.tabs.visible.length === 1 && w2.tabs.active.url.startsWith('burrow://newtab'), 'new window starts with a new tab');
@@ -896,7 +954,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     const pulledWc = pulled.view.webContents;
     const winsBefore = normals().length;
     await dragMouse(ui.webContents, cs[1], { x: cs[1].x + 60, y: cs[1].y + 220 }, 16);
-    await wait(1500);
+    await until(() => normals().length === winsBefore + 1, 5000);
+    await wait(300);
     const w3 = normals().find((w) => w !== mainWin && w !== w2);
     check(normals().length === winsBefore + 1 && w3, 'pulling a tab down opens it in a new window');
     check(w3 && w3.tabs.tabs.length === 1 && w3.tabs.tabs[0].view.webContents === pulledWc, 'the same live page moved (nothing reloaded)');
@@ -920,16 +979,18 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Sidebar beyond 8 tabs ---
     for (let i = 0; i < 8; i++) tabs.create(undefined, { activate: i === 7 });
-    await wait(1500);
+    await until(() => js("!document.getElementById('sidebar').hidden"), 5000);
     check(await js("!document.getElementById('sidebar').hidden"), `sidebar appears with ${tabs.visible.length} tabs`);
     setTheme({ mode: 'dark', seed: '#6E9A4A' });
     await wait(600);
     await shot('06-sidebar-dark', true);
+    }
+    endSection();
   } catch (err) {
     failures++;
     note('ERROR ' + (err && err.stack || err));
   }
-  note(failures ? `${failures} problem(s)` : 'ALL PASSED');
+  note(`${failures ? `${failures} problem(s)` : 'ALL PASSED'} in ${Math.round((Date.now() - started) / 1000)}s`);
   fs.writeFileSync(path.join(dir, 'log.txt'), log.join('\n'));
   app.quit();
 }
