@@ -216,6 +216,11 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | New-tab stat line (time left / focus session / streak / focus done / memory saved) | ✅ done (tested every case) |
 | Monday nudge from Mochi + ☰ Report tile + Ctrl+K "Weekly report" | ✅ done (tested) |
 | Settings → Focus: "Keep a weekly report" switch + "Clear my stats" | ✅ done (tested) |
+| Right-click menus: pages, links, images, selected text, text boxes, video/audio, tabs, tab strip, bookmarks bar, address bar | ✅ done (tested with real right-clicks) |
+| Tab menu: duplicate, move to workspace / window, close others / to the right, sleep, volume… | ✅ done (tested) |
+| Edit a bookmark (name + address) | ✅ done (tested) |
+| Last tab closes the window | ✅ done (tested, incl. workspace and Mochi exceptions) |
+| Drag a window's only tab onto another window; drop where you let go, with a marker | ✅ done (tested) |
 | Windows installer | planned |
 
 ---
@@ -229,6 +234,7 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ ctxmenu.js          right-click menus for web pages: what to offer, and running the chosen item
 │  ├─ stats.js            weekly report data: time per site per day + daily counts, kept 5 weeks (stats.json)
 │  ├─ focus.js            focus tools: daily limits, time counting, warnings, "1 more minute", gate unlock, focus sessions (focus.json)
 │  ├─ volume.js           per-tab volume: sets the page's audio/video volume, boosts above 100% where allowed
@@ -261,6 +267,7 @@ WOAHDAMN/
    ├─ mochi-react.js      Mochi's little reactions (bookmarks, workspaces, late nights…)
    ├─ focus-ui.js         the countdown chip, focus-session bar, and Mochi eating a tab
    ├─ volume.js           the tab volume slider
+   ├─ ctxmenu.js          right-click menus: the menu itself, tabs, strip, bookmarks bar, text boxes, drop marker
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
@@ -283,7 +290,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
-- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, windows. Several work too: `npm test -- phase7 phase8`.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
@@ -398,14 +405,20 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Self-test fix: when you used the computer during a run, the test window sat behind your other windows and Windows/Chromium slowed it down (no screenshots, stalled animations, failed mouse drags). In test mode Burrow now keeps full speed when covered. Your normal Burrow is unchanged.
 - Another self-test fix: the split-view picker check assumed three tabs were open, which was only true in a full run. Now the split section opens its own third tab, so the part also passes on its own.
 
+**2026-11-17 — Phase 10 done (277/277 self-test checks pass, ~2 min)**
+- Right-click menus everywhere, Burrow-styled; closing the last tab closes the window; tabs can be dragged back between windows.
+- How page menus stay safe: when you right-click a page, Chromium tells Burrow what was under the pointer (a link, an image, selected text…). Burrow builds the menu and remembers those details itself. The interface only sends back "item X of menu number N", and Burrow checks that item was really on that menu before doing anything. A web page can't add items or trigger them.
+- The self-test right-clicks a local test page with real mouse input (page, link, selected text, image, text box) and runs the actions; checks that items not on the menu (or from an old menu) are ignored; and drops a single-tab window onto the main window at the 2nd slot.
+- Test fix: one check compared window counts against a number taken while an extra test window was still open.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
 - Tabs in other workspaces keep running in the background (uses memory) until tab sleeping is built.
-- Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 10):** right-click menus, last-tab-closes-window, dragging tabs back between windows. Then import (11), Mochi (12–13), polish + installer (14). Phase 5b ("Ask AI about this page") is still postponed.
+- **Next (phase 11):** import bookmarks + history from other browsers. Then Mochi (12–13), polish + installer (14).
+- Right-click menus on media inside embedded frames (a YouTube video embedded on another site) may not control the video; the menu still shows. Phase 5b ("Ask AI about this page") is still postponed.
 - The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
 - Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
 - Time limits use the site's address (youtube.com covers m.youtube.com too) — apps on other domains (e.g. youtu.be short links) redirect first, so they're caught when they land.
@@ -424,8 +437,8 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 7 | Mochi animations + reactions | ✅ done |
 | 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | ✅ done |
 | 9 | New-tab stat + weekly report | ✅ done |
-| 10 | Right-click menus, last tab closes the window, drag tabs back between windows | next (planned) |
-| 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | planned |
+| 10 | Right-click menus, last tab closes the window, drag tabs back between windows | ✅ done |
+| 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | next (planned) |
 | 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | planned |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | planned |
 | 14 | Polish, accessibility, Windows installer | planned |

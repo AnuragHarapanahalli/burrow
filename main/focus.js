@@ -190,7 +190,7 @@ class Focus {
     this.eating.delete(site);
     this.h.onEvent?.('eaten');
     for (const w of this.h.getWindows()) {
-      for (const t of [...w.tabs.tabs]) if (this.siteOf(t.url) === site) w.tabs.close(t.id);
+      for (const t of [...w.tabs.tabs]) if (this.siteOf(t.url) === site) w.tabs.close(t.id, { keepWindow: true });
     }
   }
 

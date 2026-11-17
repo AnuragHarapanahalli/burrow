@@ -2,7 +2,7 @@
 // downloads, and routes messages from each window's interface to that window (main/window.js).
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog, webContents: WebContents } = require('electron');
+const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog, clipboard, webContents: WebContents } = require('electron');
 const Theme = require('../shared/theme');
 const { Store } = require('./store');
 const { Library } = require('./library');
@@ -294,13 +294,15 @@ const ctx = {
   get focus() { return focus; },
   themePayload, setPrefs, setupSession,
   openPrivate: () => openWindow({ isPrivate: true }),
-  openWindow: () => openWindow(),
+  openWindow: (opts) => openWindow(opts || {}),
+  get notes() { return notes; },
   saveSession: (w, snap) => { if (!windows.has(w)) return; sessions.set(w, snap); saveSessions(); },
   onClosed: (w) => {
     windows.delete(w);
     if (w.isPrivate) return;
     if (w === mainWin) mainWin = normalWindows()[0] || null;
-    if (normalWindows().length) {
+    if (normalWindows().length || w.closedEmpty) {
+      // You closed one of several windows — or closed its last tab: forget its tabs (like Chrome).
       // You closed one of several windows: forget its tabs (like Chrome).
       sessions.delete(w);
       saveSessions();
@@ -350,6 +352,45 @@ function registerIpc() {
   on('theme:set', (_w, patch) => setTheme(patch));
   on('window:private', () => ctx.openPrivate());
   on('window:new', () => openWindow());
+  // Clipboard text for Burrow's own text boxes (Paste in the right-click menu). Websites can't read it.
+  handle('clip:read', () => clipboard.readText());
+  // Right-click menus on pages: run / close (the window checks the token and the item).
+  on('ctx:run', (w, token, id) => w.runPageMenu(Number(token), String(id || '')));
+  on('ctx:closed', (w, token) => w.closePageMenu(Number(token)));
+  // Tab menu actions
+  on('tab:new-after', (w, id) => { const t = w.tabs.get(Number(id)); w.tabs.create(NEWTAB, t ? { after: t.id } : {}); });
+  on('tab:reload', (w, id) => w.tabs.reload(Number(id)));
+  on('tab:duplicate', (w, id) => w.tabs.duplicate(Number(id)));
+  on('tab:sleep', (w, id) => w.tabs.sleepTab(Number(id)));
+  on('tab:close-others', (w, id) => w.tabs.closeOthers(Number(id)));
+  on('tab:close-right', (w, id) => w.tabs.closeRight(Number(id)));
+  on('tab:move-ws', (w, id, ws) => w.tabs.moveToWorkspace(Number(id), ws === 'new' ? 'new' : Number(ws)));
+  // The other normal windows (for "Move to window ▸")
+  handle('windows:others', (w) => (w.isPrivate ? [] : normalWindows().filter((o) => o !== w && !o.win.isDestroyed()).map((o, i) => ({
+    id: o.win.id, name: `Window ${i + 2}: ${(o.tabs.active?.title || 'New tab').slice(0, 30)}`, tabs: o.tabs.tabs.length,
+  }))));
+  on('tab:move-window', (w, id, target) => {
+    if (w.isPrivate) return;
+    if (target === 'new') {
+      const tab = w.tabs.detach(Number(id));
+      if (!tab) return;
+      const b = w.win.getBounds();
+      openWindow({ adoptTab: tab, bounds: { x: b.x + 40, y: b.y + 40, width: b.width, height: b.height } });
+      return;
+    }
+    const o = normalWindows().find((x) => x.win.id === Number(target) && x !== w);
+    if (!o) return;
+    const tab = w.tabs.detach(Number(id), { allowLast: true });
+    if (!tab) return;
+    o.tabs.adopt(tab);
+    o.win.focus();
+    if (!w.tabs.tabs.length) w.tabs.onEmpty();
+  });
+  on('bookmark:edit', (_w, id, title, url) => {
+    const u = String(url || '').trim();
+    if (!/^https?:\/\//i.test(u)) return;
+    library.editBookmark(Number(id), String(title || '').slice(0, 200), u);
+  });
 
   on('tab:new', (w) => w.tabs.create(NEWTAB));
   on('tab:close', (w, id) => w.tabs.close(Number(id)));
@@ -361,15 +402,46 @@ function registerIpc() {
   on('tab:reopen', (w) => w.tabs.reopenClosed());
   on('tab:move', (w, id, to) => w.tabs.move(Number(id), Number(to)));
   // A tab dragged out of the strip: drop it on another window's tabs, or open it in a new window.
-  on('tab:detach', (w, id, sx, sy) => {
+  on('tab:detach', async (w, id, sx, sy) => {
     if (w.isPrivate) return; // private tabs stay in their private window
     const x = Math.round(Number(sx) || 0), y = Math.round(Number(sy) || 0);
     const target = normalWindows().find((o) => o !== w && overChrome(o, x, y));
+    showDropMarker(null);
+    if (target) {
+      // Land where you let go: ask the target window which slot is under the pointer.
+      const cb = target.win.getContentBounds();
+      let at;
+      try { at = await target.ui.webContents.executeJavaScript(`window.dropIndexAt ? window.dropIndexAt(${x - cb.x}, ${y - cb.y}) : null`); } catch { at = null; }
+      const tab = w.tabs.detach(Number(id), { allowLast: true });
+      if (!tab) return;
+      target.tabs.adopt(tab, typeof at === 'number' ? at : undefined);
+      target.win.focus();
+      if (!w.tabs.tabs.length) w.tabs.onEmpty(); // that was its only tab: the empty window closes
+      return;
+    }
+    const b = w.win.getBounds();
+    if (w.tabs.tabs.length < 2) {
+      // A window's only tab dropped on empty space: move the whole window there instead.
+      w.win.setPosition(Math.round(x - 160), Math.round(y - 20));
+      return;
+    }
     const tab = w.tabs.detach(Number(id));
     if (!tab) return;
-    if (target) { target.tabs.adopt(tab); target.win.focus(); return; }
-    const b = w.win.getBounds();
     openWindow({ adoptTab: tab, bounds: { x: x - 160, y: y - 20, width: b.width, height: b.height } });
+  });
+  // While a tab is being dragged: show where it would land in the window under the pointer.
+  let dropOver = null;
+  function showDropMarker(target, x, y) {
+    if (dropOver && dropOver !== target && !dropOver.win.isDestroyed()) dropOver.send('drop-marker', null);
+    dropOver = target;
+    if (!target) return;
+    const cb = target.win.getContentBounds();
+    target.send('drop-marker', { x: x - cb.x, y: y - cb.y });
+  }
+  on('tab:drag-hover', (w, sx, sy) => {
+    if (w.isPrivate || sx === null) { showDropMarker(null); return; }
+    const x = Math.round(Number(sx) || 0), y = Math.round(Number(sy) || 0);
+    showDropMarker(normalWindows().find((o) => o !== w && overChrome(o, x, y)) || null, x, y);
   });
   on('tab:mute', (w, id) => w.tabs.toggleMute(Number(id)));
   on('tab:keepawake', (w, id) => w.tabs.keepAwake(Number(id)));

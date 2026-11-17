@@ -44,20 +44,27 @@ function onPointerMove(e) {
     begin();
   }
 
-  // Pulled far enough away from the tabs? Lift it free (not in private windows).
-  const away = d.side ? e.clientX - d.boxRect.right : e.clientY - d.boxRect.bottom;
-  const canTear = !UI.state.isPrivate && UI.state.tabs.length > 1;
+  // Pulled far enough away from the tabs — up, down, or out of the window sideways? Lift it free
+  // (not in private windows). A window's only tab can lift too: drop it on another window.
+  const out = (v, lo, hi) => Math.max(lo - v, v - hi, 0);
+  const away = d.side
+    ? Math.max(out(e.clientX, d.boxRect.left, d.boxRect.right), out(e.clientY, 0, window.innerHeight))
+    : Math.max(out(e.clientY, d.boxRect.top, d.boxRect.bottom), out(e.clientX, 0, window.innerWidth));
+  const canTear = !UI.state.isPrivate;
   const tearing = canTear && away > TEAR;
   if (tearing !== d.tearing) {
     d.tearing = tearing;
     document.body.classList.toggle('tab-tearing', tearing);
     B.setOverlay(tearing); // lift Burrow's UI above the page so the tab stays visible
     if (tearing) d.items.forEach((x) => { if (x.el !== d.el) x.el.style.transform = ''; });
+    else B.tabs.dragHover(null, null);
   }
 
   if (d.tearing) {
     d.el.style.transform = `translate(${dx}px, ${dy}px) rotate(-2deg)`;
+    B.tabs.dragHover(e.screenX, e.screenY); // another window shows where it would land
     const hint = $('tearHint');
+    hint.textContent = UI.state.tabs.length > 1 ? 'DROP TO OPEN IN A NEW WINDOW' : 'DROP ON ANOTHER WINDOW';
     hint.hidden = false;
     hint.style.left = e.clientX + 14 + 'px';
     hint.style.top = e.clientY + 14 + 'px';
@@ -99,6 +106,7 @@ function finish(e, cancelled) {
   }
   d.items.forEach((x) => { x.el.classList.remove('shifting'); x.el.style.transform = ''; });
   d.el.classList.remove('dragging');
+  if (d.tearing) B.tabs.dragHover(null, null);
   if (cancelled) { if (d.tearing) B.setOverlay(false); return; }
   if (d.tearing) {
     B.setOverlay(false);

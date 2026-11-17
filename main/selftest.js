@@ -67,7 +67,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     if (section('basics')) {
     // --- Search engine chooser on the new tab ---
@@ -1066,6 +1066,225 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await until(() => tabs.active && tabs.active.url.startsWith('burrow://report')), '☰ → Report opens the report');
     tabs.close(tabs.active.id);
     srv9.close();
+    }
+    if (section('phase10')) {
+    // ================= Phase 10: right-click menus, last tab closes the window, drag tabs back =================
+    const { clipboard } = require('electron');
+    const http10 = require('http');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+    const page10 = '<!doctype html><title>Menu test</title><body style="font:16px sans-serif;margin:20px">'
+      + '<p><span id="para">Volcanoes erupt magma</span> from deep chambers.</p>'
+      + '<p><a id="lnk" href="/linked">A link to elsewhere</a></p>'
+      + '<p><img id="img" src="/pic.png" width="60" height="40"></p>'
+      + '<p><input id="inp" value="typed words" spellcheck="false"></p><div style="height:300px"></div></body>';
+    const srv10 = http10.createServer((req, res) => {
+      if (req.url === '/pic.png') { res.writeHead(200, { 'content-type': 'image/png' }); return res.end(png); }
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(req.url === '/linked' ? '<!doctype html><title>Linked</title><p>Linked page</p>' : page10);
+    });
+    await new Promise((r) => srv10.listen(0, '127.0.0.1', r));
+    const base10 = 'http://127.0.0.1:' + srv10.address().port;
+    const mt10 = tabs.create(base10 + '/');
+    await ready(mt10);
+    const pwc = mt10.view.webContents;
+    const rectOf = (sel) => pwc.executeJavaScript('(() => { const r = document.querySelector(' + JSON.stringify(sel) + ').getBoundingClientRect(); return { x: Math.round(r.left + Math.min(20, r.width / 2)), y: Math.round(r.top + r.height / 2) }; })()');
+    let lastToken = 0;
+    // A real right-click (the same path your mouse takes), then wait for Burrow's menu.
+    const rightClick = async (pt) => {
+      pwc.focus();
+      pwc.sendInputEvent({ type: 'mouseDown', x: pt.x, y: pt.y, button: 'right', clickCount: 1 });
+      pwc.sendInputEvent({ type: 'mouseUp', x: pt.x, y: pt.y, button: 'right', clickCount: 1 });
+      const ok = await until(async () => (await js('UI.lastPageMenu ? UI.lastPageMenu.token : 0')) > lastToken && !(await js("document.getElementById('ctxMenu').hidden")), 4000);
+      lastToken = await js('UI.lastPageMenu ? UI.lastPageMenu.token : 0');
+      return ok ? js('UI.lastPageMenu.items.map((i) => i.id || "-")') : [];
+    };
+    const pick = (id) => js("(() => { const i = UI.lastPageMenu.items.findIndex((x) => x.id === " + JSON.stringify(id) + "); document.querySelector('#ctxMenu .cm-item[data-i=\"' + i + '\"]').click(); return i; })()");
+
+    // Plain page
+    let ids = await rightClick({ x: 300, y: 260 });
+    check(['back', 'forward', 'reload', 'select-all', 'source', 'inspect'].every((x) => ids.includes(x)), 'right-clicking a page shows Back, Forward, Reload, Select all, View source, Inspect');
+    await shot('32-ctx-page');
+    await js('hideOverlay()');
+    check(await until(() => pwc.isFocused()), 'closing the menu gives the page its focus back');
+    // Link
+    ids = await rightClick(await rectOf('#lnk'));
+    check(['link-tab', 'link-window', 'link-private', 'link-split', 'link-copy', 'link-bookmark'].every((x) => ids.includes(x)), 'a link gets: new tab, new window, private window, split view, copy, bookmark');
+    await shot('33-ctx-link');
+    const tabsBefore = tabs.visible.length;
+    await pick('link-tab');
+    check(await until(() => tabs.visible.length === tabsBefore + 1 && tabs.visible.some((t) => t.url === base10 + '/linked')), '"Open link in new tab" opens it next to this tab');
+    const opened10 = tabs.visible.find((t) => t.url === base10 + '/linked');
+    check(tabs.activeId === mt10.id && tabs.visible.indexOf(opened10) === tabs.visible.indexOf(mt10) + 1, 'in the background, right after this tab');
+    tabs.close(opened10.id);
+    await rightClick(await rectOf('#lnk'));
+    await pick('link-copy');
+    check(await until(async () => (await clipboard.readText()) === base10 + '/linked'), '"Copy link address" copies it');
+    // Selected text
+    await pwc.executeJavaScript("(() => { const r = document.createRange(); r.selectNodeContents(document.getElementById('para')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()");
+    ids = await rightClick(await rectOf('#para'));
+    check(['copy', 'search', 'ask', 'note'].every((x) => ids.includes(x)), 'selected text gets: copy, search, ask AI, add to notes');
+    check((await js("UI.lastPageMenu.items.find((i) => i.id === 'search').label")).includes('Volcanoes erupt magma'), 'the search item quotes the selection');
+    await shot('34-ctx-selection');
+    const tb2 = tabs.visible.length;
+    await pick('search');
+    check(await until(() => tabs.visible.length === tb2 + 1 && tabs.active.url.includes('Volcanoes%20erupt%20magma')), '"Search for…" opens a search for the selection');
+    tabs.close(tabs.active.id);
+    tabs.activate(mt10.id);
+    await wait(300);
+    // Image
+    ids = await rightClick(await rectOf('#img'));
+    check(['img-open', 'img-save', 'img-copy', 'img-addr'].every((x) => ids.includes(x)), 'an image gets: open, save, copy, copy address');
+    await pick('img-addr');
+    check(await until(async () => (await clipboard.readText()) === base10 + '/pic.png'), '"Copy image address" copies it');
+    // Text box: Paste
+    clipboard.writeText(' + pasted');
+    await pwc.executeJavaScript("(() => { const i = document.getElementById('inp'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); })()");
+    ids = await rightClick(await rectOf('#inp'));
+    check(['undo', 'redo', 'cut', 'copy', 'paste', 'paste-plain', 'select-all'].every((x) => ids.includes(x)), 'a text box gets: undo, redo, cut, copy, paste, select all');
+    await pick('paste');
+    check(await until(async () => (await pwc.executeJavaScript("document.getElementById('inp').value")).includes('+ pasted')), 'Paste puts the clipboard into the text box');
+    // A page (or anything else) can't make Burrow run an item it didn't offer
+    const winsNow = windows.size;
+    await rightClick(await rectOf('#para'));
+    const tok = await js('UI.lastPageMenu.token');
+    await js('hideOverlay()');
+    await js("burrow.ctx.run(" + tok + ", 'link-window')");
+    await js("burrow.ctx.run(" + (tok + 5) + ", 'reload')");
+    await wait(600);
+    check(windows.size === winsNow, 'actions that were not on the menu (or from an old menu) are ignored');
+
+    // --- Burrow's own text boxes: the address bar ---
+    clipboard.writeText(base10 + '/linked');
+    await js("(() => { const a = document.getElementById('address'); a.focus(); const r = a.getBoundingClientRect(); a.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 40, clientY: r.top + 10 })); })()");
+    check(await until(() => js("!document.getElementById('ctxMenu').hidden && [...document.querySelectorAll('#ctxMenu .cm-label')].some((l) => l.textContent === 'Paste and go')")), 'right-clicking the address bar offers Paste and go');
+    await shot('35-ctx-address');
+    await js("[...document.querySelectorAll('#ctxMenu .cm-item')].find((b) => b.textContent.includes('Paste and go')).click()");
+    check(await until(() => tabs.active.url === base10 + '/linked', 6000), 'Paste and go opens the copied address');
+
+    // --- Tab menu ---
+    const tabMenu = (id) => js("(() => { const el = document.querySelector('#tabs [data-id=\"" + id + "\"], #sideTabs [data-id=\"" + id + "\"]'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 20, clientY: r.top + 10 })); })()");
+    const pickLabel = (label) => js("(() => { const b = [...document.querySelectorAll('#ctxMenu .cm-item')].find((x) => x.querySelector('.cm-label').textContent === " + JSON.stringify(label) + "); if (!b) return false; b.click(); return true; })()");
+    await tabMenu(mt10.id);
+    check(await until(() => js("!document.getElementById('ctxMenu').hidden && document.querySelectorAll('#ctxMenu .cm-item').length >= 12")), 'right-clicking a tab opens the tab menu');
+    await shot('36-ctx-tab');
+    const tb3 = tabs.visible.length;
+    await pickLabel('Duplicate');
+    check(await until(() => tabs.visible.length === tb3 + 1 && tabs.visible.filter((t) => t.url === mt10.url).length === 2), 'Duplicate copies the tab');
+    const dup = tabs.visible.filter((t) => t.url === mt10.url).find((t) => t.id !== mt10.id);
+    // Move to a new workspace (through the submenu)
+    const wsBefore = tabs.workspaces.length;
+    await tabMenu(dup.id);
+    await until(() => js("!document.getElementById('ctxMenu').hidden"));
+    await js("(() => { const b = [...document.querySelectorAll('#ctxMenu .cm-item')].find((x) => x.textContent.includes('Move to workspace')); b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()");
+    check(await until(() => js("[...document.querySelectorAll('#ctxMenu .cm-sub')].some((s) => !s.hidden)")), 'hovering "Move to workspace" opens its submenu');
+    await shot('37-ctx-submenu');
+    await pickLabel('New workspace');
+    check(await until(() => tabs.workspaces.length === wsBefore + 1 && dup.ws === tabs.workspaces[tabs.workspaces.length - 1].id), 'Move to workspace → New workspace moves the tab there');
+    // Close tabs to the right / other tabs
+    tabs.activate(mt10.id);
+    const r1 = tabs.create(base10 + '/?r1', { activate: false, after: mt10.id });
+    const r2 = tabs.create(base10 + '/?r2', { activate: false, after: r1.id });
+    await wait(300);
+    await tabMenu(mt10.id);
+    await until(() => js("!document.getElementById('ctxMenu').hidden"));
+    const visAfter = tabs.visible.slice(tabs.visible.indexOf(mt10) + 1).length;
+    await pickLabel('Close tabs to the right');
+    check(await until(() => !tabs.get(r1.id) && !tabs.get(r2.id) && tabs.visible[tabs.visible.length - 1] === mt10), 'Close tabs to the right (' + visAfter + ' tabs)');
+
+    // --- Bookmarks bar: edit and delete ---
+    setPrefs({ bookmarksBar: true });
+    library.toggleBookmark(base10 + '/?bm', 'Old name', null);
+    await until(() => js("document.querySelectorAll('#bmItems .bm').length > 0"));
+    await js("(() => { const el = [...document.querySelectorAll('#bmItems .bm')].find((b) => b.textContent.includes('Old name')); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + 8 })); })()");
+    check(await until(() => js("!document.getElementById('ctxMenu').hidden")), 'right-clicking a bookmark opens its menu');
+    await pickLabel('Edit\u2026');
+    check(await until(() => js("!document.getElementById('bmEdit').hidden")), 'Edit… opens the bookmark form');
+    await js("document.getElementById('bmEditName').value = 'New name'; document.getElementById('bmEditForm').requestSubmit()");
+    check(await until(() => library.bookmarks.some((b) => b.title === 'New name' && b.url === base10 + '/?bm')), 'renaming a bookmark saves it');
+    await shot('38-bookmark-edit');
+    await js("(() => { const el = [...document.querySelectorAll('#bmItems .bm')].find((b) => b.textContent.includes('New name')); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 10, clientY: r.top + 8 })); })()");
+    await until(() => js("!document.getElementById('ctxMenu').hidden"));
+    await pickLabel('Delete');
+    check(await until(() => !library.bookmarks.some((b) => b.title === 'New name')), 'Delete removes the bookmark');
+
+    // --- Last tab closes the window ---
+    const normals10 = () => [...windows].filter((w) => !w.isPrivate);
+    const lone = openWindow({ url: base10 + '/?lone' });
+    await until(() => lone.tabs.active, 5000);
+    await ready(lone.tabs.active);
+    check(lone.tabs.active.url === base10 + '/?lone' && lone.tabs.tabs.length === 1, '"Open in new window" style: a window can start on a given page');
+    const n0 = normals10().length;
+    lone.tabs.close(lone.tabs.active.id);
+    check(await until(() => lone.win.isDestroyed() && normals10().length === n0 - 1), 'closing the last tab closes the window');
+    check(!(store.get('session').windows || []).some((w) => (w.workspaces || []).some((ws) => (ws.tabs || []).some((t) => String(t.url || t).includes('?lone')))), 'and that window is not restored next time');
+    const pv = openWindow({ isPrivate: true });
+    await until(() => pv.tabs.active, 5000);
+    pv.tabs.close(pv.tabs.active.id);
+    check(await until(() => pv.win.isDestroyed()), 'a private window closes with its last tab too');
+    const two = openWindow({ url: base10 + '/?ws' });
+    await until(() => two.tabs.active, 5000);
+    two.tabs.createWorkspace('Other');
+    await wait(300);
+    const lastInWs = two.tabs.active;
+    two.tabs.close(lastInWs.id);
+    await wait(400);
+    check(!two.win.isDestroyed() && two.tabs.visible.length === 1 && two.tabs.active.url.startsWith('burrow://newtab'), 'a workspace\'s last tab leaves a new tab while other workspaces have tabs');
+    two.win.close();
+    const keep = openWindow({ url: base10 + '/?keep' });
+    await until(() => keep.tabs.active, 5000);
+    keep.tabs.close(keep.tabs.active.id, { keepWindow: true });
+    await wait(400);
+    check(!keep.win.isDestroyed() && keep.tabs.tabs.length === 1, 'Mochi eating the last tab leaves a new tab (the window stays)');
+    keep.win.close();
+    await wait(400);
+
+    // --- Drag tabs back between windows ---
+    // Tabs lift off upwards too (not only downwards): real mouse, then cancel by coming back.
+    const tc = await js("(() => { const el = document.querySelector('#tabs [data-id=\"" + mt10.id + "\"]') || document.querySelector('#sideTabs [data-id=\"" + mt10.id + "\"]'); const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, side: !!el.closest('#sideTabs') }; })()");
+    if (!tc.side) {
+      mainWin.win.focus();
+      const nDrag = normals10().length;
+      const mv = (type, x, y) => ui.webContents.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1, modifiers: type === 'mouseUp' ? [] : ['leftButtonDown'] });
+      mv('mouseDown', tc.x, tc.y);
+      for (let i = 1; i <= 8; i++) { mv('mouseMove', tc.x + i * 4, tc.y - i * 12); await wait(25); }
+      check(await js("document.body.classList.contains('tab-tearing')"), 'pulling a tab upwards out of the window lifts it free');
+      for (let i = 8; i >= 0; i--) { mv('mouseMove', tc.x + i * 4, tc.y - i * 12); await wait(25); }
+      mv('mouseUp', tc.x, tc.y);
+      await wait(400);
+      check(tabs.get(mt10.id) && normals10().length === nDrag, 'bringing it back to the strip cancels (nothing moves)');
+    }
+    // A window's only tab dropped onto another window: it joins at the drop spot and the empty window closes.
+    const single = openWindow({ url: base10 + '/?single' });
+    await until(() => single.tabs.active, 5000);
+    await ready(single.tabs.active);
+    const movingWc = single.tabs.active.view.webContents;
+    const movingId = single.tabs.active.id;
+    mainWin.win.focus();
+    await wait(300);
+    const cb = mainWin.win.getContentBounds();
+    const slot = await js("(() => { const els = [...document.querySelectorAll(document.getElementById('sidebar').hidden ? '#tabs [data-id]' : '#sideTabs [data-id]')]; const r = els[1].getBoundingClientRect(); return { x: r.left + 4, y: r.top + r.height / 2 }; })()");
+    const sx = cb.x + Math.round(slot.x), sy = cb.y + Math.round(slot.y);
+    await single.ui.webContents.executeJavaScript('burrow.tabs.dragHover(' + sx + ', ' + sy + ')');
+    check(await until(() => js("!document.getElementById('dropMarker').hidden")), 'while dragging over another window, it shows where the tab will land');
+    await capture(ui.webContents, path.join(dir, '39-drop-marker-ui.png'));
+    await single.ui.webContents.executeJavaScript('burrow.tabs.detach(' + movingId + ', ' + sx + ', ' + sy + ')');
+    check(await until(() => tabs.get(movingId) && single.win.isDestroyed(), 5000), "a window's only tab can be dropped on another window, and the empty window closes");
+    check(tabs.get(movingId)?.view.webContents === movingWc && tabs.visible.indexOf(tabs.get(movingId)) === 1, 'the same live page lands where it was dropped (2nd place)');
+    check(await until(() => js("document.getElementById('dropMarker').hidden")), 'the drop marker goes away');
+    // Move to window ▸ from the tab menu
+    const other = openWindow();
+    await until(() => other.tabs.active, 5000);
+    await wait(500);
+    await tabMenu(movingId);
+    await until(() => js("!document.getElementById('ctxMenu').hidden"));
+    await js("(() => { const b = [...document.querySelectorAll('#ctxMenu .cm-item')].find((x) => x.textContent.includes('Move to window')); b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()");
+    await until(() => js("[...document.querySelectorAll('#ctxMenu .cm-sub')].some((s) => !s.hidden && s.textContent.includes('Window 2'))"));
+    await js("[...document.querySelectorAll('#ctxMenu .cm-sub:not([hidden]) .cm-item')].find((x) => x.textContent.includes('Window 2')).click()");
+    check(await until(() => other.tabs.get(movingId) && !tabs.get(movingId)), 'Move to window ▸ moves the tab to the other window');
+    other.win.close();
+    await wait(500);
+    tabs.close(mt10.id);
+    srv10.close();
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

@@ -2,7 +2,7 @@
 //   npm test                    everything
 //   npm test -- phase8          just one part
 //   npm test -- phase7 phase8   several parts
-// Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, windows
+// Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, windows
 // Screenshots and the full log go to .selftest/ in the project (ignored by Git).
 const { spawn } = require('child_process');
 const fs = require('fs');

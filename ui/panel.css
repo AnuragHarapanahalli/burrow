@@ -436,3 +436,39 @@ body.split-resizing .split-bar { transition: none; }
 .text-btn.danger.armed { color: var(--accent-ink); font-weight: 600; }
 /* control centre: four library tiles, icon over label */
 .cc-lib button { flex-direction: column; gap: 4px; font-size: 12px; padding: 9px 4px 8px; }
+
+/* ---------- Right-click menus ---------- */
+.ctx-menu { width: auto; min-width: 210px; max-width: 340px; padding: 4px 0; outline: 0; }
+.cm-cell { position: relative; }
+.cm-item {
+  display: flex; align-items: center; gap: 16px; width: 100%; padding: 6px 12px; text-align: left;
+  font-weight: 500; white-space: nowrap; transition: background-color .08s, color .08s;
+}
+.cm-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.cm-item.strong .cm-label { font-weight: 700; }
+.cm-key { font-size: 10px; color: var(--muted); }
+.cm-arrow { font-size: 10px; }
+.cm-item:hover:not([disabled]), .cm-item:focus-visible, .cm-item:focus:not([disabled]) { background: var(--fg); color: var(--bg); outline: 0; }
+.cm-item:hover:not([disabled]) .cm-key, .cm-item:focus:not([disabled]) .cm-key { color: var(--bg); opacity: .7; }
+.cm-item[disabled] { color: var(--muted); opacity: .55; cursor: default; }
+.cm-sep { height: 1px; margin: 4px 0; background: var(--line); }
+.cm-sub { position: absolute; left: 100%; top: -5px; margin-left: 2px; width: auto; min-width: 190px; max-width: 320px; padding: 4px 0; }
+.subs-left .cm-sub { left: auto; right: 100%; margin: 0 2px 0 0; }
+.ctx-menu:not([hidden]) { animation: pop-in .1s var(--ease-out); transform-origin: top left; }
+
+/* Edit a bookmark */
+.bm-edit { width: 300px; padding-bottom: 10px; }
+.bm-edit form { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 0; }
+.bm-edit label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.bm-edit input { height: 30px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 0 8px; outline: 0; font-size: 13.5px; user-select: text; }
+.bm-edit input:focus { border-color: var(--fg); }
+.bm-edit-err { margin: 0; color: var(--accent-ink); font-size: 12.5px; }
+.bm-edit-err[hidden] { display: none; }
+.bm-edit-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.bm-edit-btns button { padding: 5px 12px; border: 1px solid var(--fg); font-weight: 600; }
+.bm-edit-btns .primary { background: var(--fg); color: var(--bg); }
+
+/* Where a tab dragged from another window will land */
+.drop-marker { position: fixed; z-index: 30; width: 3px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 1px var(--bg); }
+.drop-marker.side { height: 3px; }
+.drop-marker[hidden] { display: none; }

@@ -32,7 +32,7 @@ class BurrowWindow {
    *   setupSession(session), openPrivate(), openWindow(), saveSession(win, snapshot), onClosed(win)
    * opts: isPrivate, snapshot (saved tabs to restore), adoptTab (a tab dragged out of another window), bounds
    */
-  constructor(ctx, { isPrivate = false, snapshot = null, adoptTab = null, bounds = null } = {}) {
+  constructor(ctx, { isPrivate = false, snapshot = null, adoptTab = null, bounds = null, url = null } = {}) {
     this.ctx = ctx;
     this.isPrivate = isPrivate;
     this.layout = { top: 80, right: 0, left: 0 };
@@ -102,12 +102,18 @@ class BurrowWindow {
       onTitle: (url, title) => { if (!isPrivate) library.title(url, title); },
     });
     this.tabs.onFind = (r) => this.send('find-result', { active: r.activeMatchOrdinal, matches: r.matches });
+    this.tabs.onContextMenu = (tab, params) => this.showPageMenu(tab, params);
+    // The last tab closed (or dragged away): close this window.
+    this.tabs.onEmpty = () => {
+      this.closedEmpty = true;
+      setImmediate(() => { if (!this.win.isDestroyed()) this.win.close(); });
+    };
 
     this.relayout();
-    if (isPrivate) this.tabs.startFresh('Private');
+    if (isPrivate) this.tabs.startFresh('Private', url);
     else if (adoptTab) this.tabs.startWith('Home', adoptTab);
     else if (snapshot) this.tabs.restore(snapshot);
-    else this.tabs.startFresh('Home');
+    else this.tabs.startFresh('Home', url);
 
     ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']
       .forEach((ev) => this.win.on(ev, () => this.relayout()));
@@ -338,6 +344,52 @@ class BurrowWindow {
     if (handled) event.preventDefault();
   }
 
+  // ---------- Right-click menus on web pages (see ctxmenu.js) ----------
+  showPageMenu(tab, p) {
+    const wc = tab.view?.webContents;
+    if (!wc || wc.isDestroyed()) return;
+    const store = this.ctx.store;
+    const items = CtxMenu.build(p, {
+      canBack: wc.navigationHistory.canGoBack(), canForward: wc.navigationHistory.canGoForward(),
+      isBurrowPage: wc.getURL().startsWith('burrow://'), isPrivate: this.isPrivate,
+      engine: store.get('searchEngine'), aiProvider: store.get('aiProvider'),
+    });
+    const ids = new Set();
+    const collect = (list) => list.forEach((it) => { if (it.id && !it.disabled) ids.add(it.id); if (it.sub) collect(it.sub); });
+    collect(items);
+    const token = (this.pageMenu?.token || this.menuTokens || 0) + 1;
+    this.menuTokens = token;
+    this.pageMenu = { token, tab, p, ids };
+    const b = tab.view.getBounds();
+    this.ui.webContents.focus(); // arrow keys work in the menu
+    this.send('ctx-menu', { token, x: b.x + p.x, y: b.y + p.y, items });
+  }
+  runPageMenu(token, id) {
+    const m = this.pageMenu;
+    if (!m || m.token !== token) return;
+    this.pageMenu = null;
+    const wc = m.tab.view?.webContents;
+    if (!wc || wc.isDestroyed() || m.tab.owner !== this.tabs || !m.ids.has(String(id))) return;
+    wc.focus();
+    const ctx = this.ctx;
+    CtxMenu.run({
+      w: this, tab: m.tab, wc, p: m.p, id: String(id),
+      h: {
+        openWindowWith: (u) => ctx.openWindow({ url: u }),
+        openPrivateWith: (u) => ctx.openWindow({ url: u, isPrivate: true }),
+        library: ctx.library, notes: ctx.notes, engine: ctx.store.get('searchEngine'),
+        ask: (q) => this.ask(q, { newTab: true }),
+      },
+    }).catch(() => {});
+  }
+  closePageMenu(token) {
+    const m = this.pageMenu;
+    if (!m || m.token !== token) return;
+    this.pageMenu = null;
+    const wc = m.tab.view?.webContents;
+    if (wc && !wc.isDestroyed()) wc.focus();
+  }
+
   onClosed() {
     if (this.aiView) { try { this.aiView.webContents.close(); } catch { /* gone */ } }
     if (this.isPrivate && this.session) {
@@ -348,5 +400,7 @@ class BurrowWindow {
     this.ctx.onClosed(this);
   }
 }
+
+const CtxMenu = require('./ctxmenu');
 
 module.exports = { BurrowWindow };

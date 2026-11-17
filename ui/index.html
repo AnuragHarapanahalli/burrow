@@ -274,6 +274,7 @@
   </div>
 
   <div class="tear-hint pixel" id="tearHint" hidden>DROP TO OPEN IN A NEW WINDOW</div>
+  <div class="drop-marker" id="dropMarker" hidden aria-hidden="true"></div>
 
   <!-- Floats above websites while open (menus, address suggestions). -->
   <div class="overlay" id="overlay" hidden>
@@ -282,6 +283,16 @@
     <div class="menu main-menu" id="mainMenu" hidden role="menu" aria-label="Menu"></div>
     <div class="menu bm-menu" id="bmMenu" hidden role="menu" aria-label="More bookmarks"></div>
     <div class="suggest" id="suggest" hidden role="listbox" aria-label="Suggestions"></div>
+    <div class="menu ctx-menu" id="ctxMenu" hidden role="menu" tabindex="-1" aria-label="Menu"></div>
+    <div class="menu bm-edit" id="bmEdit" hidden role="dialog" aria-label="Edit bookmark">
+      <div class="menu-label pixel">EDIT BOOKMARK</div>
+      <form id="bmEditForm" autocomplete="off" novalidate>
+        <label>Name<input id="bmEditName" maxlength="200" spellcheck="false"></label>
+        <label>Address<input id="bmEditUrl" spellcheck="false"></label>
+        <p class="bm-edit-err" id="bmEditErr" hidden>Enter a web address like example.com</p>
+        <div class="bm-edit-btns"><button type="button" id="bmEditCancel">Cancel</button><button type="submit" class="primary">Save</button></div>
+      </form>
+    </div>
     <div class="menu vol-pop" id="volPop" hidden role="dialog" aria-label="Tab volume">
       <div class="menu-label pixel"><span id="volTitle">VOLUME</span><span id="volPct">100%</span></div>
       <div class="vol-row">
@@ -319,5 +330,6 @@
   <script src="burrow://app/ui/mochi-react.js"></script>
   <script src="burrow://app/ui/focus-ui.js"></script>
   <script src="burrow://app/ui/volume.js"></script>
+  <script src="burrow://app/ui/ctxmenu.js"></script>
 </body>
 </html>

@@ -104,6 +104,7 @@ class Tabs {
       T().onVisit(u, wc.getTitle());
     });
     wc.on('before-input-event', (e, input) => T().onInput(e, input));
+    wc.on('context-menu', (_e, params) => T().onContextMenu?.(tab, params));
     wc.on('focus', () => T().focusPane(tab));
     // Focus tools: links, redirects and Back/Forward to a closed site show the gate instead.
     const toGate = (e, url) => {
@@ -305,9 +306,16 @@ class Tabs {
     if (this.split && (this.split.a === id || this.split.b === id)) this.split = null;
   }
 
-  close(id) {
+  // Closing a window's very last tab closes the window (like Chrome). keepWindow: leave a new tab
+  // instead (Mochi eating your last tab shouldn't make the window vanish).
+  close(id, { keepWindow = false } = {}) {
     const tab = this.get(id);
     if (!tab) return;
+    if (this.tabs.length === 1 && !keepWindow && this.onEmpty) {
+      if (!tab.url.startsWith('burrow://newtab')) this.closed.push({ url: tab.url, ws: tab.ws });
+      this.onEmpty();
+      return;
+    }
     const vis = this.visible;
     const vi = vis.indexOf(tab);
     if (!tab.url.startsWith('burrow://newtab')) {
@@ -352,9 +360,11 @@ class Tabs {
   }
 
   // Pull a tab out of this window (to drag it into another one). The page keeps running.
-  detach(id) {
+  // allowLast: the window's only tab may go (it's being dropped on another window, which then
+  // closes this empty one).
+  detach(id, { allowLast = false } = {}) {
     const tab = this.get(id);
-    if (!tab || this.tabs.length < 2) return null; // a window's very last tab stays put
+    if (!tab || (this.tabs.length < 2 && !allowLast)) return null;
     const vis = this.visible;
     const vi = vis.indexOf(tab);
     const wasShown = this.shownTabs.includes(tab);
@@ -368,9 +378,61 @@ class Tabs {
     } else if (wasShown) this.activate(this.activeId);
     if (this.shownTabs.includes(tab)) this.show(this.shownTabs.filter((t) => t !== tab));
     tab.view?.webContents.stopFindInPage('clearSelection');
-    if (!this.visible.length) this.create(NEWTAB);
+    if (!this.tabs.length) this.emit(); // empty: the window is about to close
+    else if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
     return tab;
+  }
+
+  // ---------------- Tab menu actions ----------------
+  duplicate(id) {
+    const t = this.get(id);
+    if (t) this.create(t.url, { after: t.id, ws: t.ws });
+  }
+  reload(id) {
+    const t = this.get(id);
+    if (!t) return;
+    if (t.asleep || !t.view) { this.activate(t.id); return; }
+    t.view.webContents.reload();
+  }
+  sleepTab(id) {
+    const t = this.get(id);
+    if (t && this.sleep(t)) this.emit();
+  }
+  closeOthers(id) {
+    for (const t of this.visible.filter((x) => x.id !== id)) this.close(t.id);
+    if (this.get(id)) this.activate(id);
+  }
+  closeRight(id) {
+    const vis = this.visible;
+    const i = vis.findIndex((t) => t.id === id);
+    if (i < 0) return;
+    for (const t of vis.slice(i + 1)) this.close(t.id);
+  }
+  // Move a tab to another workspace in this window (or a new one).
+  moveToWorkspace(id, wsId) {
+    const t = this.get(id);
+    if (!t) return;
+    let ws = wsId === 'new' ? null : this.ws(Number(wsId));
+    if (wsId === 'new') {
+      ws = { id: nextWsId++, name: `Space ${this.workspaces.length + 1}`, activeId: null };
+      this.workspaces.push(ws);
+    }
+    if (!ws || ws.id === t.ws) return;
+    const vis = this.visible;
+    const vi = vis.indexOf(t);
+    const wasShown = this.shownTabs.includes(t);
+    this.dropFromSplit(id);
+    t.ws = ws.id;
+    ws.activeId = t.id;
+    if (wasShown) this.show(this.shownTabs.filter((x) => x !== t));
+    if (this.activeId === id) {
+      this.activeId = null;
+      const left = this.visible;
+      const nb = left[Math.min(vi, left.length - 1)];
+      if (nb) this.activate(nb.id);
+      else this.create(NEWTAB);
+    } else this.emit();
   }
 
   // Take in a tab dragged from another window, at visible position `at` (or the end).
@@ -601,8 +663,9 @@ class Tabs {
   }
 
   // A fresh window with one workspace and one new tab (used by private windows).
-  startFresh(name) {
+  startFresh(name, url) {
     this.workspaces.push({ id: nextWsId++, name, activeId: null });
+    if (url) { this.currentWs = this.workspaces[0].id; this.create(url); return; }
     this.switchWorkspace(this.workspaces[0].id);
   }
 

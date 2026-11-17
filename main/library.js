@@ -79,6 +79,15 @@ class Library {
     return i < 0;
   }
 
+  editBookmark(id, title, url) {
+    const b = this.bookmarks.find((x) => x.id === id);
+    if (!b) return false;
+    b.title = title.trim() || url;
+    b.url = url;
+    this.saveBookmarks();
+    return true;
+  }
+
   removeBookmark(id) {
     this.bookmarks = this.bookmarks.filter((b) => b.id !== id);
     this.saveBookmarks();
