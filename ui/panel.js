@@ -223,6 +223,7 @@ function renderSettingsPane() {
   }[mm];
   $('mochiGallery').innerHTML = ['idle', 'wave', 'happy', 'celebrate', 'sleepy', 'press', 'oops'].map((p) =>
     `<figure title="${p}">${window.Mochi.svg(tokens, p, 40)}<figcaption class="pixel">${p.toUpperCase()}</figcaption></figure>`).join('');
+  renderFocusSettings();
   $('sumTabs').textContent = `${cap(prefs.tabsMode)} \u00b7 sleep ${sleepLabel}`;
   $('sumLayout').textContent = [prefs.bookmarksBar ? 'Bookmarks bar' : '', settings.grid ? 'Grid' : ''].filter(Boolean).join(', ') || 'Minimal';
 }
@@ -233,6 +234,48 @@ $('engines').addEventListener('click', (e) => {
   if (b) { B.setPrefs({ searchEngine: b.dataset.engine }); bump(b, 'pop'); }
 });
 $('bmbarToggle').addEventListener('change', (e) => B.setPrefs({ bookmarksBar: e.target.checked }));
+// ---------- Settings → Focus (time limits) ----------
+async function renderFocusSettings() {
+  const info = await B.focus.info();
+  if (!info) return;
+  const opts = (sel) => info.budgets.map((m) => `<option value="${m}"${m === sel ? ' selected' : ''}>${m} min / day</option>`).join('');
+  $('limitList').innerHTML = info.limits.length
+    ? info.limits.map((l) => `<div class="limit-row" data-site="${esc(l.site)}">
+        <div class="limit-name"><b>${esc(l.name)}</b><span>${esc(l.site)}</span></div>
+        <span class="pixel limit-used${l.remainingSec <= 0 ? ' over' : ''}">${l.usedMin} / ${l.budget} MIN</span>
+        <select data-budget aria-label="Daily limit for ${esc(l.name)}">${opts(l.budget)}</select>
+        <button class="x" data-remove aria-label="Remove limit for ${esc(l.name)}">&times;</button></div>`).join('')
+    : '<div class="empty">No limits yet. Add a site, or pick one below.</div>';
+  if (!$('limitMin').options.length) $('limitMin').innerHTML = opts(30);
+  $('limitSuggest').innerHTML = info.suggested.length
+    ? '<span class="pixel">SUGGESTIONS</span>' + info.suggested.map((sname) => `<button data-suggest="${esc(sname)}">+ ${esc(sname)}</button>`).join('')
+    : '';
+  $('focusStart').textContent = info.session ? 'End the focus session' : 'Start a 25-minute focus session';
+  $('sumFocus').textContent = info.limits.length ? `${info.limits.length} limit${info.limits.length === 1 ? '' : 's'}${info.streak ? ` \u00b7 ${info.streak}-day streak` : ''}` : 'Off';
+}
+window.renderFocusSettings = renderFocusSettings;
+$('limitList').addEventListener('change', async (e) => {
+  const row = e.target.closest('[data-site]');
+  if (row && e.target.matches('[data-budget]')) { await B.focus.setLimit(row.dataset.site, Number(e.target.value)); renderFocusSettings(); }
+});
+$('limitList').addEventListener('click', async (e) => {
+  const row = e.target.closest('[data-site]');
+  if (row && e.target.closest('[data-remove]')) { await B.focus.setLimit(row.dataset.site, 0); renderFocusSettings(); }
+});
+$('limitAdd').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const ok = await B.focus.setLimit($('limitSite').value.trim(), Number($('limitMin').value));
+  $('limitErr').hidden = ok;
+  $('limitErr').textContent = ok ? '' : 'Enter a website like instagram.com';
+  if (ok) { $('limitSite').value = ''; renderFocusSettings(); }
+});
+$('limitSite').addEventListener('input', () => { $('limitErr').hidden = true; });
+$('limitSuggest').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-suggest]');
+  if (b) { await B.focus.setLimit(b.dataset.suggest, 30); renderFocusSettings(); }
+});
+$('focusStart').addEventListener('click', () => { B.focus.session(UI.focus?.session ? 'end' : 'start'); setTimeout(renderFocusSettings, 300); });
+
 $('mochiSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-mochi]');
   if (!b) return;

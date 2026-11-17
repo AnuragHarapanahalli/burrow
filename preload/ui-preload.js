@@ -42,6 +42,15 @@ contextBridge.exposeInMainWorld('burrow', {
     onChange: listen('notes-changed'),
   },
   onMochiSay: listen('mochi-say'),
+  focus: {
+    snooze: (site) => ipcRenderer.invoke('focus:snooze', site),
+    eaten: send('focus:eaten'),
+    session: send('focus:session'),
+    setLimit: (site, minutes) => ipcRenderer.invoke('focus:limit', site, minutes),
+    info: () => ipcRenderer.invoke('focus:info'),
+    onTimeUp: listen('focus-timeup'),
+    onState: listen('focus-state'),
+  },
   zoom: send('zoom:step'),
   find: {
     query: send('find:query'),
@@ -59,6 +68,7 @@ contextBridge.exposeInMainWorld('burrow', {
     reopen: send('tab:reopen'),
     mute: send('tab:mute'),
     keepAwake: send('tab:keepawake'),
+    volume: (id, volume, remember) => ipcRenderer.invoke('tab:volume', id, volume, remember),
     sleepNow: send('tabs:sleep-now'),
     move: send('tab:move'),
     detach: send('tab:detach'),

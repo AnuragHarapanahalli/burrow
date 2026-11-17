@@ -76,9 +76,9 @@ function updateTab(el, t, i) {
   el.querySelector('.close').setAttribute('aria-label', `Close ${t.title}`);
   // Speaker when the tab makes sound; click it to mute/unmute.
   const snd = el.querySelector('.snd');
-  snd.hidden = !(t.audible || t.muted);
-  snd.classList.toggle('muted', !!t.muted);
-  snd.title = t.muted ? 'Unmute this tab' : 'Mute this tab';
+  snd.hidden = !(t.audible || t.muted || (t.volume ?? 100) !== 100);
+  snd.classList.toggle('muted', !!t.muted || t.volume === 0);
+  snd.title = `Volume ${t.muted ? '(muted)' : (t.volume ?? 100) + '%'} — click to change`;
   snd.setAttribute('aria-label', snd.title);
   const fav = /^(https?:|data:)/.test(t.favicon || '') ? t.favicon : '';
   const slot = el.querySelector('.fav');
@@ -138,7 +138,7 @@ function onTabMouseDown(e) {
   const tab = e.target.closest('[data-id]');
   if (!tab || tab.classList.contains('closing')) return;
   const id = Number(tab.dataset.id);
-  if (e.target.closest('[data-mute]')) { e.preventDefault(); B.tabs.mute(id); return; }
+  if (e.target.closest('[data-mute]')) { e.preventDefault(); window.openVolume?.(id, e.target.closest('[data-mute]')); return; }
   if (e.target.closest('[data-close]') || e.button === 1) { e.preventDefault(); B.tabs.close(id); }
   else if (e.button === 0) B.tabs.activate(id);
 }

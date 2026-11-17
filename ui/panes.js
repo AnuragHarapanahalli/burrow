@@ -290,6 +290,17 @@ palActions = function () {
   }
   const t = activeTab();
   if (t?.readerable || t?.inReader) list.push(A(t.inReader ? 'Leave reader view' : 'Reader view', svToggleReader, 'F9', 'article read clean'));
+  // Focus tools
+  const sess = UI.focus?.session;
+  list.push(sess
+    ? A('End the focus session', () => B.focus.session('end'), '', 'focus pomodoro timer stop')
+    : A('Start a focus session (25 min)', () => B.focus.session('start'), '', 'focus pomodoro timer work study'));
+  list.push(A('Focus settings (time limits)', () => { openPanel('settings'); setTimeout(() => { const d = $('focusSect'); if (d) d.open = true; }, 50); }, '', 'limit time doomscroll'));
+  if (t && /^https?:/.test(t.rawUrl || '')) {
+    let host = '';
+    try { host = new URL(t.rawUrl).host.replace(/^www\./, ''); } catch { host = ''; }
+    if (host) list.push(A(`Limit ${host} to 30 min a day`, async () => { await B.focus.setLimit(host, 30); mochiSay(`I'll keep an eye on ${host}`, { pose: 'wave', essential: true }); }, '', 'focus limit time doomscroll'));
+  }
   // Tab sleeping
   list.push(A('Put other tabs to sleep now', () => B.tabs.sleepNow(), '', 'sleep memory free ram slow zz'));
   if (t) {

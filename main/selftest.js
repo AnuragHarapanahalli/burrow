@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -44,7 +44,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(2500);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     // --- Search engine chooser on the new tab ---
     const page = tabs.active.view.webContents;
@@ -143,7 +143,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // --- Main menu ---
     await js("document.getElementById('menuBtn').click()");
     await wait(300);
-    check(await js("document.querySelectorAll('#mainMenu .mm-row').length") >= 8, 'menu opens with its items');
+    check(await js("document.querySelectorAll('#mainMenu [data-cmd]').length") >= 18 && await js("document.querySelectorAll('#mainMenu .cc-tool').length") === 8, 'menu opens as a control centre (search, new, zoom, 8 tools, library)');
     await shot('01b-menu');
     await js("document.querySelector('#mainMenu [data-cmd=bookmarks]').click()");
     await wait(700);
@@ -166,7 +166,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("openPanel('settings')");
     await wait(500);
     check(await js("document.querySelectorAll('#engines .engine').length") === 6, 'settings lists search engines');
-    check(await js("document.querySelectorAll('#panel details.sect').length") === 7, 'settings has seven dropdown sections');
+    check(await js("document.querySelectorAll('#panel details.sect').length") === 8, 'settings has eight dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
     await wait(400);
@@ -285,7 +285,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await mainWin.pip(); // bring it back
     tabs.toggleMute(mt.id);
     await wait(300);
-    check(tabs.state().tabs.find((t) => t.id === mt.id).muted, 'clicking the speaker mutes the tab');
+    check(tabs.state().tabs.find((t) => t.id === mt.id).muted, 'a tab can be muted');
     tabs.close(mt.id);
 
     // --- Private window ---
@@ -666,6 +666,205 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await js("document.querySelectorAll('#mochiGallery figure').length") === 7, 'Settings → Mochi shows the pose gallery');
     await shot('19b-mochi-settings');
     await js("closePanel()");
+
+
+    // ================= Phase 8: focus tools, per-tab volume, control centre =================
+    const focus = getFocus();
+    const http8 = require('http');
+    // Volume test pages: one with same-origin audio (may be boosted), one with audio from another origin (may not).
+    const wav = (() => {
+      const n = 8000, b = Buffer.alloc(44 + n);
+      b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+      b.writeUInt32LE(8000, 24); b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(n, 40); b.fill(128, 44);
+      return b;
+    })();
+    let limitPort = 0;
+    const srv8 = http8.createServer((req, res) => {
+      if (req.url.startsWith('/a.wav')) { res.writeHead(200, { 'content-type': 'audio/wav' }); return res.end(wav); }
+      const src = req.url.startsWith('/cross') ? 'http://localhost:' + srv8.address().port + '/a.wav' : '/a.wav';
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>Doomscroll test</title><h1>Endless feed</h1><audio id="a" src="' + src + '" preload="auto"></audio>');
+    });
+    await new Promise((r) => srv8.listen(0, '127.0.0.1', r));
+    limitPort = srv8.address().port;
+    const site = '127.0.0.1:' + limitPort;
+    const feedUrl = 'http://' + site + '/feed';
+    focus.isIdle = () => false; // the test machine may look idle
+
+    // --- Settings → Focus ---
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('focusSect').open = true");
+    await until(() => js("document.querySelectorAll('#limitSuggest [data-suggest]').length === 6"));
+    check(await js("document.querySelectorAll('#limitSuggest [data-suggest]').length") === 6, 'Settings → Focus suggests six sites to limit');
+    await js("document.querySelector('#limitSuggest [data-suggest=\"youtube.com\"]').click()");
+    check(await until(() => focus.limits['youtube.com'] === 30), 'a suggestion chip adds a 30-minute limit');
+    check(await until(() => js("document.querySelectorAll('#limitList .limit-row').length === 1")), 'the limit is listed');
+    await js("const sel = document.querySelector('#limitList [data-budget]'); sel.value = '60'; sel.dispatchEvent(new Event('change', { bubbles: true }))");
+    check(await until(() => focus.limits['youtube.com'] === 60), 'changing the budget saves it');
+    await js("document.getElementById('limitSite').value = 'not a site'; document.getElementById('limitAdd').requestSubmit()");
+    check(await until(() => js("!document.getElementById('limitErr').hidden")), 'a bad site name shows an error');
+    await js("document.getElementById('limitSite').value = 'https://www.Instagram.com/reels'; document.getElementById('limitAdd').requestSubmit()");
+    check(await until(() => focus.limits['instagram.com'] === 30), 'typing a full address limits just the site (instagram.com)');
+    await shot('20-focus-settings');
+    await js("document.querySelector('#limitList [data-remove]').click()");
+    check(await until(() => !focus.limits['youtube.com']), 'the × removes a limit');
+    focus.setLimit('instagram.com', 0);
+    await js("closePanel()");
+
+    // --- Warnings ---
+    focus.limits[site] = 15; // (a local test address: set directly, since the form only takes real domains)
+    const feed = tabs.create(feedUrl);
+    await until(() => !feed.loading, 8000);
+    focus.used[site] = 15 * 60 - 299; // under 5 minutes left
+    await js('mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false');
+    focus.checkWarnings(site);
+    check(await until(() => js("UI.mochiLog.some((m) => /5 min left on 127/.test(m.text))")), 'Mochi warns "5 min left" on a 15-minute limit');
+    check(await until(() => js("!document.getElementById('focusChip').hidden && /127/.test(document.getElementById('focusChip').textContent)")), 'the countdown chip shows in the address bar');
+    await shot('21-focus-warning');
+
+    // --- Time's up: "1 more minute" works twice ---
+    const eater = () => js("!document.getElementById('eater').hidden");
+    const eatSteps = () => js("UI.eatLog.map((e) => e.step).join(',')");
+    for (let n = 1; n <= 2; n++) {
+      focus.used[site] = focus.budgetSec(site) + (focus.extra[site] || 0);
+      focus.timeUp(site);
+      check(await until(() => js("!!document.getElementById('eatSnooze')"), 4000), 'time\'s up: Mochi offers "1 more minute" (' + n + ')');
+      if (n === 1) await shot('22-times-up');
+      await js("document.getElementById('eatSnooze').click()");
+      check(await until(async () => (await eatSteps()).split(',').filter((x) => x === 'snoozed').length === n), '"1 more minute" gives a minute (' + n + ' of 2)');
+      check(focus.remaining(site) > 0 && tabs.get(feed.id), 'the tab stays open after the snooze');
+      await until(async () => !(await eater()), 5000);
+    }
+    // Third time: no more snoozes, Mochi eats the tab.
+    check(focus.snooze(site) === false, 'no snooze without a time-up');
+    focus.used[site] = focus.budgetSec(site) + (focus.extra[site] || 0);
+    focus.timeUp(site);
+    check(await until(() => js("document.getElementById('eaterBubble').textContent.includes('Time\\'s up') && !document.getElementById('eatSnooze')"), 4000), 'after two snoozes there is no "1 more minute" button');
+    check(await until(() => js("!!document.querySelector('#tabs .being-eaten, #sideTabs .being-eaten')"), 12000), 'Mochi walks over and starts eating the tab');
+    await shot('23-mochi-eats');
+    check(await until(() => !tabs.get(feed.id), 6000), 'the eaten tab is closed');
+    check(await until(() => js("UI.eatLog.some((e) => e.step === 'eaten')")), 'Mochi says "Nom!"');
+    await until(async () => !(await eater()), 8000);
+
+    // --- The gate on every way back ---
+    const gated = (t) => until(() => t.url.startsWith('burrow://gate') && t.view && !t.loading, 8000);
+    const g1 = tabs.create(feedUrl);
+    check(await gated(g1), 'opening the site again shows the Burrow gate');
+    check(await until(() => js("document.getElementById('address').value.includes('127.0.0.1')")), 'the address bar still shows the site you asked for');
+    const gp = () => g1.view.webContents;
+    check(await until(async () => (await gp().executeJavaScript("document.getElementById('title').textContent")).includes('closed for today')), 'the gate says the site is closed for today');
+    await shot('24-gate', true);
+    tabs.close(g1.id);
+    await wait(300);
+    tabs.reopenClosed();
+    await wait(300);
+    check(await gated(tabs.active), 'Ctrl+Shift+T lands on the gate too');
+    tabs.close(tabs.active.id);
+    const gt = tabs.create();
+    await wait(800);
+    tabs.navigate(feedUrl);
+    check(await gated(gt), 'typing the address lands on the gate');
+    gt.view.webContents.executeJavaScript("location.href = " + JSON.stringify(feedUrl));
+    await wait(1200);
+    check(gt.url.startsWith('burrow://gate'), 'a link from the gate page itself is caught too');
+
+    // --- Friction unlock: the wait is enforced by Burrow, not the page ---
+    const gwc = gt.view.webContents;
+    await gwc.executeJavaScript("document.getElementById('needMore').click()");
+    await gwc.executeJavaScript("{ const i = document.getElementById('phraseInput'); i.value = 'let me in'; i.dispatchEvent(new Event('input')) }");
+    check(await gwc.executeJavaScript("document.getElementById('breatheBtn').disabled"), 'the wrong sentence keeps the button locked');
+    check(await gwc.executeJavaScript("(() => { const e = new Event('paste', { cancelable: true }); document.getElementById('phraseInput').dispatchEvent(e); return e.defaultPrevented; })()"), 'pasting the sentence is blocked');
+    await gwc.executeJavaScript("{ const i = document.getElementById('phraseInput'); i.value = document.getElementById('phrase').textContent; i.dispatchEvent(new Event('input')) }");
+    check(await gwc.executeJavaScript("!document.getElementById('breatheBtn').disabled"), 'typing the sentence unlocks "Breathe"');
+    check(await gwc.executeJavaScript("burrowPage.gateUnlock()") === false, 'unlocking without the countdown is refused');
+    await gwc.executeJavaScript("document.getElementById('breatheBtn').click()");
+    await wait(1500);
+    check(await gwc.executeJavaScript("burrowPage.gateUnlock()") === false, 'unlocking before the 10 seconds are up is refused');
+    await shot('25-gate-breathe', true);
+    check(await until(() => gwc.executeJavaScript("!document.getElementById('openBtn').hidden"), 12000), 'after 10 seconds of breathing the open button appears');
+    await gwc.executeJavaScript("document.getElementById('openBtn').click()");
+    check(await until(() => gt.url === feedUrl && !gt.loading, 8000), 'the site opens again');
+    check(focus.remaining(site) > 280 && focus.remaining(site) <= 300, 'with 5 more minutes (' + focus.remaining(site) + 's)');
+    check(focus.unlockWait(site) === 30, 'the next unlock needs 30 seconds of breathing');
+
+    // --- Private windows count too --- (pause the real counter so the open tab here isn't eaten meanwhile)
+    focus.isIdle = () => true;
+    focus.used[site] = focus.budgetSec(site) + focus.extra[site];
+    const pw8 = openWindow({ isPrivate: true });
+    await wait(1200);
+    const pt = pw8.tabs.create(feedUrl);
+    check(await gated(pt), 'a private window shows the gate too');
+    pw8.win.close();
+    await wait(500);
+
+    // --- Focus session ---
+    focus.used[site] = 0; focus.extra[site] = 0; focus.hit = {};
+    focus.isIdle = () => false;
+    gt.view.webContents.loadURL(feedUrl);
+    await until(() => gt.url === feedUrl && !gt.loading, 8000);
+    tabs.activate(gt.id);
+    await js("document.getElementById('menuBtn').click()");
+    await wait(300);
+    await js("document.querySelector('#mainMenu [data-cmd=focus]').click()");
+    check(await until(() => focus.session?.phase === 'focus'), 'the menu\'s Focus button starts a 25-minute session');
+    check(await gated(gt) && gt.url.includes('r=focus'), 'limited sites already open go to the gate');
+    check(await until(() => js("!document.getElementById('focusBar').hidden && /FOCUS 2[45]:/.test(document.getElementById('focusChip').textContent)")), 'the focus bar and timer show');
+    check(await until(async () => (await gt.view.webContents.executeJavaScript("document.getElementById('title').textContent")).includes('can wait')), 'the gate says the site can wait');
+    check(await gt.view.webContents.executeJavaScript("document.getElementById('unlock').hidden"), 'no unlock during a focus session');
+    await shot('26-focus-session', true);
+    await gt.view.webContents.executeJavaScript("document.querySelector('[data-act=\"end-session\"]').click()");
+    check(await until(() => !focus.session && gt.url === feedUrl, 8000), 'ending the session early reopens the site');
+    // Counting: only while the site is on screen in a focused window
+    mainWin.win.focus();
+    await wait(300);
+    if (mainWin.win.isFocused()) {
+      const u0 = focus.used[site] || 0;
+      await wait(2300);
+      check((focus.used[site] || 0) >= u0 + 1, 'time counts while the site is on screen');
+      tabs.create();
+      await wait(300);
+      const u1 = focus.used[site] || 0;
+      await wait(2100);
+      check((focus.used[site] || 0) === u1, 'and stops when you switch away');
+      tabs.close(tabs.active.id);
+    } else note('(skipped the counting check: the test window is not focused)');
+    delete focus.limits[site];
+    focus.save();
+    tabs.close(gt.id);
+
+    // --- Per-tab volume ---
+    const vt = tabs.create(feedUrl + '?vol');
+    await until(() => !vt.loading, 8000);
+    await wait(500);
+    const elVol = () => vt.view.webContents.executeJavaScript("document.getElementById('a').volume");
+    let vr = await tabs.setVolume(vt.id, 50);
+    check(vr.volume === 50 && Math.abs(await elVol() - 0.5) < 0.01, 'setting 50% turns the page\'s audio down');
+    vr = await tabs.setVolume(vt.id, 150);
+    check(vr.boostOk && await elVol() === 1, '150% boosts same-site audio');
+    await tabs.setVolume(vt.id, 50);
+    await wait(400);
+    check(await until(() => js("!document.querySelector('#tabs [data-id=\"" + vt.id + "\"] [data-mute]').hidden")), 'a tab at 50% shows its speaker');
+    await js("document.querySelector('#tabs [data-id=\"" + vt.id + "\"] [data-mute]').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))");
+    check(await until(() => js("!document.getElementById('volPop').hidden && document.getElementById('volSlider').value === '50'")), 'clicking the speaker opens the volume slider');
+    await shot('27-volume');
+    await js("document.getElementById('volRemember').checked = true; document.getElementById('volRemember').dispatchEvent(new Event('change'))");
+    check(await until(() => (store.get('volumes') || {})[site] === 50), '"Remember for this site" saves 50%');
+    await js('hideOverlay()');
+    const vt2 = tabs.create(feedUrl + '?again');
+    await until(() => !vt2.loading, 8000);
+    check(await until(async () => Math.abs(await vt2.view.webContents.executeJavaScript("document.getElementById('a').volume") - 0.5) < 0.01), 'another tab on that site opens at 50%');
+    tabs.close(vt2.id);
+    const ct = tabs.create(feedUrl.replace('/feed', '/cross'));
+    await until(() => !ct.loading, 8000);
+    await wait(500);
+    vr = await tabs.setVolume(ct.id, 180);
+    check(vr.boostOk === false && await ct.view.webContents.executeJavaScript("document.getElementById('a').volume") === 1, 'audio from another site is never boosted (stays at 100%, not silent)');
+    await tabs.setVolume(vt.id, 100, false);
+    check(!(store.get('volumes') || {})[site], 'unticking forgets the site');
+    tabs.close(ct.id);
+    tabs.close(vt.id);
+    srv8.close();
 
     // ================= Windows + dragging tabs =================
     const tabCenters = () => js("[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => [t, t.getBoundingClientRect()]).map(([t, r]) => ({ id: +t.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }))");

@@ -83,6 +83,7 @@ class BurrowWindow {
     const { store, library } = ctx;
     this.tabs = new Tabs({
       win: this.win, store, session: this.session, persist: !isPrivate,
+      gate: (url) => ctx.focus?.gateFor(url) || null,
       zoom: {
         get: (host) => (store.get('zoom') || {})[host] || 1,
         // Private windows can use your saved zoom levels but don't save new ones.

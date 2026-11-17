@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'; img-src 'self' burrow: data:">
+  <title>Closed for today</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="gate.css">
+</head>
+<body>
+  <main class="gate">
+    <div class="scene" aria-hidden="true">
+      <svg class="door" viewBox="0 0 40 52" shape-rendering="crispEdges">
+        <rect x="2" y="2" width="36" height="50" class="door-frame"/>
+        <rect x="6" y="6" width="28" height="46" class="door-panel"/>
+        <rect x="10" y="10" width="20" height="14" class="door-inset"/>
+        <rect x="10" y="28" width="20" height="18" class="door-inset"/>
+        <rect x="27" y="27" width="3" height="3" class="door-knob"/>
+        <rect x="12" y="14" width="16" height="6" class="door-sign"/>
+      </svg>
+      <div class="sleeper" id="mochi"></div>
+      <span class="zz pixel">z<span>z</span><span>z</span></span>
+    </div>
+
+    <section class="text">
+      <p class="pixel kicker" id="kicker">CLOSED FOR TODAY</p>
+      <h1 id="title">This site is closed for today<span class="dot">.</span></h1>
+      <p class="lead" id="lead"></p>
+      <div class="pills" id="pills"></div>
+    </section>
+
+    <section class="choices" id="choices" aria-label="What to do instead"></section>
+
+    <section class="stretch" id="stretch" hidden aria-live="polite">
+      <p class="pixel">STRETCH BREAK</p>
+      <div class="ring"><span id="stretchTime">2:00</span></div>
+      <p id="stretchTip">Stand up. Roll your shoulders back, slowly.</p>
+      <button class="link" id="stretchStop">Done</button>
+    </section>
+
+    <section class="unlock" id="unlock" hidden>
+      <button class="link" id="needMore">I really need more time&hellip;</button>
+      <div class="unlock-body" id="unlockBody" hidden>
+        <p>Type this to continue:</p>
+        <p class="phrase" id="phrase"></p>
+        <input id="phraseInput" spellcheck="false" autocomplete="off" aria-label="Type the sentence above">
+        <button class="breathe-btn" id="breatheBtn" disabled>Breathe first</button>
+        <div class="breathe" id="breathe" hidden aria-live="polite">
+          <div class="breath-dot" id="breathDot"></div>
+          <p><span id="breathWord">Breathe in</span> &middot; <span class="pixel" id="breathLeft"></span></p>
+        </div>
+        <button class="open-btn" id="openBtn" hidden></button>
+      </div>
+    </section>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/shared/mochi.js"></script>
+  <script src="gate.js"></script>
+</body>
+</html>

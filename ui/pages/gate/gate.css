@@ -1,0 +1,63 @@
+/* The Burrow gate: calm, one column, Mochi asleep by a closed door. */
+body { min-height: 100vh; }
+.dot { color: var(--accent-ink); }
+.gate { max-width: 760px; margin: 0 auto; padding: 56px 28px 80px; display: flex; flex-direction: column; gap: 28px; }
+
+.scene { position: relative; display: flex; align-items: flex-end; gap: 0; height: 150px; border-bottom: var(--rule); padding-left: 8px; }
+.door { width: 104px; height: 135px; }
+.door-frame { fill: var(--fg); }
+.door-panel { fill: var(--surface); }
+.door-inset { fill: none; stroke: var(--line); stroke-width: 1; }
+.door-knob { fill: var(--accent); }
+.door-sign { fill: var(--accent); }
+.sleeper { margin-left: -6px; margin-bottom: -2px; }
+.sleeper .mochi-svg { animation: breathe 3.2s ease-in-out infinite; transform-origin: bottom center; }
+@keyframes breathe { 50% { transform: scaleY(.96); } }
+.zz { position: absolute; left: 230px; top: 6px; color: var(--muted); font-size: 16px; }
+.zz span { display: inline-block; animation: float 2.4s ease-in-out infinite; }
+.zz span:nth-child(2) { animation-delay: .8s; }
+@keyframes float { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-6px); opacity: 1; } }
+
+.kicker { color: var(--accent-ink); margin: 0 0 8px; }
+h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; letter-spacing: -.04em; line-height: 1.02; margin: 0 0 14px; }
+.lead { font-size: 18px; line-height: 1.55; color: var(--fg); margin: 0 0 14px; max-width: 600px; }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--fg); padding: 3px 8px; }
+
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); border-left: var(--hair); border-top: var(--hair); }
+.choices[hidden] { display: none; }
+.card {
+  display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; text-align: left;
+  border-right: var(--hair); border-bottom: var(--hair); transition: background-color .12s, color .12s;
+}
+.card b { font-size: 16px; }
+.card span { color: var(--muted); font-size: 13px; }
+.card:hover { background: var(--fg); color: var(--bg); }
+.card:hover span { color: var(--accent); }
+
+.stretch { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.stretch[hidden] { display: none; }
+.stretch .pixel { color: var(--accent-ink); margin: 0; }
+.ring { width: 140px; height: 140px; border: var(--rule); border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: 800; animation: ring 4s ease-in-out infinite; }
+@keyframes ring { 50% { transform: scale(1.06); } }
+#stretchTip { font-size: 18px; margin: 0; }
+
+.link { color: var(--muted); border-bottom: 1px solid currentColor; padding: 0 0 1px; align-self: flex-start; }
+.link:hover { color: var(--fg); }
+.unlock { border-top: var(--hair); padding-top: 16px; }
+.unlock[hidden] { display: none; }
+.unlock-body { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+.unlock-body[hidden] { display: none; }
+.unlock-body p { margin: 0; color: var(--muted); }
+.phrase { font-weight: 700; color: var(--fg) !important; font-size: 17px; }
+#phraseInput { height: 40px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); font-size: 15px; outline: 0; user-select: text; }
+#phraseInput:focus { border-color: var(--fg); }
+#phraseInput.ok { border-color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-ink); }
+.breathe-btn, .open-btn { align-self: flex-start; padding: 10px 16px; font-weight: 700; border: 2px solid var(--fg); transition: background-color .12s, opacity .12s; }
+.breathe-btn:disabled { opacity: .35; cursor: default; }
+.breathe-btn:not(:disabled):hover, .open-btn:hover { background: var(--fg); color: var(--bg); }
+.open-btn[hidden], .breathe-btn[hidden], .breathe[hidden] { display: none; }
+.breathe { display: flex; align-items: center; gap: 14px; }
+.breath-dot { width: 26px; height: 26px; background: var(--accent); border-radius: 50%; animation: breath 8s ease-in-out infinite; }
+@keyframes breath { 0%, 100% { transform: scale(.6); } 50% { transform: scale(1.4); } }
+.breathe p { margin: 0; color: var(--fg); font-weight: 600; }

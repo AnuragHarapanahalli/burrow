@@ -8,6 +8,7 @@ const { Store } = require('./store');
 const { Library } = require('./library');
 const { Downloads } = require('./downloads');
 const { Notes } = require('./notes');
+const { Focus, pretty: sitePretty } = require('./focus');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -49,7 +50,7 @@ if (SELFTEST) {
   require('fs').mkdirSync(path.join(SELFTEST, 'downloads'), { recursive: true });
 }
 
-let store, library, downloads, notes;
+let store, library, downloads, notes, focus;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -60,7 +61,7 @@ function servePath(url) {
   const u = new URL(url);
   const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
   let base, file;
-  if (['newtab', 'reader', 'welcome'].includes(u.host)) {
+  if (['newtab', 'reader', 'welcome', 'gate'].includes(u.host)) {
     base = path.join(ROOT, 'ui', 'pages', u.host);
     file = path.join(base, rel || `${u.host}.html`);
   } else if (u.host === 'app') {
@@ -192,6 +193,46 @@ function sweepSleep(onlyWin, force = false) {
   return results;
 }
 
+// ---------------- Focus tools ----------------
+// Which windows currently show a tab of this site (focused window first).
+function windowsShowing(site) {
+  return [...windows]
+    .filter((w) => !w.win.isDestroyed() && w.tabs.shownTabs.some((t) => focus.siteOf(t.url) === site))
+    .sort((a, b) => Number(b.win.isFocused()) - Number(a.win.isFocused()));
+}
+function startFocus() {
+  focus = new Focus({
+    getWindows: () => [...windows],
+    onWarn: (site, mins) => {
+      for (const w of windowsShowing(site)) {
+        w.send('mochi-say', { text: `${mins} min left on ${sitePretty(site)} today`, pose: mins <= 1 ? 'oops' : 'wave', essential: true });
+      }
+    },
+    onTimeUp: (site, snoozesLeft) => {
+      const w = windowsShowing(site)[0] || [...windows].find((x) => x.tabs.tabs.some((t) => focus.siteOf(t.url) === site));
+      if (!w) return focus.eaten(site);
+      const tabIds = w.tabs.visible.filter((t) => focus.siteOf(t.url) === site).map((t) => t.id);
+      w.send('focus-timeup', { site, name: sitePretty(site), snoozesLeft, tabIds });
+    },
+    onTick: () => {
+      const sess = focus.session ? { phase: focus.session.phase, leftSec: Math.max(0, Math.round((focus.session.endsAt - Date.now()) / 1000)) } : null;
+      for (const w of windows) {
+        const site = w.tabs.active ? focus.siteOf(w.tabs.active.url) : null;
+        w.send('focus-state', { site, name: site ? sitePretty(site) : '', remainingSec: site ? Math.max(0, focus.remaining(site)) : null, session: sess });
+      }
+    },
+    onSession: (ev) => {
+      const say = {
+        started: ["Focus time! I'll guard the distractions", 'wave'],
+        'focus-done': ['Focus session done! Take a 5-minute break', 'celebrate'],
+        'break-done': ["Break's over. Ready for another round?", 'happy'],
+        ended: ['Focus session ended', 'idle'],
+      }[ev];
+      everyWindow((w) => { if (say) w.send('mochi-say', { text: say[0], pose: say[1], essential: true }); });
+    },
+  });
+}
+
 // ---------------- Windows ----------------
 // Every open normal window is saved, so they all come back after a restart.
 function saveSessions() {
@@ -202,6 +243,7 @@ const ctx = {
   get store() { return store; },
   get library() { return library; },
   get mainDownloads() { return downloads; },
+  get focus() { return focus; },
   themePayload, setPrefs, setupSession,
   openPrivate: () => openWindow({ isPrivate: true }),
   openWindow: () => openWindow(),
@@ -283,6 +325,7 @@ function registerIpc() {
   });
   on('tab:mute', (w, id) => w.tabs.toggleMute(Number(id)));
   on('tab:keepawake', (w, id) => w.tabs.keepAwake(Number(id)));
+  handle('tab:volume', (w, id, volume, remember) => w.tabs.setVolume(Number(id), Number(volume), remember === undefined ? undefined : !!remember));
   on('tabs:sleep-now', (w) => sweepSleep(w, true));
   handle('tab:pip', (w) => w.pip());
   on('nav:back', (w) => w.tabs.back());
@@ -291,6 +334,12 @@ function registerIpc() {
   on('nav:stop', (w) => w.tabs.stop());
   on('zoom:step', (w, dir) => w.tabs.stepZoom(Math.sign(Number(dir) || 0)));
   on('find:query', (w, q) => w.find(q));
+  // Focus tools
+  handle('focus:snooze', (_w, site) => focus.snooze(String(site || '')));
+  on('focus:eaten', (_w, site) => focus.eaten(String(site || '')));
+  on('focus:session', (_w, what) => (what === 'start' ? focus.startSession() : focus.endSession()));
+  handle('focus:limit', (_w, site, minutes) => focus.setLimit(site, minutes));
+  handle('focus:info', () => focus.info());
   // Split view
   on('split:with', (w, id) => w.tabs.splitWith(id === 'new' ? 'new' : (Number(id) || undefined)));
   on('split:off', (w) => w.tabs.unsplit());
@@ -409,6 +458,39 @@ function registerIpc() {
       w.tabs.navigateFrom(e.sender, NEWTAB);
     }
   });
+  // ---- The Burrow gate (burrow://gate only). The site comes from the page's own address. ----
+  const gatePage = (e) => {
+    if (!e.sender.getURL().startsWith('burrow://gate')) return null;
+    const w = winOfPage(e.sender);
+    if (!w) return null;
+    const q = new URL(e.sender.getURL()).searchParams;
+    const site = focus.limits[q.get('site')] !== undefined || focus.session ? q.get('site') : null;
+    const original = q.get('u') || '';
+    return { w, site, original: /^https?:\/\//i.test(original) && focus.siteOf(original) === site ? original : null };
+  };
+  ipcMain.handle('page:gate-info', (e) => {
+    const g = gatePage(e);
+    if (!g?.site) return null;
+    const links = (store.get('quickLinks') || []).filter((l) => !focus.siteOf(l.url) && !l.ws).slice(0, 4);
+    return { ...focus.gateInfo(g.site, focus.blocked(g.site) || 'limit'), links, open: !focus.blocked(g.site) };
+  });
+  ipcMain.handle('page:gate-start', (e) => { const g = gatePage(e); return g?.site ? focus.startUnlock(e.sender.id, g.site) : null; });
+  ipcMain.handle('page:gate-unlock', (e) => {
+    const g = gatePage(e);
+    if (!g?.site || !focus.unlock(e.sender.id, g.site)) return false;
+    if (g.original) g.w.tabs.navigateFrom(e.sender, g.original);
+    return true;
+  });
+  ipcMain.on('page:gate-action', (e, action, value) => {
+    const g = gatePage(e);
+    if (!g) return;
+    const wc = e.sender;
+    if (action === 'end-session') { focus.endSession(); if (g.original && !focus.gateFor(g.original)) g.w.tabs.navigateFrom(wc, g.original); }
+    else if (action === 'start-session') focus.startSession();
+    else if (action === 'back') { const nav = wc.navigationHistory; if (nav.canGoBack()) nav.goBack(); else g.w.tabs.navigateFrom(wc, NEWTAB); }
+    else if (action === 'open' && /^https?:\/\//i.test(String(value || ''))) g.w.tabs.navigateFrom(wc, String(value));
+    else if (action === 'continue' && g.original && !focus.gateFor(g.original)) g.w.tabs.navigateFrom(wc, g.original);
+  });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);
     if (w) w.tabs.navigateFrom(e.sender, String(text || ''));
@@ -437,6 +519,7 @@ app.whenReady().then(() => {
     }),
   });
   // Normal windows share one session, so they share one downloads list.
+  startFocus();
   notes = new Notes({ onChange: (host) => everyWindow((w) => w.send('notes-changed', host)) });
   downloads = new Downloads({
     session: session.defaultSession,
@@ -460,11 +543,11 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus,
     });
   }
 });
 
-function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); }
+function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); focus?.flush(); }
 app.on('before-quit', flushAll);
 app.on('window-all-closed', () => { flushAll(); app.quit(); });

@@ -43,6 +43,7 @@
         <button type="button" class="addr-chip" id="pipBtn" hidden title="Picture in picture: pop the video out" aria-label="Picture in picture">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2z"/><path class="pip-inner" d="M8 8h5v4H8z"/></svg>
         </button>
+        <span class="focus-chip pixel" id="focusChip" hidden title="Time left today"></span>
         <button type="button" class="addr-chip zoom-chip pixel" id="zoomBtn" hidden title="Reset zoom (Ctrl+0)"></button>
         <button type="button" class="addr-chip" id="readerBtn" hidden title="Reader view (F9)" aria-label="Reader view" aria-pressed="false">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3.5h4.5c.8 0 1.5.7 1.5 1.5v8c0-.8-.7-1.5-1.5-1.5H2zM14 3.5H9.5C8.7 3.5 8 4.2 8 5v8c0-.8.7-1.5 1.5-1.5H14z"/></svg>
@@ -67,6 +68,7 @@
       </button>
     </nav>
 
+    <div class="focus-bar" id="focusBar" hidden></div>
     <div class="findbar" id="findbar" hidden role="search" aria-label="Find in page">
       <span class="pixel find-label">FIND</span>
       <input id="findInput" placeholder="Find in page" spellcheck="false" aria-label="Find in page">
@@ -218,6 +220,21 @@
           <div class="mochi-gallery" id="mochiGallery" aria-label="Mochi's poses"></div>
         </div>
       </details>
+      <details class="sect" name="settings" id="focusSect">
+        <summary><span class="pixel sect-n">08</span><span class="sect-t">Focus</span><span class="sect-v" id="sumFocus"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <p class="sect-note">Daily time limits. Time counts only while a site is on screen and you're active. Mochi warns you, then eats the tab when time's up.</p>
+          <div class="limits" id="limitList"></div>
+          <form class="limit-add" id="limitAdd" autocomplete="off">
+            <input id="limitSite" placeholder="instagram.com" spellcheck="false" aria-label="Site to limit">
+            <select id="limitMin" aria-label="Daily limit"></select>
+            <button type="submit">Add</button>
+          </form>
+          <p class="limit-err" id="limitErr" hidden></p>
+          <div class="suggest-chips" id="limitSuggest"></div>
+          <button class="text-btn" id="focusStart">Start a 25-minute focus session</button>
+        </div>
+      </details>
       </div>
       <div class="panel-mochi">
         <div class="bubble" id="panelBubble">Make it yours!</div>
@@ -244,6 +261,11 @@
     </div>
   </aside>
 
+  <div class="eater" id="eater" hidden aria-live="assertive">
+    <div class="eater-bubble" id="eaterBubble" hidden></div>
+    <div class="eater-sprite" id="eaterSprite"></div>
+  </div>
+
   <div class="tear-hint pixel" id="tearHint" hidden>DROP TO OPEN IN A NEW WINDOW</div>
 
   <!-- Floats above websites while open (menus, address suggestions). -->
@@ -253,6 +275,18 @@
     <div class="menu main-menu" id="mainMenu" hidden role="menu" aria-label="Menu"></div>
     <div class="menu bm-menu" id="bmMenu" hidden role="menu" aria-label="More bookmarks"></div>
     <div class="suggest" id="suggest" hidden role="listbox" aria-label="Suggestions"></div>
+    <div class="menu vol-pop" id="volPop" hidden role="dialog" aria-label="Tab volume">
+      <div class="menu-label pixel"><span id="volTitle">VOLUME</span><span id="volPct">100%</span></div>
+      <div class="vol-row">
+        <button class="vol-mute" id="volMute" aria-label="Mute this tab" title="Mute">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z"/><path class="w" d="M11 5.5c1 .7 1.5 1.6 1.5 2.5s-.5 1.8-1.5 2.5"/><path class="m" d="M11 6l4 4M15 6l-4 4"/></svg>
+        </button>
+        <input type="range" id="volSlider" min="0" max="200" step="5" value="100" aria-label="Volume">
+      </div>
+      <div class="vol-marks pixel"><span>0</span><span>100%</span><span>200%</span></div>
+      <label class="vol-remember"><input type="checkbox" id="volRemember"> Remember for <b id="volSite">this site</b></label>
+      <p class="vol-note" id="volNote" hidden></p>
+    </div>
     <div class="menu split-pick" id="splitPick" hidden role="listbox" aria-label="Split view with" tabindex="-1"></div>
     <div class="palette" id="palette" hidden role="dialog" aria-label="Command palette">
       <div class="pal-head">
@@ -276,5 +310,7 @@
   <script src="burrow://app/ui/palette.js"></script>
   <script src="burrow://app/ui/panes.js"></script>
   <script src="burrow://app/ui/mochi-react.js"></script>
+  <script src="burrow://app/ui/focus-ui.js"></script>
+  <script src="burrow://app/ui/volume.js"></script>
 </body>
 </html>

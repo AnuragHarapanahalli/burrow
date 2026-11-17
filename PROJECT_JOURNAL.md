@@ -39,6 +39,10 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Time only counts when you're really there**: a limited site counts only while it's on screen, in the focused window, and you've touched the keyboard or mouse in the last minute | Count time a tab is open | A paused tab in the background shouldn't eat your budget |
+| 2026-11-17 | When time's up, **every tab of that site closes**, in every window (private ones too) | Close only the tab you're looking at | Otherwise a second tab of the same site is an instant loophole |
+| 2026-11-17 | The gate's breathing countdown is **checked by Burrow itself**, not just shown by the page | Trust the page's timer | A page can be tricked; the main process refuses an unlock that comes too early |
+| 2026-11-17 | Per-tab volume: the tab's speaker now opens a **volume slider** (0–200%, mute, "Remember for this site") instead of muting straight away | Keep click-to-mute plus a separate control | One place for all sound settings; mute is still one click inside it |
 | 2026-11-17 | **Phase 8 plan** (details in PLAN.md): daily per-site limits; Mochi warns (10/5/1 or 5/1 or 2/1 min left, by budget); at zero Mochi **eats the tab** (after a 5-s "1 more minute", twice a day); reopening shows the **Burrow gate** | Mochi presses the tab's × (original idea); no warnings | Your idea — eating the tab is more memorable and more Mochi |
 | 2026-11-17 | Gate unlock = **friction, not a lock**: type a sentence + breathing countdown (10 s → 30 s → 60 s) for 5 more minutes | Hard lock until midnight; plain "continue" button | Never trapped, but never mindless |
 | 2026-11-17 | Phase 8 extras: **focus sessions** (25/5), **private windows count** toward limits, **volume up to 200%** | "What are you here for?" pause (left out for now) | Your choice. Private windows would otherwise be an easy loophole |
@@ -192,11 +196,12 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Welcome tour (first run + replay) | ✅ done (tested every step) |
 | Tab sleeping (timer, keep awake, never-sleep sites, sleep now, lazy restore) | ✅ done (tested) |
 | Mochi poses, walk-in, reactions, Lively/Quiet/Off | ✅ done (tested) |
-| Ctrl+K command palette | planned |
-| Split view, notes (+ .md export), reader mode | planned |
-| Tab sleeping | planned |
-| Mochi animations + reactions | planned |
-| Focus tools (limits, Mochi closes tab, focus sessions) | planned |
+| Daily site limits + Settings → Focus (suggestions, budgets, streak) | ✅ done (tested) |
+| Mochi's warnings, "1 more minute" (twice a day), Mochi eats the tab | ✅ done (tested) |
+| The Burrow gate + friction unlock (sentence + breathing, 10 s → 30 s → 60 s) | ✅ done (tested, incl. early-unlock refusal and private windows) |
+| Focus sessions (25 min focus / 5 min break, bar + timer) | ✅ done (tested) |
+| Per-tab volume 0–200% + remember per site | ✅ done (tested; boost refused for audio from other sites) |
+| ☰ control-centre menu | ✅ done (tested) |
 | Weekly Burrow report | planned |
 | Windows installer | planned |
 
@@ -211,6 +216,8 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ focus.js            focus tools: daily limits, time counting, warnings, "1 more minute", gate unlock, focus sessions (focus.json)
+│  ├─ volume.js           per-tab volume: sets the page's audio/video volume, boosts above 100% where allowed
 │  ├─ notes.js            notes, one per website (notes.json); Markdown export
 │  ├─ reader.js           reader mode: runs Mozilla Readability safely and hands the article to the reader page
 │  ├─ tabs.js             tabs + workspaces: create/close/switch, reopen closed, session restore
@@ -238,11 +245,14 @@ WOAHDAMN/
    ├─ palette.js          the Ctrl+K command palette
    ├─ panes.js            split-view divider, reader button, AI panel, notes
    ├─ mochi-react.js      Mochi's little reactions (bookmarks, workspaces, late nights…)
+   ├─ focus-ui.js         the countdown chip, focus-session bar, and Mochi eating a tab
+   ├─ volume.js           the tab volume slider
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
    ├─ pages/reader/       the reader view (reader.html / .css / .js, with its own sanitiser)
-   └─ pages/welcome/      Mochi's welcome tour (welcome.html / .css / .js)
+   ├─ pages/welcome/      Mochi's welcome tour (welcome.html / .css / .js)
+   └─ pages/gate/         the Burrow gate shown when a site is closed (gate.html / .css / .js)
 ```
 
 **`burrow://` addresses** — Burrow's own pages live at made-up addresses served from the project folder:
@@ -349,6 +359,12 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - How sleeping works: the tab's page is closed, but Burrow keeps its address, title, icon and its whole Back/Forward list; waking rebuilds the page and restores that list.
 - Known limit: a page that held unsaved typing (a half-written message on some sites) loses it when it sleeps — those sites belong in "never sleep".
 
+**2026-11-17 — Phase 8 done (202/202 self-test checks pass)**
+- Daily site limits, Mochi's warnings, "1 more minute", Mochi eating the tab, the Burrow gate with its friction unlock, focus sessions, per-tab volume, and the ☰ control centre.
+- The self-test runs a tiny local "doomscroll" site with a short limit and goes through the whole day: warning → two snoozes → eaten → every way back in (new tab, Ctrl+Shift+T, typing, links) lands on the gate → unlock refused too early → unlock after breathing → private window gated too → focus session.
+- Fixed while testing: the gate's countdown timer was created after its first tick (harmless, but fragile).
+- Note: one older check (dragging the split divider) failed once while the test window was covered by another window. It passed on the other runs.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
@@ -356,7 +372,9 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 5b):** "Ask AI about this page / selected text". Then tab sleeping (phase 6).
+- **Next (phase 9):** new-tab stat + weekly report. Phase 5b ("Ask AI about this page") is still postponed.
+- Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
+- Time limits use the site's address (youtube.com covers m.youtube.com too) — apps on other domains (e.g. youtu.be short links) redirect first, so they're caught when they land.
 - Split view isn't remembered after a restart yet (the two tabs come back as normal tabs).
 - One self-test check (downloads) needs the internet (it downloads example.com); it failed once when the site was slow and passed on the re-run.
 - Ask AI relies on Claude's and ChatGPT's "question in the address" links; if they ever change them, the question may stop being filled in (the site still opens).
@@ -370,7 +388,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 5b | Ask AI about this page / selected text | postponed |
 | 6 | Tab sleeping | ✅ done |
 | 7 | Mochi animations + reactions | ✅ done |
-| 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | next (planned) |
+| 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | ✅ done |
 | 9 | New-tab stat + weekly report | planned |
 | 10 | Polish, accessibility, Windows installer | planned |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |

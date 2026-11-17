@@ -6,10 +6,11 @@ const path = require('path');
 const { WebContentsView } = require('electron');
 const { toUrl, displayUrl, NEWTAB } = require('./url');
 const Reader = require('./reader');
+const Volume = require('./volume');
 
 // In reader view the tab's address is burrow://reader/?k=…&u=<original>; this gets the original.
 function readerOriginal(url) {
-  if (!String(url).startsWith('burrow://reader')) return null;
+  if (!String(url).startsWith('burrow://reader') && !String(url).startsWith('burrow://gate')) return null;
   try { const u = new URL(url).searchParams.get('u'); return /^https?:\/\//i.test(u || '') ? u : null; } catch { return null; }
 }
 
@@ -19,7 +20,8 @@ let nextTabId = 1;
 let nextWsId = 1;
 
 class Tabs {
-  constructor({ win, store, session, persist = true, zoom, onChange, onInput, onVisit, onTitle, onSave }) {
+  constructor({ win, store, session, persist = true, zoom, gate, onChange, onInput, onVisit, onTitle, onSave }) {
+    this.gate = gate || (() => null); // focus tools: returns the gate page to show instead of a URL, or null
     this.win = win;
     this.store = store;
     this.session = session;   // private windows pass their own in-memory session
@@ -57,7 +59,7 @@ class Tabs {
     else this.tabs.push(tab);
     if (!tab.asleep) {
       this.attach(tab);
-      tab.view.webContents.loadURL(url).catch(() => {});
+      tab.view.webContents.loadURL(this.gate(url) || url).catch(() => {});
     }
     if (activate && ws === this.currentWs) this.activate(tab.id);
     else this.emit();
@@ -90,7 +92,8 @@ class Tabs {
     });
     // Sound + video: a speaker on the tab, and the picture-in-picture button.
     wc.on('audio-state-changed', (e) => update({ audible: !!e.audible }));
-    wc.on('media-started-playing', () => update({ media: true, playing: true }));
+    wc.on('media-started-playing', () => { update({ media: true, playing: true }); T().applyVolume(tab); });
+    wc.on('dom-ready', () => T().applyVolume(tab));
     wc.on('media-paused', () => update({ playing: false }));
     // Ctrl + mouse wheel zooms, like other browsers.
     wc.on('zoom-changed', (_e, dir) => T().stepZoom(dir === 'in' ? 1 : -1, tab));
@@ -102,6 +105,22 @@ class Tabs {
     });
     wc.on('before-input-event', (e, input) => T().onInput(e, input));
     wc.on('focus', () => T().focusPane(tab));
+    // Focus tools: links, redirects and Back/Forward to a closed site show the gate instead.
+    const toGate = (e, url) => {
+      const g = T().gate(url);
+      if (!g) return;
+      e?.preventDefault?.();
+      setImmediate(() => { if (!wc.isDestroyed()) wc.loadURL(g).catch(() => {}); });
+    };
+    wc.on('will-navigate', (e) => toGate(e, e.url));
+    wc.on('will-redirect', (e) => { if (e.isMainFrame !== false) toGate(e, e.url); });
+    wc.on('did-start-navigation', (e, legacyUrl, _inPlace, legacyMain) => {
+      const url = typeof legacyUrl === 'string' ? legacyUrl : e.url;
+      const isMain = typeof legacyMain === 'boolean' ? legacyMain : e.isMainFrame;
+      if (!isMain || e.isSameDocument) return;
+      const g = T().gate(url);
+      if (g) setImmediate(() => { if (!wc.isDestroyed()) { wc.stop(); wc.loadURL(g).catch(() => {}); } });
+    });
     // Links that open a new window become new tabs next to this one.
     wc.setWindowOpenHandler(({ url: u }) => {
       if (/^https?:/i.test(u)) T().create(u, { after: tab.id, ws: tab.ws });
@@ -149,7 +168,7 @@ class Tabs {
     const wc = tab.view.webContents;
     const h = tab.history;
     tab.history = null;
-    const load = () => wc.loadURL(tab.url).catch(() => {});
+    const load = () => wc.loadURL(this.gate(tab.url) || tab.url).catch(() => {});
     if (h?.entries?.length) {
       Promise.resolve()
         .then(() => wc.navigationHistory.restore({ entries: h.entries, index: Math.max(0, h.index) }))
@@ -380,14 +399,17 @@ class Tabs {
   navigate(input) {
     const tab = this.active;
     if (!tab) return;
-    tab.view.webContents.loadURL(toUrl(input, this.store.get('searchEngine'))).catch(() => {});
+    const url = toUrl(input, this.store.get('searchEngine'));
+    tab.view.webContents.loadURL(this.gate(url) || url).catch(() => {});
     tab.view.webContents.focus();
   }
 
   // Navigate the tab that owns a given page (used by the new-tab search box).
   navigateFrom(webContents, input) {
     const tab = this.tabs.find((t) => t.view?.webContents === webContents);
-    if (tab) tab.view.webContents.loadURL(toUrl(input, this.store.get('searchEngine'))).catch(() => {});
+    if (!tab) return;
+    const url = toUrl(input, this.store.get('searchEngine'));
+    tab.view.webContents.loadURL(this.gate(url) || url).catch(() => {});
   }
 
   // ---------------- Zoom (remembered per site) ----------------
@@ -412,6 +434,39 @@ class Tabs {
     for (const t of this.tabs) if (t.view && (t === tab || (host && this.hostOf(t.url) === host))) t.view.webContents.setZoomFactor(factor);
     if (host) this.zoom.set(host, factor);
     this.emit();
+  }
+
+  // ---------------- Per-tab volume (0–200%) ----------------
+  siteVolume(tab) {
+    try { return (this.store.get('volumes') || {})[new URL(tab.url).host]; } catch { return undefined; }
+  }
+  volumeOf(tab) { return tab.volume ?? this.siteVolume(tab) ?? 100; }
+  async applyVolume(tab) {
+    if (!tab.view) return null;
+    const v = this.volumeOf(tab);
+    if (v === 100 && !tab.volApplied) return null; // nothing to change yet
+    tab.volApplied = true;
+    const res = await Volume.apply(tab.view.webContents, v);
+    tab.boostOk = res.boostOk;
+    return res;
+  }
+  async setVolume(id, volume, remember) {
+    const t = this.get(id);
+    if (!t) return null;
+    const v = Math.max(0, Math.min(200, Math.round(Number(volume) / 5) * 5 || 0));
+    t.volume = v;
+    if (remember !== undefined) {
+      let host = '';
+      try { host = new URL(t.url).host; } catch { /* not a website */ }
+      if (host && /^https?:/.test(t.url)) {
+        const all = { ...(this.store.get('volumes') || {}) };
+        if (remember) all[host] = v; else delete all[host];
+        this.store.set('volumes', all);
+      }
+    }
+    const res = await this.applyVolume(t);
+    this.emit();
+    return { volume: v, media: res?.media ?? 0, boostOk: res?.boostOk ?? true };
   }
 
   toggleMute(id) {
@@ -504,7 +559,8 @@ class Tabs {
           url: readerOriginal(t.url) || displayUrl(t.url),
           rawUrl: readerOriginal(t.url) || t.url,
           readerable: !!t.readerable,
-          inReader: !!readerOriginal(t.url),
+          inReader: String(t.url).startsWith('burrow://reader') && !!readerOriginal(t.url),
+          gated: String(t.url).startsWith('burrow://gate'),
           favicon: t.favicon,
           loading: t.loading,
           audible: t.audible,
@@ -514,6 +570,9 @@ class Tabs {
           canBack: nav ? nav.canGoBack() : false,
           canForward: nav ? nav.canGoForward() : false,
           asleep: !!t.asleep,
+          volume: this.volumeOf(t),
+          volumeRemembered: this.siteVolume(t) !== undefined,
+          boostOk: t.boostOk !== false,
           keepAwake: !!t.keepAwake,
         };
       }),

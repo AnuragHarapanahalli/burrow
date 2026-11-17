@@ -48,6 +48,15 @@
       'b.bb....bb.b', 'bbib....bibb', '.bib....bib.', '..bbbbbbbb..', '.bbbbbbbbbb.',
       'bbkbkbbkbkbb', 'bcbbbbbbbbcb', 'bbbbkkkkbbbb', '.bbbbbbbbbb.', '..ss....ss..',
     ],
+    // Chomp! Mouth wide open, then cheeks puffed (Mochi eating a tab when its time is up).
+    chomp1: [
+      '..bb....bb..', '.bib....bib.', '.bib....bib.', '..bbbbbbbb..', '.bbkbbbbkbb.',
+      'bbbbbbbbbbbb', 'bckkkkkkkkcb', 'bbk......kbb', '.bkkkkkkkkb.', '..ss....ss..',
+    ],
+    chomp2: [
+      '..bb....bb..', '.bib....bib.', '.bib....bib.', '..bbbbbbbb..', '.bbbbbbbbbb.',
+      'bbkkbbbbkkbb', 'ccbbbbbbbbcc', 'bcbbkkkkbbcb', '.bbbbbbbbbb.', '..ss....ss..',
+    ],
     // Something went wrong: a little frown.
     oops: [
       '..bb....bb..', '.bib....bib.', '.bib....bib.', '..bbbbbbbb..', '.bbbbbbbbbb.',

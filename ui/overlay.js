@@ -72,46 +72,66 @@ $('wsBtn').addEventListener('click', () => {
 // Keep the zoom number in the open menu up to date.
 B.tabs.onChange(() => { const z = $('mmZoom'); if (z) z.textContent = `${activeTab()?.zoom || 100}%`; });
 
-// =============== Main menu (☰) ===============
-const MENU = [
-  { cmd: 'palette', label: 'Command palette', key: 'CTRL K' },
-  null,
-  { cmd: 'newtab', label: 'New tab', key: 'CTRL T' },
-  { cmd: 'window', label: 'New window', key: 'CTRL N' },
-  { cmd: 'private', label: 'New private window', key: 'CTRL SHIFT N' },
-  { cmd: 'newws', label: 'New workspace', hideInPrivate: true },
-  { cmd: 'reopen', label: 'Reopen closed tab', key: 'CTRL SHIFT T' },
-  null,
-  'zoom',
-  { cmd: 'find', label: 'Find in page', key: 'CTRL F' },
-  { cmd: 'split', label: 'Split view', key: 'CTRL \\', check: () => !!UI.state.split },
-  { cmd: 'reader', label: 'Reader view', key: 'F9', check: () => !!activeTab()?.inReader },
-  { cmd: 'ai', label: 'AI panel', key: 'CTRL SHIFT A', check: () => !!window.aiState?.open, hideInPrivate: true },
-  { cmd: 'notes', label: 'Notes', key: 'CTRL SHIFT E', hideInPrivate: true },
-  { cmd: 'pip', label: 'Picture in picture' },
-  null,
-  { cmd: 'bookmarks', label: 'Bookmarks', key: 'CTRL SHIFT O' },
-  { cmd: 'history', label: 'History', key: 'CTRL H' },
-  { cmd: 'downloads', label: 'Downloads', key: 'CTRL J' },
-  { cmd: 'bmbar', label: 'Show bookmarks bar', key: 'CTRL SHIFT B', check: () => !!UI.theme?.prefs.bookmarksBar },
-  null,
-  { cmd: 'settings', label: 'Settings', key: 'THEME, SEARCH' },
-  { cmd: 'welcome', label: 'Welcome tour' },
-  { cmd: 'bug', label: 'Report a bug' },
-];
-const zoomRow = () => `<div class="mm-zoom" role="group" aria-label="Zoom">
-    <span class="mm-check"></span><span>Zoom</span>
-    <button class="mm-zbtn" data-cmd="zoomout" aria-label="Zoom out">&minus;</button>
-    <button class="mm-zval pixel" data-cmd="zoomreset" id="mmZoom" title="Reset (Ctrl+0)">${activeTab()?.zoom || 100}%</button>
-    <button class="mm-zbtn" data-cmd="zoomin" aria-label="Zoom in">+</button></div>`;
+// =============== Main menu (☰): a compact control centre ===============
+// Search, new tab/window, zoom, page tools, library, and small links — nothing hidden, 5 rows.
+const CC_ICON = {
+  "find": "<path d=\"M7 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zM10.5 10.5 14 14\"/>",
+  "split": "<path d=\"M2 3h12v10H2zM8 3v10\"/>",
+  "reader": "<path d=\"M2 3.5h4.5c.8 0 1.5.7 1.5 1.5v8c0-.8-.7-1.5-1.5-1.5H2zM14 3.5H9.5C8.7 3.5 8 4.2 8 5v8c0-.8.7-1.5 1.5-1.5H14z\"/>",
+  "pip": "<path d=\"M2 3h12v10H2z\"/><path class=\"fill\" d=\"M8 8h5v4H8z\"/>",
+  "notes": "<path d=\"M3 13l1-3.5L11 2.5l2.5 2.5L6.5 12zM9.5 4l2.5 2.5\"/>",
+  "ai": "<path d=\"M8 1.5l1.6 4.9L14.5 8l-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z\"/>",
+  "focus": "<path d=\"M8 3.5a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM8 6v3l2 1.5M6 1.5h4\"/>",
+  "bmbar": "<path d=\"M2 4h12M4 4v9l4-3 4 3V4\"/>",
+  "bookmarks": "<path d=\"M8 2l1.8 3.8 4.2.5-3.1 2.9.8 4.1L8 11.3 4.3 13.3l.8-4.1L2 6.3l4.2-.5z\"/>",
+  "history": "<path d=\"M8 2.5a5.5 5.5 0 1 1-5.2 3.8M2.5 2.5v3.5H6M8 5v3.5l2.5 1.5\"/>",
+  "downloads": "<path d=\"M8 2v7M5 6.5 8 9.5l3-3M2.5 10.5v3h11v-3\"/>",
+  "newtab": "<path d=\"M8 3v10M3 8h10\"/>",
+  "window": "<path d=\"M2 3h12v10H2zM2 6h12\"/>",
+  "private": "<path d=\"M2 7c1.5-2 3.5-3 6-3s4.5 1 6 3M3.5 9.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM8.5 9.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0z\"/>"
+};
+const ccIcon = (name) => `<svg viewBox="0 0 16 16" aria-hidden="true">${CC_ICON[name]}</svg>`;
+function ccTool(cmd, label, on, title) {
+  return `<button class="cc-tool${on ? ' on' : ''}" data-cmd="${cmd}" title="${title || label}" aria-pressed="${!!on}">${ccIcon(cmd)}<span>${label}</span></button>`;
+}
 function openMainMenu() {
-  mainMenu.innerHTML = MENU.filter((m) => !(m && m.hideInPrivate && UI.state.isPrivate)).map((m) => {
-    if (m === 'zoom') return zoomRow();
-    if (!m) return '<div class="mm-sep" role="separator"></div>';
-    return `<button class="mm-row" role="menuitem" data-cmd="${m.cmd}">
-        <span class="mm-check">${m.check ? (m.check() ? '&#10003;' : '') : ''}</span>
-        <span>${m.label}</span><span class="pixel mm-key">${m.key || ''}</span></button>`;
-  }).join('');
+  const t = activeTab();
+  const priv = !!UI.state.isPrivate;
+  const sess = UI.focus?.session;
+  const tools = [
+    ccTool('find', 'Find', false, 'Find in page (Ctrl+F)'),
+    ccTool('split', 'Split', !!UI.state.split, 'Split view (Ctrl+\\)'),
+    ccTool('reader', 'Reader', !!t?.inReader, 'Reader view (F9)'),
+    ccTool('pip', 'PiP', false, 'Picture in picture'),
+    priv ? '' : ccTool('notes', 'Notes', false, 'Notes for this site (Ctrl+Shift+E)'),
+    priv ? '' : ccTool('ai', 'AI', !!window.aiState?.open, 'AI panel (Ctrl+Shift+A)'),
+    ccTool('focus', sess ? 'End focus' : 'Focus', !!sess, sess ? 'End the focus session' : 'Start a 25-minute focus session'),
+    ccTool('bmbar', 'Bar', !!UI.theme?.prefs.bookmarksBar, 'Bookmarks bar (Ctrl+Shift+B)'),
+  ].join('');
+  mainMenu.innerHTML = `
+    <button class="cc-search" data-cmd="palette">${ccIcon('find')}<span>Search actions, tabs, history&hellip;</span><span class="pixel">CTRL K</span></button>
+    <div class="cc-row cc-new">
+      <button data-cmd="newtab" title="New tab (Ctrl+T)">${ccIcon('newtab')}<span>Tab</span></button>
+      <button data-cmd="window" title="New window (Ctrl+N)">${ccIcon('window')}<span>Window</span></button>
+      <button data-cmd="private" title="New private window (Ctrl+Shift+N)">${ccIcon('private')}<span>Private</span></button>
+    </div>
+    <div class="cc-zoom" role="group" aria-label="Zoom">
+      <span>Zoom</span>
+      <button class="mm-zbtn" data-cmd="zoomout" aria-label="Zoom out">&minus;</button>
+      <button class="mm-zval pixel" data-cmd="zoomreset" id="mmZoom" title="Reset (Ctrl+0)">${t?.zoom || 100}%</button>
+      <button class="mm-zbtn" data-cmd="zoomin" aria-label="Zoom in">+</button>
+    </div>
+    <div class="cc-grid">${tools}</div>
+    <div class="cc-row cc-lib">
+      <button data-cmd="bookmarks" title="Bookmarks (Ctrl+Shift+O)">${ccIcon('bookmarks')}<span>Bookmarks</span></button>
+      <button data-cmd="history" title="History (Ctrl+H)">${ccIcon('history')}<span>History</span></button>
+      <button data-cmd="downloads" title="Downloads (Ctrl+J)">${ccIcon('downloads')}<span>Downloads</span></button>
+    </div>
+    <div class="cc-foot">
+      <button data-cmd="settings">Settings</button><span>&middot;</span>
+      <button data-cmd="welcome">Tour</button><span>&middot;</span>
+      <button data-cmd="bug">Report a bug</button>
+    </div>`;
   const r = $('menuBtn').getBoundingClientRect();
   mainMenu.style.right = (window.innerWidth - r.right) + 'px';
   mainMenu.style.top = (r.bottom + 4) + 'px';
@@ -140,6 +160,7 @@ mainMenu.addEventListener('click', (e) => {
   else if (cmd === 'ai') B.ai.panel();
   else if (cmd === 'reopen') B.tabs.reopen();
   else if (cmd === 'bmbar') B.setPrefs({ bookmarksBar: !UI.theme?.prefs.bookmarksBar });
+  else if (cmd === 'focus') B.focus.session(UI.focus?.session ? 'end' : 'start');
   else window.openPanel(cmd);
 });
 
