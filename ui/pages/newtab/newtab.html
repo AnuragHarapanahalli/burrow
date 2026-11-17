@@ -14,8 +14,12 @@
     <section class="hero">
       <h1>What are we<br>looking for<span class="dot">?</span></h1>
       <form id="search" class="search" autocomplete="off">
+        <div class="mode-seg" id="modeToggle" role="radiogroup" aria-label="Search or ask AI">
+          <button type="button" data-mode="search" role="radio" aria-checked="true">Search</button>
+          <button type="button" data-mode="ask" role="radio" aria-checked="false">Ask</button>
+        </div>
         <input id="q" spellcheck="false" placeholder="Search or type a URL" aria-label="Search or type a URL" autofocus>
-        <span class="pixel hint">ENTER</span>
+        <span class="pixel hint" id="qHint">ENTER</span>
       </form>
       <div class="links-row">
         <nav class="links" id="links" aria-label="Quick links"></nav>
@@ -83,6 +87,7 @@
 
   <script src="burrow://app/shared/theme.js"></script>
   <script src="burrow://app/shared/mochi.js"></script>
+  <script src="burrow://app/shared/ai.js"></script>
   <script src="newtab.js"></script>
   <script src="quicklinks.js"></script>
   <script src="bugreport.js"></script>

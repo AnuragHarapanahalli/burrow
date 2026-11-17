@@ -36,7 +36,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(2500);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     // --- Search engine chooser on the new tab ---
     const page = tabs.active.view.webContents;
@@ -162,7 +162,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("openPanel('settings')");
     await wait(500);
     check(await js("document.querySelectorAll('#engines .engine').length") === 6, 'settings lists search engines');
-    check(await js("document.querySelectorAll('#panel details.sect').length") === 5, 'settings has five dropdown sections');
+    check(await js("document.querySelectorAll('#panel details.sect').length") === 6, 'settings has six dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
     await wait(400);
@@ -304,6 +304,88 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     pw.win.close();
     await wait(800);
     check(windows.size === 1, 'closing the private window leaves the main window open');
+
+    // ================= Phase 4: Ask AI + Ctrl+K palette =================
+    const AI = require('../shared/ai');
+    const { clipboard } = require('electron');
+    check(AI.isQuestion('how do volcanoes work') && AI.isQuestion('weather tomorrow?') && !AI.isQuestion('example.com') && !AI.isQuestion('cheap flights to goa'), 'question detection tells questions from searches');
+    // Record where Burrow would go instead of really loading AI sites.
+    const went = [];
+    const realNavigate = tabs.navigate.bind(tabs);
+    tabs.navigate = (u) => { went.push(u); };
+    const typeAddress = (text) => js(`(() => { const a = document.getElementById('address'); a.focus(); a.value = ${JSON.stringify(text)}; a.dispatchEvent(new Event('input')); })()`);
+    await typeAddress('how do volcanoes work');
+    await wait(300);
+    check(await js("document.querySelector('#suggest .sg').classList.contains('sg-ask')"), 'a question puts "Ask Claude" first in the address bar');
+    await shot('11-address-ask');
+    await js("document.getElementById('addressForm').requestSubmit()");
+    await wait(300);
+    check(went.includes('https://claude.ai/new?q=how%20do%20volcanoes%20work'), 'Enter asks Claude with the question filled in');
+    await typeAddress('cheap flights to goa');
+    await wait(300);
+    check(await js("document.querySelector('#suggest .sg').classList.contains('sg-search')"), 'a normal search keeps Search first');
+    await js("document.getElementById('address').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    setPrefs({ aiProvider: 'gemini' });
+    mainWin.ask('what is a black hole');
+    await wait(200);
+    // (In Electron 45 reading the clipboard is asynchronous.)
+    check(await clipboard.readText() === 'what is a black hole' && went.includes('https://gemini.google.com/app'), 'Gemini: the question is copied and Gemini opens');
+    setPrefs({ aiProvider: 'claude' });
+    tabs.navigate = realNavigate;
+
+    // New tab: Search | Ask
+    const nt = tabs.create();
+    await wait(1500);
+    const ntjs = (code) => nt.view.webContents.executeJavaScript(code);
+    await ntjs("(() => { const q = document.getElementById('q'); q.value = 'why is the sky blue'; q.dispatchEvent(new Event('input')); })()");
+    await wait(200);
+    check(await ntjs("document.body.classList.contains('ask-mode')"), 'new tab flips to Ask when you type a question');
+    await shot('11b-newtab-ask', true);
+    let askedFrom = '';
+    const realFrom = tabs.navigateFrom.bind(tabs);
+    tabs.navigateFrom = (_wc, u) => { askedFrom = u; };
+    await ntjs("document.getElementById('search').requestSubmit()");
+    await wait(300);
+    check(askedFrom === 'https://claude.ai/new?q=why%20is%20the%20sky%20blue', 'new tab Ask opens Claude with the question');
+    tabs.navigateFrom = realFrom;
+    tabs.close(nt.id);
+    await wait(300);
+
+    // Settings: AI assistant
+    await js("openPanel('settings')");
+    await wait(300);
+    check(await js("document.querySelectorAll('#aiList .engine').length") === 3, 'Settings offers Claude, ChatGPT and Gemini');
+    check((await js("document.getElementById('sumAI').textContent")).startsWith('Claude'), 'Settings shows Claude as the current AI');
+    await js("closePanel()");
+
+    // Ctrl+K palette
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'K', modifiers: ['control'] });
+    await wait(600);
+    check(await js("!document.getElementById('palette').hidden"), 'Ctrl+K opens the command palette');
+    const typePalette = (text) => js(`(() => { const p = document.getElementById('palInput'); p.value = ${JSON.stringify(text)}; p.dispatchEvent(new Event('input')); })()`);
+    const paletteKey = (key) => js(`document.getElementById('palInput').dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', bubbles: true }))`);
+    await typePalette('dark');
+    await wait(300);
+    check((await js("document.querySelector('#palList .pal-row .main').textContent")).includes('dark theme'), 'typing "dark" finds "Switch to dark theme"');
+    await shot('12-palette');
+    await paletteKey('Enter');
+    await wait(400);
+    check(store.get('theme').mode === 'dark' && await js("document.getElementById('palette').hidden"), 'Enter runs the action and closes the palette');
+    setTheme({ mode: 'light' });
+    mainWin.send('palette-open');
+    await wait(500);
+    await typePalette('example');
+    await wait(500);
+    check(await js("document.querySelector('#palList .pal-row').classList.contains('pal-tab')"), 'typing a site name finds its open tab');
+    await paletteKey('Escape');
+    mainWin.send('palette-open');
+    await wait(500);
+    await typePalette('how do I center a div');
+    await wait(400);
+    check(await js("document.querySelector('#palList .pal-row').classList.contains('pal-ask')"), 'a question in the palette puts Ask first');
+    await shot('12b-palette-ask');
+    await paletteKey('Escape');
+    await wait(200);
 
     // ================= Windows + dragging tabs =================
     // Real mouse input, the same path your mouse takes.

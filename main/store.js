@@ -11,6 +11,8 @@ const SETTINGS_DEFAULTS = {
   searchEngine: 'google',
   searchChosen: false,   // the user hasn't picked an engine yet (new tab asks once)
   bookmarksBar: true,
+  aiProvider: 'claude',  // Ask AI: claude | chatgpt | gemini
+  askMode: 'smart',      // smart (questions go to AI first) | search (search first) | ai (AI first)
   quickLinks: [
     { name: 'Mail', url: 'https://mail.google.com' },
     { name: 'Drive', url: 'https://drive.google.com' },

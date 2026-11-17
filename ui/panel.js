@@ -166,6 +166,7 @@ B.downloads.onDone((d) => {
   if (panel.hidden || section !== 'downloads') $('dlBtn').classList.add('fresh');
   renderDlBadge();
   bump($('dlBtn'), 'pop');
+  UI.stripClickOpens = 'downloads';
   stripMochi(`Saved ${d.filename}`);
 });
 
@@ -195,6 +196,14 @@ function renderSettingsPane() {
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   const preset = presets.find((p) => p.hex === settings.seed);
   $('sumEngine').textContent = prefs.engines.find((e) => e.id === prefs.searchEngine)?.name || '';
+  $('aiList').innerHTML = prefs.aiProviders.map((p) => `
+    <button class="engine" role="radio" aria-checked="${p.id === prefs.aiProvider}" data-ai="${p.id}">
+      <span class="radio" aria-hidden="true"></span><span class="en-name">${esc(p.name)}</span>
+      <span class="en-host">${esc(p.host)}${p.prefill ? '' : ' &middot; you paste'}</span>
+    </button>`).join('');
+  document.querySelectorAll('#askSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.ask === prefs.askMode)));
+  const aiName = prefs.aiProviders.find((p) => p.id === prefs.aiProvider)?.name || '';
+  $('sumAI').textContent = `${aiName} \u00b7 ${{ smart: 'Smart', search: 'Search first', ai: 'AI first' }[prefs.askMode]}`;
   $('sumTheme').textContent = cap(settings.mode);
   $('sumColour').innerHTML = `<span class="chip-s" style="background:${tokens.accent}"></span>${settings.useWindowsAccent ? 'Windows accent' : esc(preset ? preset.name : 'Custom')}`;
   $('sumTabs').textContent = cap(prefs.tabsMode);
@@ -207,6 +216,11 @@ $('engines').addEventListener('click', (e) => {
   if (b) { B.setPrefs({ searchEngine: b.dataset.engine }); bump(b, 'pop'); }
 });
 $('bmbarToggle').addEventListener('change', (e) => B.setPrefs({ bookmarksBar: e.target.checked }));
+$('aiList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-ai]');
+  if (b) { B.setPrefs({ aiProvider: b.dataset.ai }); bump(b, 'pop'); }
+});
+$('askSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-ask]'); if (b) B.setPrefs({ askMode: b.dataset.ask }); });
 
 $('modeSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) B.theme.set({ mode: b.dataset.mode }); });
 $('tabsSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-tabs]'); if (b) B.setPrefs({ tabsMode: b.dataset.tabs }); });

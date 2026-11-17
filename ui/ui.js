@@ -204,13 +204,15 @@ B.tabs.onChange((s) => {
 let stripTimer;
 function stripMochi(text, ms = 5000) {
   if (!UI.theme) return;
+  if (UI.stripClickOpens === undefined) UI.stripClickOpens = 'downloads';
   $('stripSprite').innerHTML = window.Mochi.svg(UI.theme.tokens, 'happy', 30);
   $('stripBubble').textContent = text;
   $('stripMochi').hidden = false;
   clearTimeout(stripTimer);
   stripTimer = setTimeout(() => { $('stripMochi').hidden = true; }, ms);
 }
-$('stripMochi').addEventListener('click', () => { $('stripMochi').hidden = true; window.openPanel?.('downloads'); });
+$('stripMochi').addEventListener('click', () => { $('stripMochi').hidden = true; if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens); });
+B.onMochiSay((text) => { UI.stripClickOpens = null; stripMochi(String(text || ''), 6000); });
 
 // ---------- Theme + preferences ----------
 B.theme.onChange((payload) => {

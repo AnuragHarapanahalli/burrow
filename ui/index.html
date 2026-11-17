@@ -128,7 +128,20 @@
         </div>
       </details>
       <details class="sect" name="settings">
-        <summary><span class="pixel sect-n">02</span><span class="sect-t">Theme</span><span class="sect-v" id="sumTheme"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <summary><span class="pixel sect-n">02</span><span class="sect-t">AI assistant</span><span class="sect-v" id="sumAI"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <div class="engines" id="aiList" role="radiogroup" aria-label="AI assistant"></div>
+          <div class="pixel sect-sub">WHEN YOU TYPE A QUESTION</div>
+          <div class="seg" id="askSeg" role="radiogroup" aria-label="When you type a question">
+            <button data-ask="smart" role="radio" title="Questions go to AI first, everything else to search">Smart</button>
+            <button data-ask="search" role="radio">Search first</button>
+            <button data-ask="ai" role="radio">AI first</button>
+          </div>
+          <p class="sect-note">Burrow opens the AI site you're signed in to, with your question filled in. No keys or accounts needed in Burrow.</p>
+        </div>
+      </details>
+      <details class="sect" name="settings">
+        <summary><span class="pixel sect-n">03</span><span class="sect-t">Theme</span><span class="sect-v" id="sumTheme"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
         <div class="sect-body">
           <div class="seg" id="modeSeg" role="radiogroup" aria-label="Theme">
             <button data-mode="light" role="radio">Light</button>
@@ -138,7 +151,7 @@
         </div>
       </details>
       <details class="sect" name="settings">
-        <summary><span class="pixel sect-n">03</span><span class="sect-t">Colour</span><span class="sect-v" id="sumColour"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <summary><span class="pixel sect-n">04</span><span class="sect-t">Colour</span><span class="sect-v" id="sumColour"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
         <div class="sect-body">
           <div class="swatches" id="swatches" role="radiogroup" aria-label="Colour"></div>
           <label class="row"><input type="color" id="customColor"> Custom colour</label>
@@ -146,7 +159,7 @@
         </div>
       </details>
       <details class="sect" name="settings">
-        <summary><span class="pixel sect-n">04</span><span class="sect-t">Tabs</span><span class="sect-v" id="sumTabs"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <summary><span class="pixel sect-n">05</span><span class="sect-t">Tabs</span><span class="sect-v" id="sumTabs"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
         <div class="sect-body">
           <div class="seg" id="tabsSeg" role="radiogroup" aria-label="Tab position">
             <button data-tabs="auto" role="radio" title="Top, moving to a sidebar beyond 8 tabs">Auto</button>
@@ -157,7 +170,7 @@
         </div>
       </details>
       <details class="sect" name="settings">
-        <summary><span class="pixel sect-n">05</span><span class="sect-t">Layout</span><span class="sect-v" id="sumLayout"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <summary><span class="pixel sect-n">06</span><span class="sect-t">Layout</span><span class="sect-v" id="sumLayout"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
         <div class="sect-body">
           <label class="row"><input type="checkbox" id="bmbarToggle"> Show bookmarks bar <span class="pixel kbd">CTRL SHIFT B</span></label>
           <label class="row"><input type="checkbox" id="gridToggle"> Show grid lines on new tab</label>
@@ -180,15 +193,25 @@
     <div class="menu main-menu" id="mainMenu" hidden role="menu" aria-label="Menu"></div>
     <div class="menu bm-menu" id="bmMenu" hidden role="menu" aria-label="More bookmarks"></div>
     <div class="suggest" id="suggest" hidden role="listbox" aria-label="Suggestions"></div>
+    <div class="palette" id="palette" hidden role="dialog" aria-label="Command palette">
+      <div class="pal-head">
+        <span class="pixel pal-k">CTRL K</span>
+        <input id="palInput" spellcheck="false" autocomplete="off" placeholder="Type a command, tab, site or question" aria-label="Command palette" aria-controls="palList">
+      </div>
+      <div class="pal-list" id="palList" role="listbox"></div>
+      <div class="pal-foot pixel">&uarr;&darr; MOVE &nbsp; &crarr; OPEN &nbsp; ESC CLOSE</div>
+    </div>
   </div>
 
   <script src="burrow://app/shared/theme.js"></script>
   <script src="burrow://app/shared/mochi.js"></script>
+  <script src="burrow://app/shared/ai.js"></script>
   <script src="burrow://app/ui/ui.js"></script>
   <script src="burrow://app/ui/overlay.js"></script>
   <script src="burrow://app/ui/panel.js"></script>
   <script src="burrow://app/ui/bmbar.js"></script>
   <script src="burrow://app/ui/find.js"></script>
   <script src="burrow://app/ui/drag.js"></script>
+  <script src="burrow://app/ui/palette.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@ const { BaseWindow, WebContentsView, session: Session } = require('electron');
 const { Tabs } = require('./tabs');
 const { Downloads } = require('./downloads');
 const { NEWTAB } = require('./url');
+const AI = require('../shared/ai');
 
 const ROOT = path.join(__dirname, '..');
 const TITLEBAR_HEIGHT = 40;
@@ -184,6 +185,36 @@ class BurrowWindow {
   }
   stopFind() { this.tabs.active?.view.webContents.stopFindInPage('clearSelection'); }
 
+  // ---------- Ask AI ----------
+  // Opens your AI with the question filled in. Gemini can't take a question in its address,
+  // so Burrow copies it and Mochi tells you to paste it.
+  ask(text, { newTab = false, pageWc = null } = {}) {
+    const q = String(text || '').trim().slice(0, 2000);
+    if (!q) return;
+    const { url, copy } = AI.askUrl(this.ctx.store.get('aiProvider'), q);
+    if (copy) {
+      require('electron').clipboard.writeText(q);
+      const name = AI.PROVIDERS[this.ctx.store.get('aiProvider')]?.name || 'the AI';
+      this.send('mochi-say', `Question copied. Press Ctrl+V in ${name}`);
+    }
+    if (pageWc) this.tabs.navigateFrom(pageWc, url);
+    else if (newTab) this.tabs.create(url);
+    else this.tabs.navigate(url);
+  }
+
+  // Every tab in this window (all workspaces), for the Ctrl+K palette.
+  allTabs() {
+    return this.tabs.tabs.map((t) => ({
+      id: t.id,
+      title: t.url.startsWith('burrow://newtab') ? 'New tab' : (t.title || t.url),
+      url: t.url.startsWith('burrow://') ? '' : t.url,
+      favicon: t.favicon,
+      ws: this.tabs.ws(t.ws)?.name || '',
+      here: t.ws === this.tabs.currentWs,
+      active: t.id === this.tabs.activeId,
+    }));
+  }
+
   // ---------- Picture-in-picture ----------
   async pip() {
     const wc = this.tabs.active?.view.webContents;
@@ -210,6 +241,7 @@ class BurrowWindow {
     else if (ctrl && input.shift && k === 'o') this.openPanel('bookmarks');
     else if (ctrl && input.shift && k === 'b') ctx.setPrefs({ bookmarksBar: !ctx.store.get('bookmarksBar') });
     else if (ctrl && !input.shift && k === 'f') { this.ui.webContents.focus(); this.send('find-open'); }
+    else if (ctrl && !input.shift && k === 'k') { this.ui.webContents.focus(); this.send('palette-open'); }
     else if (input.key === 'F3') this.send('find-step', input.shift ? -1 : 1);
     else if (ctrl && (k === '=' || k === '+') ) tabs.stepZoom(1);
     else if (ctrl && (k === '-' || k === '_')) tabs.stepZoom(-1);

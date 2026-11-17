@@ -74,6 +74,8 @@ B.tabs.onChange(() => { const z = $('mmZoom'); if (z) z.textContent = `${activeT
 
 // =============== Main menu (☰) ===============
 const MENU = [
+  { cmd: 'palette', label: 'Command palette', key: 'CTRL K' },
+  null,
   { cmd: 'newtab', label: 'New tab', key: 'CTRL T' },
   { cmd: 'window', label: 'New window', key: 'CTRL N' },
   { cmd: 'private', label: 'New private window', key: 'CTRL SHIFT N' },
@@ -121,6 +123,7 @@ mainMenu.addEventListener('click', (e) => {
   if (cmd.startsWith('zoom')) { B.zoom(cmd === 'zoomin' ? 1 : cmd === 'zoomout' ? -1 : 0); return; }
   hideOverlay();
   if (cmd === 'newtab') B.tabs.create();
+  else if (cmd === 'palette') window.openPalette();
   else if (cmd === 'private') B.openPrivate();
   else if (cmd === 'window') B.openWindow();
   else if (cmd === 'bug') B.tabs.navigate('burrow://newtab/#report-bug');
@@ -161,10 +164,28 @@ wsMenu.addEventListener('keydown', (e) => {
 });
 
 // =============== Address bar + suggestions ===============
-let suggestions = [];   // [{ kind, url, title }]; index 0 is always "what you typed"
+let suggestions = [];   // [{ kind, url, title }]; the first rows are always "what you typed"
 let sel = 0;
 let suggestTimer;
 const looksLikeUrl = (s) => /^(https?:\/\/|localhost|burrow:\/\/)/i.test(s) || (!/\s/.test(s) && /^[^\s/]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(s));
+const aiName = () => {
+  const p = UI.theme?.prefs;
+  return p?.aiProviders.find((x) => x.id === p.aiProvider)?.name || 'AI';
+};
+
+// Should "Ask AI" come before "Search"? (Settings → AI assistant)
+function askFirst(q) {
+  const mode = UI.theme?.prefs.askMode || 'smart';
+  return mode === 'ai' || (mode === 'smart' && window.BurrowAI.isQuestion(q));
+}
+
+// The rows for what you typed: Go (an address) or Search + Ask AI, in the right order.
+function typedRows(q) {
+  if (looksLikeUrl(q)) return [{ kind: 'go', text: q }];
+  const search = { kind: 'search', text: q };
+  const ask = { kind: 'ask', text: q };
+  return askFirst(q) ? [ask, search] : [search, ask];
+}
 
 function renderSuggest() {
   if (!suggestions.length) { if (!suggestBox.hidden) hideOverlay(); return; }
@@ -173,11 +194,13 @@ function renderSuggest() {
   suggestBox.style.top = (r.bottom + 4) + 'px';
   suggestBox.style.width = r.width + 'px';
   suggestBox.innerHTML = suggestions.map((s, i) => {
-    const kind = { typed: looksLikeUrl(s.url) ? 'GO' : 'FIND', bookmark: '&#9733; SAVED', history: 'PAST' }[s.kind];
-    const main = s.kind === 'typed'
-      ? (looksLikeUrl(s.url) ? `Go to <b>${esc(s.url)}</b>` : `Search ${esc(engineName())} for <b>${esc(s.url)}</b>`)
-      : `${esc(s.title)}<span class="u">${esc(s.url.replace(/^https?:\/\/(www\.)?/, ''))}</span>`;
-    return `<div class="sg${i === sel ? ' sel' : ''}" role="option" aria-selected="${i === sel}" data-i="${i}">
+    const kind = { go: 'GO', search: 'FIND', ask: 'ASK', bookmark: '&#9733; SAVED', history: 'PAST' }[s.kind];
+    let main;
+    if (s.kind === 'go') main = `Go to <b>${esc(s.text)}</b>`;
+    else if (s.kind === 'search') main = `Search ${esc(engineName())} for <b>${esc(s.text)}</b>`;
+    else if (s.kind === 'ask') main = `Ask ${esc(aiName())}: <b>${esc(s.text)}</b>`;
+    else main = `${esc(s.title)}<span class="u">${esc(s.url.replace(/^https?:\/\/(www\.)?/, ''))}</span>`;
+    return `<div class="sg sg-${s.kind}${i === sel ? ' sel' : ''}" role="option" aria-selected="${i === sel}" data-i="${i}">
       <span class="kind pixel">${kind}</span><span class="main">${main}</span></div>`;
   }).join('');
   if (suggestBox.hidden) showOverlay('suggest');
@@ -188,24 +211,28 @@ address.addEventListener('input', () => {
   const q = address.value.trim();
   clearTimeout(suggestTimer);
   if (!q) { suggestions = []; renderSuggest(); return; }
+  // Show the typed rows straight away; add bookmarks/history a moment later.
+  suggestions = typedRows(q);
+  sel = 0;
+  renderSuggest();
   suggestTimer = setTimeout(async () => {
     const found = (await B.library.suggest(q)) || [];
     if (address.value.trim() !== q) return; // you kept typing
-    suggestions = [{ kind: 'typed', url: q }, ...found];
-    sel = 0;
+    suggestions = [...typedRows(q), ...found];
     renderSuggest();
   }, 70);
 });
 
 function go(i = sel) {
-  const s = suggestions[i];
-  const text = s && s.kind !== 'typed' ? s.url : address.value;
+  const q = address.value.trim();
+  const s = suggestions[i] || typedRows(q)[0];
   suggestions = [];
   hideOverlay();
-  if (!text.trim()) return;
-  B.tabs.navigate(text);
   UI.editing = false;
   address.blur();
+  if (!q && !s?.url) return;
+  if (s?.kind === 'ask') B.ask(s.text, false);
+  else B.tabs.navigate(s?.url || s?.text || q);
 }
 
 address.addEventListener('focus', () => { UI.editing = true; address.select(); });

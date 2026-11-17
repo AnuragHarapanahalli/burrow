@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('burrow', {
   setPrefs: send('prefs:set'),
   openPrivate: send('window:private'),
   openWindow: send('window:new'),
+  ask: send('ai:ask'),
+  searchNewTab: send('tab:search'),
+  allTabs: () => ipcRenderer.invoke('palette:tabs'),
+  onPaletteOpen: listen('palette-open'),
+  onMochiSay: listen('mochi-say'),
   zoom: send('zoom:step'),
   find: {
     query: send('find:query'),

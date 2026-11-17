@@ -8,6 +8,7 @@ if (location.protocol === 'burrow:') {
     onTheme: (cb) => ipcRenderer.on('theme', (_e, data) => cb(data)),
     navigate: (text) => ipcRenderer.send('page:navigate', String(text || '')),
     setSearchEngine: (id) => ipcRenderer.send('page:search-engine', String(id || '')),
+    ask: (text) => ipcRenderer.send('page:ask', String(text || '')),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),
     reportBug: (report) => ipcRenderer.send('page:report-bug', {
       title: String(report?.title || ''), what: String(report?.what || ''),

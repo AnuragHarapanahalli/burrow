@@ -10,6 +10,7 @@ const { Downloads } = require('./downloads');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
 const { NEWTAB, ENGINES } = require('./url');
+const AI = require('../shared/ai');
 
 const ROOT = path.join(__dirname, '..');
 const PKG = require('../package.json');
@@ -109,6 +110,9 @@ function themePayload(isPrivate = false) {
     bookmarksBar: store.get('bookmarksBar'),
     tabsMode: store.get('tabsMode'),
     quickLinks: store.get('quickLinks'),
+    aiProvider: store.get('aiProvider'),
+    askMode: store.get('askMode'),
+    aiProviders: AI.list(),
     engines: Object.entries(ENGINES).map(([id, e]) => ({ id, name: e.name, host: new URL(e.url).host.replace(/^www\./, '') })),
   };
   return { settings, tokens, presets: Theme.PRESETS, prefs, isPrivate };
@@ -132,6 +136,8 @@ function setPrefs(patch) {
   if (patch && Object.hasOwn(ENGINES, patch.searchEngine)) { store.set('searchEngine', patch.searchEngine); store.set('searchChosen', true); }
   if (typeof patch?.bookmarksBar === 'boolean') store.set('bookmarksBar', patch.bookmarksBar);
   if (['auto', 'top', 'side'].includes(patch?.tabsMode)) store.set('tabsMode', patch.tabsMode);
+  if (patch && Object.hasOwn(AI.PROVIDERS, patch.aiProvider)) store.set('aiProvider', patch.aiProvider);
+  if (['smart', 'search', 'ai'].includes(patch?.askMode)) store.set('askMode', patch.askMode);
   broadcastTheme();
   everyWindow((w) => w.sendTabs());
 }
@@ -209,6 +215,9 @@ function registerIpc() {
   on('tab:close', (w, id) => w.tabs.close(Number(id)));
   on('tab:activate', (w, id) => w.tabs.activate(Number(id)));
   on('tab:navigate', (w, text) => w.tabs.navigate(String(text || '')));
+  on('tab:search', (w, text) => w.tabs.create(require('./url').toUrl(String(text || ''), store.get('searchEngine'))));
+  on('ai:ask', (w, text, newTab) => w.ask(String(text || ''), { newTab: !!newTab }));
+  handle('palette:tabs', (w) => w.allTabs());
   on('tab:reopen', (w) => w.tabs.reopenClosed());
   on('tab:move', (w, id, to) => w.tabs.move(Number(id), Number(to)));
   // A tab dragged out of the strip: drop it on another window's tabs, or open it in a new window.
@@ -295,6 +304,10 @@ function registerIpc() {
     if (!w || !String(report?.title || '').trim()) return;
     const url = bugReportUrl(report || {});
     if (url) w.tabs.create(url);
+  });
+  ipcMain.on('page:ask', (e, text) => {
+    const w = isBurrowPage(e.sender) && winOfPage(e.sender);
+    if (w) w.ask(String(text || ''), { pageWc: e.sender });
   });
   ipcMain.on('page:navigate', (e, text) => {
     const w = isBurrowPage(e.sender) && winOfPage(e.sender);

@@ -25,10 +25,50 @@ function greeting() {
 $('stat').textContent = greeting();
 
 // ---------- Search ----------
+// ---------- Search | Ask ----------
+// "Smart" mode flips the toggle to Ask when what you type looks like a question.
+// Clicking the toggle yourself overrides that until the box is cleared.
+let prefsNow = null;
+let mode = 'search';
+let modePinned = false;
+function setMode(m, pinned) {
+  mode = m;
+  if (pinned !== undefined) modePinned = pinned;
+  document.querySelectorAll('#modeToggle [data-mode]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === m)));
+  document.body.classList.toggle('ask-mode', m === 'ask');
+  updatePlaceholder();
+}
+function updatePlaceholder() {
+  if (!prefsNow) return;
+  const engine = prefsNow.engines.find((e) => e.id === prefsNow.searchEngine);
+  const ai = prefsNow.aiProviders.find((p) => p.id === prefsNow.aiProvider);
+  $('q').placeholder = mode === 'ask' ? `Ask ${ai ? ai.name : 'AI'} anything` : `Search ${engine ? engine.name : 'the web'} or type a URL`;
+  $('qHint').textContent = mode === 'ask' ? `ENTER TO ASK ${(ai?.name || 'AI').toUpperCase()}` : 'ENTER';
+}
+function autoMode() {
+  if (modePinned || !prefsNow) return;
+  const q = $('q').value.trim();
+  const m = prefsNow.askMode === 'ai' ? 'ask'
+    : prefsNow.askMode === 'search' ? 'search'
+    : (window.BurrowAI.isQuestion(q) ? 'ask' : 'search');
+  if (m !== mode) setMode(m);
+}
+$('modeToggle').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (!b) return;
+  setMode(b.dataset.mode, true);
+  $('q').focus();
+});
+$('q').addEventListener('input', () => {
+  if (!$('q').value.trim()) modePinned = false;
+  autoMode();
+});
 $('search').addEventListener('submit', (e) => {
   e.preventDefault();
   const q = $('q').value.trim();
-  if (q) window.burrowPage.navigate(q);
+  if (!q) return;
+  if (mode === 'ask') window.burrowPage.ask(q);
+  else window.burrowPage.navigate(q);
 });
 
 // ---------- Mochi ----------
@@ -78,7 +118,9 @@ let askedEngine = false;
 function renderPrefs(prefs, ws) {
   window.renderQuickLinks?.(prefs.quickLinks || [], ws || null);
   const engine = prefs.engines.find((e) => e.id === prefs.searchEngine);
-  $('q').placeholder = `Search ${engine ? engine.name : 'the web'} or type a URL`;
+  prefsNow = prefs;
+  if (!modePinned && prefs.askMode === 'ai' && mode !== 'ask') setMode('ask'); else autoMode();
+  updatePlaceholder();
   const chooser = $('chooser');
   if (!prefs.searchChosen) {
     $('engineGrid').innerHTML = prefs.engines.map((e) =>

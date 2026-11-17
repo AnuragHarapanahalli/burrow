@@ -207,3 +207,36 @@
 .mm-zval { border-left: 0; border-right: 0; font-size: 11px; }
 .mm-zbtn:hover, .mm-zval:hover { background: var(--fg); color: var(--bg); }
 .mm-zbtn:active, .mm-zval:active { transform: scale(.94); }
+
+/* Ask AI row in address suggestions */
+.suggest .sg-ask .kind { color: var(--accent-ink); }
+.suggest .sg-ask.sel .kind { color: var(--accent); }
+.sect-sub { color: var(--muted); margin-top: 6px; }
+
+/* ---------- Ctrl+K command palette ---------- */
+.palette {
+  position: absolute; left: 50%; top: 70px; transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px)); background: var(--bg); border: var(--rule); box-shadow: 8px 8px 0 var(--fg);
+  display: flex; flex-direction: column;
+}
+.palette[hidden] { display: none; }
+.palette.pop-in { animation: pal-in .16s var(--ease-out); }
+@keyframes pal-in { from { opacity: 0; transform: translate(-50%, -6px) scale(.98); } }
+.pal-head { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: var(--rule); }
+.pal-k { color: var(--accent-ink); }
+#palInput { flex: 1; height: 48px; border: 0; outline: 0; background: none; font-size: 17px; font-weight: 500; user-select: text; }
+#palInput::placeholder { color: var(--muted); font-weight: 400; }
+.pal-list { max-height: min(420px, 60vh); overflow-y: auto; scrollbar-width: thin; }
+.pal-row {
+  display: grid; grid-template-columns: 96px 1fr auto; gap: 10px; align-items: center;
+  padding: 8px 14px; border-bottom: var(--hair); cursor: pointer;
+}
+.pal-row .kind { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-row .main { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pal-row .main .u { color: var(--muted); margin-left: 8px; }
+.pal-key { color: var(--muted); font-size: 11px; }
+.pal-row.pal-ask .kind { color: var(--accent-ink); }
+.pal-row.sel { background: var(--fg); color: var(--bg); }
+.pal-row.sel .kind, .pal-row.sel .u, .pal-row.sel .pal-key { color: var(--accent); }
+.pal-empty { padding: 16px 14px; color: var(--muted); }
+.pal-foot { padding: 6px 14px; color: var(--muted); border-top: var(--hair); }

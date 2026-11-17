@@ -39,6 +39,9 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Ctrl+K command palette** searches actions, every open tab (all workspaces), bookmarks and history, plus Search / Ask AI rows. Matching is "fuzzy" (letters in order, e.g. "nwpr" finds New private window). Results open in the current tab only if you're on a new tab | Separate tab search + command list | One box to remember; shortcuts shown on each row teach you the keys |
+| 2026-11-17 | Ask AI default: **Claude** (changeable in Settings → AI assistant). Claude and ChatGPT get your question in the address; **Gemini can't, so Burrow copies the question and Mochi says "Press Ctrl+V in Gemini"** | Skip Gemini | You wanted Gemini; copy-and-paste is the honest workaround |
+| 2026-11-17 | New tab gets a **Search \| Ask** toggle that flips to Ask by itself when you type a question (in Smart mode); clicking it yourself overrides until you clear the box | Two separate boxes | Same box, clear which way Enter will go |
 | 2026-11-17 | **AI in Burrow, in layers.** (1) "Ask AI" next to search — address bar, new tab, Ctrl+K, Settings — phase 4. (2) AI side panel docked beside the page — with split view, phase 5. (3) "Ask about this page / selected text" — after phase 5. (Later) Mochi answers with your own API key | AI built into Burrow from day one with an API key; a single "AI button" only | Many people now ask an AI instead of searching. Opening the AI sites you're already signed in to costs nothing, needs no keys, and works today; deeper features come step by step |
 | 2026-11-17 | AI services offered: **Claude, ChatGPT, Gemini** (you pick a default in Settings). Where a site supports it, your question is filled in for you; Gemini may just open the chat | Also Perplexity | Your choice |
 | 2026-11-17 | **Smart default:** text that looks like a question ("how…", "why…", ends in "?") offers Ask AI first; everything else offers search first. Both are always shown | Always search first; always AI first | Gets you to the right place in one keypress most of the time |
@@ -161,6 +164,8 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Pull a tab out into a new window / onto another window | ✅ done (tested) |
 | Git + GitHub repo | ✅ set up |
 | Report a bug (opens a prefilled GitHub issue) | ✅ done (tested) |
+| Ctrl+K command palette | ✅ done (tested) |
+| Ask AI: address bar, new tab toggle, palette, Settings (Claude / ChatGPT / Gemini, Smart default) | ✅ done (tested) |
 | Ctrl+K command palette | planned |
 | Split view, notes (+ .md export), reader mode | planned |
 | Tab sleeping | planned |
@@ -191,6 +196,7 @@ WOAHDAMN/
 │  └─ tab-preload.js      gives Burrow's own pages (new tab) a read-only theme + search; websites get nothing
 ├─ shared/                ── code used by both the brain and the pages ──
 │  ├─ theme.js            the colour engine: one seed colour → every colour token, with contrast checks
+│  ├─ ai.js               Ask AI: the AI sites, how to open each one, and "does this look like a question?"
 │  └─ mochi.js            Mochi's pixel sprites (idle, blink, happy, wave) drawn as SVG
 └─ ui/                    ── what you see ──
    ├─ base.css            fonts + colour variables shared by every Burrow page
@@ -201,6 +207,7 @@ WOAHDAMN/
    ├─ bmbar.js            the bookmarks bar (and its » overflow menu)
    ├─ find.js             the find-in-page bar
    ├─ drag.js             dragging tabs: reorder, pull out into a new window
+   ├─ palette.js          the Ctrl+K command palette
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
       └─ bugreport.js     the "Report a bug" form
@@ -218,7 +225,7 @@ WOAHDAMN/
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
 
-**Shortcuts so far:** Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
+**Shortcuts so far:** Ctrl+K command palette · Ctrl+N new window · Ctrl+F find (Enter / Shift+Enter, F3) · Ctrl+= / Ctrl+- / Ctrl+0 zoom · Ctrl+Shift+N private window · Ctrl+Shift+B bookmarks bar · Ctrl+T new tab · Ctrl+Shift+T reopen closed tab · Ctrl+Shift+1–9 switch workspace · Ctrl+D bookmark · Ctrl+H history · Ctrl+J downloads · Ctrl+Shift+O bookmarks · Ctrl+W close · Ctrl+L address bar · Ctrl+Tab / Ctrl+Shift+Tab switch · Ctrl+1–8 jump to tab, Ctrl+9 last tab · Ctrl+R / F5 reload · Alt+←/→ back/forward · F12 developer tools · middle-click a tab to close it.
 
 ---
 
@@ -288,6 +295,11 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Back up to GitHub: `git push`.
 - Undo uncommitted changes to a file: `git restore path/to/file`.
 
+**2026-11-17 — Phase 4 done (93/93 self-test checks pass)**
+- Ctrl+K command palette; Ask AI in the address bar, new tab (Search | Ask), palette and Settings.
+- The self-test checks the exact addresses Burrow would open for Claude/Gemini **without** actually visiting those sites.
+- Discovered: in Electron 45, *reading* the clipboard is asynchronous (returns a "promise"). Burrow only writes to it, so only the test needed changing.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
@@ -295,14 +307,15 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 4):** Ctrl+K command palette + "Ask AI" (Claude / ChatGPT / Gemini). Then phase 5: split view + AI side panel, notes, reader mode; then "Ask about this page".
+- **Next (phase 5):** split view + AI side panel, notes, reader mode; then "Ask about this page".
+- Ask AI relies on Claude's and ChatGPT's "question in the address" links; if they ever change them, the question may stop being filled in (the site still opens).
 
 ### Roadmap at a glance
 | Phase | What | Status |
 |---|---|---|
 | 1–3 | Tabs, workspaces, library, theming, find, zoom, private & multiple windows, tab dragging, bug reports | ✅ done |
-| 4 | Ctrl+K command palette + Ask AI in search | next |
-| 5 | Split view + AI side panel, notes, reader mode | planned |
+| 4 | Ctrl+K command palette + Ask AI in search | ✅ done |
+| 5 | Split view + AI side panel, notes, reader mode | next |
 | 5b | Ask AI about this page / selected text | planned |
 | 6 | Tab sleeping | planned |
 | 7 | Mochi animations + reactions | planned |
