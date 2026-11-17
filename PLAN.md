@@ -81,8 +81,40 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
    - **Delivery**: on the first new tab of a new week (if last week has data), Mochi walks in: "Your week in Burrow is ready" + Open button — once per week. Also ☰ (library row → Report) and Ctrl+K "Weekly report" any time.
    - *Not in phase 9:* save the report as an image; "limit this site?" suggestions.
    - Self-test: counting (idle stubbed), private windows not recorded, 5-week pruning, stat-line choice for each case, report numbers from seeded data (totals, vs-last-week, top sites, empty state), Monday nudge appears once, switch off stops recording, Clear my stats.
-10. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
-11. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
+10. **Right-click menus + window fixes** (decided 2026-11-17):
+   - **Burrow-styled right-click menus** everywhere, same look as ☰ (keyboard: arrows / Enter / Esc; opens at the cursor, flips near edges, floats over pages with the overlay trick). The page tells Burrow *what* was clicked; Burrow decides the actions itself, so a page can't fake menu items.
+     - Page: Back · Forward · Reload · Select all · View page source · Inspect
+     - Link: Open in new tab · new window · private window · split view · Copy link address · Bookmark link
+     - Image: Open in new tab · Save image as… · Copy image · Copy image address
+     - Selected text: Copy · Search {engine} for "…" · Ask {AI} about "…" · Add to notes
+     - Text boxes (pages *and* Burrow's address bar and fields): Undo · Redo · Cut · Copy · Paste · Select all, spelling suggestions; address bar adds **Paste and go**
+     - Video/audio: Play/Pause · Mute · Loop · Picture-in-picture
+     - Tab: New tab to the right · Reload · Duplicate · Mute / Volume · Keep awake / Sleep now · Split with… · Move to workspace ▸ · Move to window ▸ (other windows / new window) · Close · Close other tabs · Close tabs to the right · Reopen closed tab
+     - Tab strip (empty space): New tab · Reopen closed tab
+     - Bookmarks bar item: Open · Open in new tab · Edit · Delete
+   - **Closing the last tab closes the window** (×, Ctrl+W, middle-click). Closing the last window quits Burrow, like Chrome. Exceptions: a workspace's last tab while other workspaces still have tabs leaves a new tab in that workspace; Mochi eating the last tab leaves a new tab (the window doesn't vanish from under you).
+   - **Drag tabs back between windows**: a tab lifts off when it leaves the strip in *any* direction (not only downwards); a window's **only tab** can be dragged too — drop it on another window and that window takes it while the empty one closes; the drop lands **where you let go** in the target strip (not at the end), with an insert marker shown in the target window while you drag. Also "Move to window ▸" in the tab menu.
+   - Self-test: every menu type from a real right-click (sendInputEvent) on a local test page; actions run (open link, copy, paste, search selection, tab actions); a page can't trigger menu actions itself; last-tab → window closes; last window → quit is requested; single-tab window dropped onto another merges; drop index.
+11. **Import from other browsers** (decided 2026-11-17): **bookmarks + history** from Chrome, Edge, Brave, Vivaldi, Opera (all profiles, by name) and Firefox.
+   - Where: a new **welcome-tour step** ("Bring your stuff", right after Hello), **Settings → Import** and Ctrl+K "Import from…".
+   - Bookmarks keep their folders (shown as a folder label); the other browser's bookmarks-bar items go to Burrow's bookmarks bar. History: the last 90 days (within Burrow's 5,000 limit). Importing twice doesn't create duplicates. Optional: offer your most-visited sites as quick links.
+   - Safe: read-only, works while the other browser is open (Burrow copies its files first), nothing leaves the PC; shows a summary ("312 bookmarks, 4,210 pages of history").
+   - Not possible: staying signed in to sites (Chrome/Edge lock their cookies to themselves) — you sign in once. **Passwords come later** (phase 15), after Burrow has its own password manager.
+   - Reading the history databases: Node's built-in SQLite if Electron 45 includes it, otherwise a small, well-known WebAssembly SQLite library (checked when building).
+   - Self-test: fake Chrome / Edge / Firefox profiles in the test folder (Bookmarks JSON + History / places.sqlite made by the test) → counts, folders, bar items, no duplicates on a second import, the tour step.
+12. **Mochi, part 1: helpful** (decided 2026-11-17):
+   - **Eye & break nudges**: after 20 minutes of active screen time, Mochi: "Look at something far away for 20 seconds" with a little 20-second countdown; after ~90 minutes, a stretch nudge (opens the 2-minute stretch). Resets after 5 minutes away. Not during fullscreen video. Settings → Mochi: on/off and 20 / 30 / 45 minutes.
+   - **Tab tidy-up**: duplicate tabs ("3 copies of YouTube are open — close the extras?") and forgotten tabs ("12 tabs you haven't opened in 3 days") with a review list to tick; closed ones go to "Reopen closed tab", so nothing is lost. At most once a day each.
+   - **Remind me about this tab**: tab menu → Remind me ▸ in 1 hour · this evening (18:00) · tomorrow morning (09:00) · pick a time. The tab leaves the strip; at that time Mochi walks in and brings it back. Survives restarts; reminders missed while Burrow was closed appear at the next start. A list in Ctrl+K.
+   - **Safety warnings**: Mochi warns when you start typing in a password box on a page without HTTPS (and a "NOT SECURE" chip shows in the address bar); risky downloads (.exe, .msi, .bat, .cmd, .scr, .ps1, .vbs, .js, .jar…) wait for "Keep" or "Discard" before they're saved.
+13. **Mochi, part 2: fun** (decided 2026-11-17):
+   - **Offline mini-game "Mochi Hop"** (our own game and art): when there's no internet, Burrow shows its own offline page — Mochi hops over puddles and pebbles and collects carrots; Space / click to hop, double-hop, best score saved, colours follow your theme. The page returns to the site by itself when you're back online. Also Ctrl+K "Play Mochi Hop". Other error pages (site not found, etc.) also get Burrow-styled pages.
+   - **Mochi grows + outfits**: carrots for focus sessions, days within limits, eye breaks taken and Mochi Hop scores; spend them on outfits (scarf, glasses, beanie, bow tie, cape…) in Settings → Mochi → Wardrobe. Purely for fun — never lost, never a penalty.
+   - **Reading time + idle life**: a "7 MIN READ" chip for articles; Mochi naps when you're away and waves when you're back; on the new tab Mochi's eyes follow the cursor and it blinks, stretches and hops now and then.
+   - **Bedtime wind-down** (off by default; you set the time): 30 minutes before, Mochi mentions it; at bedtime it offers night mode (a warm, dim Burrow theme and a gentle warm tint over pages, can be turned off) and every 30 minutes after, a soft "It's late" (a few times at most). Ends at 06:00.
+14. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
+15. Later: **password manager** (encrypted with Windows' own protection, autofill on login forms, "save password?" prompt, revealing a password asks for your Windows PIN) **+ password import** from other browsers.
+16. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 
 ## Verification
 - `npm install` and `npm start` after every phase, then check that phase's features by hand.

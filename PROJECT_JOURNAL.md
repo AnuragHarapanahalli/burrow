@@ -39,6 +39,12 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-17 | **Phases 10–13 planned** (details in PLAN.md): 10 right-click menus + window fixes, 11 import from other browsers, 12 helpful Mochi, 13 fun Mochi. The polish/installer phase moves to 14 | Do them inside the polish phase | Each is big enough to build, test and merge on its own |
+| 2026-11-17 | Right-click menus are **Burrow-styled** (our own menus) | Native Windows menus | Same look as the rest of Burrow, and room for Burrow actions (Ask AI about a selection, open in split view) |
+| 2026-11-17 | **Closing the last tab closes the window**; the last window quits Burrow | Always keep a new tab | You asked; it's what Chrome does. A workspace's last tab and Mochi eating the last tab still leave a new tab |
+| 2026-11-17 | A window's only tab can be dragged onto another window (the empty window closes); tabs lift off in any direction and land where you drop them | Keep "last tab stays put" | You couldn't drag a torn-off tab back |
+| 2026-11-17 | Import **bookmarks + history** now; **passwords later** with a proper password manager | Everything now; bookmarks only | Importing passwords needs somewhere safe to keep them first. Staying signed in can't be imported at all: Chrome and Edge lock their cookies to themselves |
+| 2026-11-17 | Mochi gets all eight ideas: eye & break nudges, tab tidy-up, tab reminders, safety warnings (phase 12); offline game, carrots + outfits, reading time + idle life, bedtime wind-down (phase 13) | Fewer | Your picks |
 | 2026-11-17 | **Phase 9 plan** (details in PLAN.md): weekly report records active time on **all sites** (not just limited ones), on your PC only, kept 5 weeks; private windows never recorded; a switch and "Clear my stats" in Settings → Focus | Only limited sites; ask at the first report | Your choice. "Top sites" needs every site; 5 weeks is enough for week-on-week comparisons without building a long history |
 | 2026-11-17 | Weekly report arrives as a **Mochi nudge** on the first new tab of the week, opening a report page (also in ☰ and Ctrl+K) | Report opens by itself; no reminder | Noticeable but never in the way |
 | 2026-11-17 | New-tab stat line **rotates to the most relevant kind fact** (time left, focus session, streak, focus done, memory saved), or shows nothing | Always screen time; streak only; no line | Keeps the "one gentle stat" rule from the design review; constant screen-time totals feel guilt-trippy |
@@ -399,7 +405,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Tabs can't be moved between workspaces yet (only between windows).
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 10):** polish, accessibility check, Windows installer. Phase 5b ("Ask AI about this page") is still postponed.
+- **Next (phase 10):** right-click menus, last-tab-closes-window, dragging tabs back between windows. Then import (11), Mochi (12–13), polish + installer (14). Phase 5b ("Ask AI about this page") is still postponed.
 - The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
 - Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
 - Time limits use the site's address (youtube.com covers m.youtube.com too) — apps on other domains (e.g. youtu.be short links) redirect first, so they're caught when they land.
@@ -418,7 +424,12 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 7 | Mochi animations + reactions | ✅ done |
 | 8 | Focus tools (limits, Mochi eats the tab, the gate, focus sessions) + per-tab volume + control-centre menu | ✅ done |
 | 9 | New-tab stat + weekly report | ✅ done |
-| 10 | Polish, accessibility, Windows installer | planned |
+| 10 | Right-click menus, last tab closes the window, drag tabs back between windows | next (planned) |
+| 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | planned |
+| 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | planned |
+| 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | planned |
+| 14 | Polish, accessibility, Windows installer | planned |
+| 15 | Password manager + password import | later |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 
 ---
