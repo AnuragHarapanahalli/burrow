@@ -1832,7 +1832,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Updates ---
     const upd = getUpdates();
-    check(['dev', 'portable', 'idle', 'latest'].includes(upd.state.status), 'while developing there is nothing to update (' + upd.state.status + ')');
+    if (!app.isPackaged) check(['dev', 'portable', 'idle', 'latest'].includes(upd.state.status), 'while developing there is nothing to update (' + upd.state.status + ')');
+    else check(upd.state.status !== 'error', 'the installed app checks for updates without an error (' + upd.state.status + ')');
     await js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
     upd.set({ status: 'ready', version: '9.9.9' });
     check(await until(() => js("UI.mochiLog.some((m) => /^Update ready\\. Click me to restart into v9\\.9\\.9/.test(m.text))")), 'when an update has downloaded, Mochi says "Update ready"');
@@ -1873,8 +1874,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
 
     // --- App icon ---
-    const icoBuf = fs.readFileSync(path.join(__dirname, '..', 'build', 'icon.ico'));
-    check(icoBuf.readUInt16LE(2) === 1 && icoBuf.readUInt16LE(4) === 6, 'the app icon has all six sizes (16–256 px)');
+    if (!app.isPackaged) { // (build/ is a build-time folder; it isn't inside the installed app)
+      const icoBuf = fs.readFileSync(path.join(__dirname, '..', 'build', 'icon.ico'));
+      check(icoBuf.readUInt16LE(2) === 1 && icoBuf.readUInt16LE(4) === 6, 'the app icon has all six sizes (16–256 px)');
+    }
     srv14.close();
     }
     if (section('windows')) {

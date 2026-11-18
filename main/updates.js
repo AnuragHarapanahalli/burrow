@@ -25,7 +25,7 @@ class Updates {
     u.on('update-not-available', () => this.set({ status: 'latest' }));
     u.on('update-available', (info) => this.set({ status: 'downloading', version: info?.version || null }));
     u.on('update-downloaded', (info) => this.set({ status: 'ready', version: info?.version || this.state.version }));
-    u.on('error', (err) => this.set({ status: 'error', error: String(err?.message || err).slice(0, 200) }));
+    u.on('error', (err) => this.failed(err));
     setTimeout(() => this.check(), 15000);
     setInterval(() => this.check(), EVERY_MS);
   }
@@ -37,8 +37,15 @@ class Updates {
 
   check() {
     if (!this.updater) return this.state;
-    this.updater.checkForUpdates().catch((err) => this.set({ status: 'error', error: String(err?.message || err).slice(0, 200) }));
+    this.updater.checkForUpdates().catch((err) => this.failed(err));
     return this.state;
+  }
+
+  // No release published yet (GitHub answers 404 / "no published versions") means you're up to date.
+  failed(err) {
+    const msg = String(err?.message || err);
+    if (/404|no published versions|unable to find latest version/i.test(msg)) this.set({ status: 'latest', error: null });
+    else this.set({ status: 'error', error: msg.slice(0, 200) });
   }
 
   install() {

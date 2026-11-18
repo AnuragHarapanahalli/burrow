@@ -491,6 +491,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Browser basics: site permission prompts, clear browsing data, default browser + links from other apps, a crash page, split view after a restart, PDF viewing.
 - Installer: `npm run dist` makes a one-click installer and a portable .exe with the Mochi icon; installed copies update themselves from GitHub Releases.
 - The self-test's download check now uses a local test server (no internet needed for it).
+- Checked the packaged app itself (the files inside the installer) with three test parts. Found and fixed: before your first release, the installed app said "Couldn't check for updates" (GitHub has no releases yet); that now counts as "You have the latest version".
 - npm's audit flags some build tools (electron-builder's helpers); they only run on your PC to package Burrow and are not inside the app — the app's own packages have no known problems.
 
 ## 10. Known issues / next up
