@@ -39,6 +39,7 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | **MIT licence**; README with screenshots, issue templates (blank issues stay on for the in-app Report a bug) | GPL-3.0; no licence | Your pick: simple and common, and keeps the free SignPath signing option open |
 | 2026-11-18 | **Release via GitHub Releases with auto-update, unsigned for now** (phase 14) | SignPath free signing (needs an open-source licence); Microsoft Store; installer only | Simplest that really updates itself; signing can be added later without changing anything. Cost: a one-time SmartScreen warning on first install |
 | 2026-11-18 | **One-click per-user installer + portable .exe** | One-click only; classic wizard | Installs in seconds without admin; the portable copy runs from a USB stick or a college PC |
 | 2026-11-18 | Phase 14 adds browser basics: **site permission prompts, clear browsing data, default browser, crash page + remembered split view** | Leave for later | Your picks; these are what people expect from a real browser |
@@ -342,6 +343,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
 - `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, phase14, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- readme` retakes the README screenshots (clean demo data) into `docs/screenshots`; it never runs as part of a normal `npm test`.
 - `npm test -- --slow` also lists the 30 slowest checks, to see where time goes.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 

@@ -87,5 +87,8 @@
         "releaseType": "release"
       }
     ]
-  }
+  },
+  "license": "MIT",
+  "author": "Anurag Harapanahalli",
+  "homepage": "https://github.com/AnuragHarapanahalli/burrow"
 }

@@ -1,0 +1,32 @@
+name: Report a bug
+description: Something in Burrow doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Thanks for helping fix Burrow! (The **Report a bug** button next to the version on Burrow's new tab fills most of this in for you.)"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to make it happen
+      placeholder: |
+        1. Open a new tab
+        2. Click Mochi
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: Burrow version
+      description: Shown at the bottom of the new tab, e.g. v0.2.0
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run Burrow?
+      options: [Installed (Burrow-Setup), Portable .exe, From the source code (npm start)]

@@ -53,6 +53,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
   const section = (name) => {
     endSection();
     if (only.length && !only.includes(name)) return false;
+    if (name === 'readme' && !only.includes('readme')) return false; // only when asked for: npm test -- readme
     current = { name, at: Date.now() };
     note(`--- ${name}`);
     return true;
@@ -1879,6 +1880,86 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       check(icoBuf.readUInt16LE(2) === 1 && icoBuf.readUInt16LE(4) === 6, 'the app icon has all six sizes (16–256 px)');
     }
     srv14.close();
+    }
+    if (section('readme')) {
+    // ================= README screenshots (npm test -- readme) → docs/screenshots =================
+    const out = path.join(__dirname, '..', 'docs', 'screenshots');
+    fs.mkdirSync(out, { recursive: true });
+    const save = async (wc, name) => { await capture(wc, path.join(out, name + '.png')); note('    saved ' + name + '.png'); };
+    setTheme({ mode: 'light', seed: '#E63027' });
+    setPrefs({ mochiMode: 'lively', bookmarksBar: false, searchEngine: 'google' });
+    store.set('searchChosen', true);
+    store.set('carrots', 23);
+    await wait(500);
+    // New tab with Mochi's menu
+    const r1 = tabs.create();
+    await ready(r1);
+    await wait(600);
+    await r1.view.webContents.executeJavaScript("document.getElementById('bubble').hidden = true; openMochiMenu()");
+    await wait(500);
+    await save(r1.view.webContents, 'new-tab-mochi-menu');
+    // The Burrow gate for a site that's used up its time
+    const focus = getFocus();
+    focus.limits['youtube.com'] = 30;
+    focus.used['youtube.com'] = 34 * 60;
+    focus.streak = { days: 4, last: null };
+    r1.view.webContents.loadURL('burrow://gate/?site=youtube.com&r=limit&u=' + encodeURIComponent('https://www.youtube.com/'));
+    await ready(r1);
+    await wait(900);
+    await save(r1.view.webContents, 'burrow-gate');
+    // A week in the weekly report
+    const stats = getStats();
+    const { keyOf, mondayOf, addDays } = require('./stats');
+    stats.clear();
+    const mon = addDays(mondayOf(new Date()), -7);
+    const day = (o) => ({ sites: {}, total: 0, limited: 0, hadLimits: true, hit: false, focus: 0, eaten: 0, snoozes: 0, unlocks: 0, slept: 0, freedMB: 0, ...o });
+    const week = [
+      { 'github.com': 5400, 'youtube.com': 1700, 'wikipedia.org': 1200, 'docs.google.com': 2200 },
+      { 'github.com': 6200, 'youtube.com': 1800, 'stackoverflow.com': 1500 },
+      { 'youtube.com': 1800, 'github.com': 3000, 'reddit.com': 900, 'docs.google.com': 2600 },
+      { 'github.com': 7000, 'wikipedia.org': 800, 'youtube.com': 1500 },
+      { 'youtube.com': 1800, 'reddit.com': 1500, 'github.com': 2400 },
+      { 'youtube.com': 1600, 'wikipedia.org': 1400 },
+      { 'youtube.com': 1200, 'docs.google.com': 900 },
+    ];
+    week.forEach((sites, i) => {
+      const total = Object.values(sites).reduce((a, b) => a + b, 0);
+      stats.days[keyOf(addDays(mon, i))] = day({ sites, total, limited: sites['youtube.com'] || 0, focus: [2, 3, 1, 4, 0, 1, 0][i], eaten: i === 4 ? 1 : 0, hit: i === 4, slept: 6, freedMB: 180 });
+    });
+    stats.days[keyOf(addDays(mon, -7))] = day({ sites: { 'youtube.com': 16000, 'github.com': 20000 }, total: 52000, limited: 16000 });
+    r1.view.webContents.loadURL('burrow://report/');
+    await ready(r1);
+    await wait(1200);
+    await save(r1.view.webContents, 'weekly-report');
+    // Mochi Hop, mid-game
+    r1.view.webContents.loadURL('burrow://offline/?play=1');
+    await ready(r1);
+    await wait(500);
+    // (Captured mid-jump while the game is really running; the obstacles are placed so nothing is hit first.)
+    await r1.view.webContents.executeJavaScript("hop.start(); hop.things = [{ type: 'pebble', x: 520, w: 15, h: 15 }, { type: 'carrot', x: 330, w: 9, h: 15, y: 96 }, { type: 'puddle', x: 700, w: 44, h: 6 }]; hop.nextThing = 999; hop.score = 186; hop.carrots = 7; hop.best = 412; document.getElementById('best').textContent = '412'; hop.jump()");
+    await wait(200);
+    // Freeze the game mid-hop for the picture (screenshot only), without the keyboard-focus outline.
+    await r1.view.webContents.executeJavaScript('document.activeElement.blur(); hop.y = -46; hop.vy = 0; step = () => {}; null');
+    await wait(100);
+    await save(r1.view.webContents, 'mochi-hop');
+    // Welcome tour: the Mochi step
+    r1.view.webContents.loadURL('burrow://welcome/');
+    await ready(r1);
+    await wait(500);
+    for (let i = 0; i < 5; i++) { await r1.view.webContents.executeJavaScript("document.getElementById('next').click()"); await wait(150); }
+    await wait(900);
+    await save(r1.view.webContents, 'welcome-tour');
+    // Night mode on the new tab
+    setPrefs({ mochiMode: 'lively' });
+    store.set('nightMode', true);
+    setTheme({});
+    r1.view.webContents.loadURL('burrow://newtab/');
+    await ready(r1);
+    await wait(900);
+    await save(r1.view.webContents, 'night-mode');
+    store.set('nightMode', false);
+    setTheme({ mode: 'light', seed: '#E63027' });
+    tabs.close(r1.id);
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

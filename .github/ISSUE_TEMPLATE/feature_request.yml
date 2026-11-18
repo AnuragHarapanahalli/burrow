@@ -1,0 +1,11 @@
+name: Suggest an idea
+description: Something Burrow (or Mochi) could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like, and what would it help with?
+    validations:
+      required: true
