@@ -39,6 +39,7 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | **Google sign-in:** on accounts.google.com only, Burrow presents itself as Firefox (request headers, the page's navigator.userAgent, no Chromium client hints); everywhere else it stays Chrome | Leave it (Google blocks sign-in); pretend to be Google Chrome everywhere | Google refuses sign-in from browsers it sees as embedded Chromium. Presenting as Firefox only there is the usual approach of independent browsers and changes nothing for other sites. Google could change its checks later |
 | 2026-11-18 | **MIT licence**; README with screenshots, issue templates (blank issues stay on for the in-app Report a bug) | GPL-3.0; no licence | Your pick: simple and common, and keeps the free SignPath signing option open |
 | 2026-11-18 | **Release via GitHub Releases with auto-update, unsigned for now** (phase 14) | SignPath free signing (needs an open-source licence); Microsoft Store; installer only | Simplest that really updates itself; signing can be added later without changing anything. Cost: a one-time SmartScreen warning on first install |
 | 2026-11-18 | **One-click per-user installer + portable .exe** | One-click only; classic wizard | Installs in seconds without admin; the portable copy runs from a USB stick or a college PC |
@@ -499,6 +500,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 ## 10. Known issues / next up
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
+- Google sign-in relies on Google accepting a Firefox identity on its sign-in pages; if Google changes its checks, sign-in could be refused again.
 - **Next:** your first release (v0.2.0) when you're ready; then the parked items (phase 15 password manager, "Ask AI about this page", Mochi answers).
 - Installers are **unsigned**: the first install shows "Windows protected your PC" (More info → Run anyway). Signing (SignPath or Microsoft Store) can be added later.
 - Updates only work in the installed copy; the portable .exe has to be replaced by hand.

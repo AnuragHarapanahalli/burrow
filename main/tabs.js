@@ -7,6 +7,7 @@ const { WebContentsView } = require('electron');
 const { toUrl, displayUrl, NEWTAB } = require('./url');
 const Reader = require('./reader');
 const Volume = require('./volume');
+const SignIn = require('./signin');
 
 // In reader view the tab's address is burrow://reader/?k=…&u=<original>; this gets the original.
 function readerOriginal(url) {
@@ -147,6 +148,12 @@ class Tabs {
       const url = typeof legacyUrl === 'string' ? legacyUrl : e.url;
       const isMain = typeof legacyMain === 'boolean' ? legacyMain : e.isMainFrame;
       if (!isMain || e.isSameDocument) return;
+      // On Google's sign-in pages the page sees Firefox's identity too (matching the request headers).
+      const signIn = SignIn.isSignIn(url);
+      if (signIn !== !!tab.signInUA) {
+        tab.signInUA = signIn;
+        wc.setUserAgent(signIn ? SignIn.firefoxUA() : require('electron').app.userAgentFallback);
+      }
       const g = T().gate(url);
       if (g) setImmediate(() => { if (!wc.isDestroyed()) { wc.stop(); wc.loadURL(g).catch(() => {}); } });
     });

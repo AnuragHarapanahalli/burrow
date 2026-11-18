@@ -1874,6 +1874,16 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(sa.id); tabs.close(sb.id);
     await wait(300);
 
+    // --- Google sign-in: Firefox's identity on accounts.google.com only ---
+    const SignIn = require('./signin');
+    check(SignIn.isSignIn('https://accounts.google.com/v3/signin/identifier') && !SignIn.isSignIn('https://www.google.com/') && !SignIn.isSignIn('https://mail.google.com/'), 'only Google\'s sign-in pages get the Firefox identity');
+    const hdr = SignIn.signInHeaders({ 'User-Agent': 'x Chrome/1', 'sec-ch-ua': '"Chromium"', 'Sec-CH-UA-Platform': '"Windows"', Accept: '*/*' });
+    check(/Firefox\/\d+/.test(hdr['User-Agent']) && !Object.keys(hdr).some((k) => /^sec-ch-ua/i.test(k)) && hdr.Accept === '*/*', 'there, requests say Firefox and carry no Chromium brand hints');
+    const plain = tabs.create(base14 + '/plain');
+    await ready(plain);
+    check(/Chrome\/\d+/.test(await plain.view.webContents.executeJavaScript('navigator.userAgent')) && !plain.signInUA, 'every other site still sees Chrome');
+    tabs.close(plain.id);
+
     // --- App icon ---
     if (!app.isPackaged) { // (build/ is a build-time folder; it isn't inside the installed app)
       const icoBuf = fs.readFileSync(path.join(__dirname, '..', 'build', 'icon.ico'));

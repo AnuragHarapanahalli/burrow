@@ -49,3 +49,11 @@ if (location.protocol === 'http:') {
     ipcRenderer.send('page:insecure-password');
   }, true);
 }
+
+// Google's sign-in pages: Burrow presents itself as Firefox there (see main/signin.js), and Firefox
+// has no navigator.userAgentData, so it's hidden on those pages so the identity is consistent.
+if (location.protocol === 'https:' && location.hostname === 'accounts.google.com') {
+  try {
+    contextBridge.executeInMainWorld({ func: () => { Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true }); } });
+  } catch { /* older Electron: the request headers alone usually suffice */ }
+}

@@ -15,6 +15,7 @@ const { Care } = require('./care');
 const { Fun, NIGHT_SEED } = require('./fun');
 const { Permissions } = require('./permissions');
 const { Updates } = require('./updates');
+const SignIn = require('./signin');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -106,6 +107,7 @@ function setupSession(ses) {
   // Electron allows every permission by default; a browser must not. Camera, microphone, location and
   // notifications are asked for (and remembered per site, except in private windows); see permissions.js.
   perms.attach(ses, { isPrivate });
+  SignIn.attach(ses); // Google sign-in works (see signin.js)
 }
 
 // ---------------- Links opened from other apps (Burrow as your default browser) ----------------
