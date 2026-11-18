@@ -13,6 +13,7 @@ const SETTINGS_DEFAULTS = {
   bookmarksBar: true,
   onboarded: false,
   sleep: { on: true, minutes: 30, never: [] }, // tab sleeping: unload tabs you haven't looked at for a while
+  sitePerms: {},         // per site: camera / microphone / location / notifications → allow | block
   carrots: 0,            // earned by focus sessions, eye breaks, days within limits, Mochi Hop
   outfitsOwned: [],
   outfit: null,          // what Mochi is wearing

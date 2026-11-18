@@ -21,7 +21,7 @@
       </button>
       <div class="caption-space">
         <button class="strip-mochi" id="stripMochi" hidden aria-label="Open downloads">
-          <span class="strip-bubble" id="stripBubble"></span><span id="stripSprite"></span>
+          <span class="strip-bubble" id="stripBubble" aria-live="polite"></span><span id="stripSprite"></span>
         </button>
       </div>
     </header>
@@ -71,6 +71,12 @@
     </nav>
 
     <div class="focus-bar" id="focusBar" hidden></div>
+    <div class="permbar" id="permBar" hidden role="alertdialog" aria-labelledby="permText">
+      <span class="perm-ico" id="permIco" aria-hidden="true"></span>
+      <span class="perm-text" id="permText"></span>
+      <button type="button" id="permBlock">Block</button>
+      <button type="button" class="primary" id="permAllow">Allow</button>
+    </div>
     <div class="findbar" id="findbar" hidden role="search" aria-label="Find in page">
       <span class="pixel find-label">FIND</span>
       <input id="findInput" placeholder="Find in page" spellcheck="false" aria-label="Find in page">
@@ -274,6 +280,44 @@
           <div class="imp-result" id="impResult" hidden></div>
         </div>
       </details>
+      <details class="sect" name="settings" id="permSect">
+        <summary><span class="pixel sect-n">10</span><span class="sect-t">Site permissions</span><span class="sect-v" id="sumPerms"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <p class="sect-note">Sites must ask before using your camera, microphone or location, or showing notifications. Your answers are remembered here. Private windows ask every time.</p>
+          <div class="perm-list" id="permList"></div>
+        </div>
+      </details>
+      <details class="sect" name="settings" id="clearSect">
+        <summary><span class="pixel sect-n">11</span><span class="sect-t">Clear browsing data</span><span class="sect-v"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <label class="clr-range">From <select id="clearRange" aria-label="Time range">
+            <option value="hour">the last hour</option><option value="day">the last 24 hours</option>
+            <option value="week">the last 7 days</option><option value="all" selected>all time</option>
+          </select></label>
+          <div class="clr-what">
+            <label><input type="checkbox" id="clrHistory" checked> History</label>
+            <label><input type="checkbox" id="clrCookies"> Cookies and site data <small>(signs you out of sites)</small></label>
+            <label><input type="checkbox" id="clrCache" checked> Cached files</label>
+            <label><input type="checkbox" id="clrDownloads"> Downloads list <small>(the files stay)</small></label>
+          </div>
+          <p class="sect-note">The time range applies to history and the downloads list. Cookies and cached files are always cleared completely. Shortcut: <span class="pixel kbd">CTRL SHIFT DEL</span></p>
+          <button class="clr-go" id="clearGo">Clear data</button>
+          <p class="sect-note" id="clearResult" aria-live="polite"></p>
+        </div>
+      </details>
+      <details class="sect" name="settings" id="aboutSect">
+        <summary><span class="pixel sect-n">12</span><span class="sect-t">About Burrow</span><span class="sect-v pixel" id="aboutVersion"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <div class="sect-body">
+          <p class="sect-note" id="updateStatus" aria-live="polite"></p>
+          <div class="about-btns">
+            <button class="text-btn" id="updateCheck">Check for updates</button>
+            <button class="text-btn" id="updateRestart" hidden>Restart to update</button>
+          </div>
+          <div class="sect-sub pixel">DEFAULT BROWSER</div>
+          <p class="sect-note" id="defaultState"></p>
+          <button class="text-btn" id="makeDefault">Make Burrow your default browser</button>
+        </div>
+      </details>
       </div>
       <div class="panel-mochi">
         <div class="bubble" id="panelBubble">Make it yours!</div>
@@ -378,5 +422,6 @@
   <script src="burrow://app/ui/ctxmenu.js"></script>
   <script src="burrow://app/ui/care-ui.js"></script>
   <script src="burrow://app/ui/fun-ui.js"></script>
+  <script src="burrow://app/ui/site-ui.js"></script>
 </body>
 </html>

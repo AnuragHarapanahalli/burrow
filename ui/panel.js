@@ -235,6 +235,8 @@ function renderSettingsPane() {
     `<figure title="${p}">${window.Mochi.svg(tokens, p, 40)}<figcaption class="pixel">${p.toUpperCase()}</figcaption></figure>`).join('');
   renderFocusSettings();
   window.renderWardrobe?.();
+  window.renderSitePerms?.();
+  window.renderDefault?.();
   window.renderBedtime?.(prefs);
   $('sumTabs').textContent = `${cap(prefs.tabsMode)} \u00b7 sleep ${sleepLabel}`;
   $('sumLayout').textContent = [prefs.bookmarksBar ? 'Bookmarks bar' : '', settings.grid ? 'Grid' : ''].filter(Boolean).join(', ') || 'Minimal';

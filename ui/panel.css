@@ -525,3 +525,27 @@ body.split-resizing .split-bar { transition: none; }
 .bed-row select { height: 28px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 12.5px; }
 .bed-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .bed-row input { accent-color: var(--accent); }
+
+/* ---------- Site permission bar ---------- */
+.permbar { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px 4px 12px; border-bottom: var(--rule); background: var(--surface); }
+.permbar[hidden] { display: none; }
+.perm-ico { width: 12px; height: 12px; background: var(--accent); flex: none; }
+.perm-text { flex: 1; min-width: 0; font-size: 13.5px; }
+.perm-note { color: var(--muted); font-size: 12px; }
+.permbar button { padding: 4px 14px; border: 1px solid var(--fg); font-weight: 600; transition: background-color .12s, color .12s; }
+.permbar button:hover { background: var(--hover); }
+.permbar .primary { background: var(--fg); color: var(--bg); }
+.permbar .primary:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+/* Settings: site permissions, clear data, about */
+.perm-list { display: flex; flex-direction: column; border-top: var(--rule); }
+.perm-site { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: var(--hair); }
+.perm-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.perm-row select, .clr-range select { height: 26px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 12.5px; }
+.clr-range { display: flex; align-items: center; gap: 8px; }
+.clr-what { display: flex; flex-direction: column; gap: 6px; }
+.clr-what label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.clr-what input { accent-color: var(--accent); }
+.clr-what small { color: var(--muted); }
+.clr-go { align-self: flex-start; padding: 6px 14px; background: var(--fg); color: var(--bg); font-weight: 600; transition: background-color .12s; }
+.clr-go:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.about-btns { display: flex; gap: 14px; }

@@ -60,6 +60,7 @@ class BurrowWindow {
       width: 1280, height: 820, minWidth: 640, minHeight: 420,
       ...(bounds || {}),
       title: isPrivate ? 'Burrow (private)' : 'Burrow',
+      icon: path.join(ROOT, 'ui', 'icon.png'), // Mochi on red (the installed app uses build/icon.ico)
       show: false,
       backgroundColor: tokens.bg,
       titleBarStyle: 'hidden',
@@ -343,6 +344,7 @@ class BurrowWindow {
     else if (input.alt && input.key === 'ArrowLeft') tabs.back();
     else if (input.alt && input.key === 'ArrowRight') tabs.forward();
     else if (input.key === 'F12') tabs.active?.view.webContents.toggleDevTools();
+    else if (ctrl && input.shift && (input.key === 'Delete' || input.code === 'Delete') && !this.isPrivate) this.openPanel('settings:clear');
     else handled = false;
     if (handled) event.preventDefault();
   }

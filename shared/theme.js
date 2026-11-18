@@ -85,7 +85,7 @@
       t.line = hslToHex(h, Math.min(s, 20), 84);
       t.muted = ensureContrast(h, 8, 40, t.bg, 4.6, false);
       t.accent = seed;
-      t.accentInk = ensureContrast(h, s, l, t.bg, 3.2, false); // accent used as text/marks
+      t.accentInk = ensureContrast(h, s, l, t.bg, 4.6, false); // accent used as text: AA for small text
       t.hover = hslToHex(h, Math.min(s, 25), 90);
       t.mochiBody = '#FFFFFF';
       t.mochiInner = hslToHex(h, 70, 84);
@@ -94,15 +94,28 @@
       t.fg = hslToHex(h, 12, 94);
       t.surface = hslToHex(h, 10, 11);
       t.line = hslToHex(h, 8, 19);
-      t.muted = ensureContrast(h, 6, 64, t.bg, 4.6, true);
+      // (Checked against the lighter card surface, so it's readable on the page and on cards.)
+      t.muted = ensureContrast(h, 6, 64, t.surface, 4.6, true);
       t.accent = hslToHex(h, Math.max(s, 60), Math.max(l, 62));
-      t.accentInk = ensureContrast(h, Math.max(s, 60), Math.max(l, 62), t.bg, 4.5, true);
+      t.accentInk = ensureContrast(h, Math.max(s, 60), Math.max(l, 62), t.surface, 4.6, true);
       t.hover = hslToHex(h, 10, 13);
       t.mochiBody = t.fg;
       t.mochiInner = hslToHex(h, 60, 78);
     }
     // Mochi's eyes + outline are always dark ink, so the face reads in both modes.
     t.mochiInk = hslToHex(h, Math.min(s, 25), 9);
+    // Text on the accent colour (buttons, chips): white or near-black, whichever reads better — and if
+    // neither reaches 4.5:1, the accent is nudged darker (or lighter) just enough. (Signal red and Klein
+    // used to sit at 4.4:1.)
+    const best = (bgHex) => Math.max(contrast('#FFFFFF', bgHex), contrast('#111111', bgHex));
+    if (best(t.accent) < 4.5) {
+      const [ah, as, al] = hexToHsl(t.accent);
+      const whiteWins = contrast('#FFFFFF', t.accent) >= contrast('#111111', t.accent);
+      let ll = al;
+      let hex = t.accent;
+      for (let i = 0; i < 60 && best(hex) < 4.5; i++) { ll += whiteWins ? -0.5 : 0.5; hex = hslToHex(ah, as, ll); }
+      t.accent = hex;
+    }
     t.onAccent = contrast('#FFFFFF', t.accent) >= contrast('#111111', t.accent) ? '#FFFFFF' : '#111111';
     return t;
   }

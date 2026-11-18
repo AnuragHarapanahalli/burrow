@@ -2,7 +2,7 @@
 // downloads, and routes messages from each window's interface to that window (main/window.js).
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog, clipboard, webContents: WebContents } = require('electron');
+const { app, ipcMain, protocol, net, nativeTheme, systemPreferences, session, dialog, clipboard, shell, webContents: WebContents } = require('electron');
 const Theme = require('../shared/theme');
 const { Store } = require('./store');
 const { Library } = require('./library');
@@ -13,6 +13,8 @@ const { Stats } = require('./stats');
 const { Importer, topSites } = require('./importer');
 const { Care } = require('./care');
 const { Fun, NIGHT_SEED } = require('./fun');
+const { Permissions } = require('./permissions');
+const { Updates } = require('./updates');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -62,7 +64,7 @@ if (SELFTEST) {
   app.commandLine.appendSwitch('disable-background-timer-throttling');
 }
 
-let store, library, downloads, notes, focus, stats, care, fun;
+let store, library, downloads, notes, focus, stats, care, fun, perms, updates;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -99,12 +101,39 @@ async function serveBurrow(req) {
 
 // Every browsing session (normal and each private one) gets burrow:// pages and safe permissions.
 function setupSession(ses) {
-  if (ses !== session.defaultSession) ses.protocol.handle('burrow', serveBurrow);
-  // Electron allows every permission by default; a browser must not.
-  // Safe ones are allowed; the rest are denied until Burrow has a permission prompt.
-  const SAFE = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock']);
-  ses.setPermissionRequestHandler((_wc, perm, cb) => cb(SAFE.has(perm)));
-  ses.setPermissionCheckHandler((_wc, perm) => SAFE.has(perm));
+  const isPrivate = ses !== session.defaultSession;
+  if (isPrivate) ses.protocol.handle('burrow', serveBurrow);
+  // Electron allows every permission by default; a browser must not. Camera, microphone, location and
+  // notifications are asked for (and remembered per site, except in private windows); see permissions.js.
+  perms.attach(ses, { isPrivate });
+}
+
+// ---------------- Links opened from other apps (Burrow as your default browser) ----------------
+// Windows starts Burrow (or pokes the running one) with the address as an argument.
+function linkFromArgs(argv) {
+  for (const a of (argv || []).slice(1)) {
+    if (/^https?:\/\//i.test(a)) return a;
+    if (/\.(html?|xhtml|pdf)$/i.test(a) && !a.startsWith('-')) {
+      try { if (require('fs').existsSync(a)) return pathToFileURL(a).toString(); } catch { /* not a file */ }
+    }
+  }
+  return null;
+}
+
+// ---------------- Clear browsing data ----------------
+const RANGES = { hour: 3600e3, day: 864e5, week: 7 * 864e5, all: Infinity };
+async function clearData(range, what) {
+  const since = RANGES[range] === Infinity || !RANGES[range] ? 0 : Date.now() - RANGES[range];
+  const done = {};
+  if (what.history) done.history = library.clearHistorySince(since);
+  if (what.downloads) done.downloads = downloads.clearSince(since);
+  // Cookies, site storage and the cache can't be cleared by date in Electron, so these go entirely.
+  if (what.cookies) {
+    await session.defaultSession.clearStorageData({ storages: ['cookies', 'localstorage', 'indexdb', 'websql', 'serviceworkers', 'cachestorage', 'filesystem', 'shadercache'] });
+    done.cookies = true;
+  }
+  if (what.cache) { await session.defaultSession.clearCache(); done.cache = true; }
+  return done;
 }
 
 // ---------------- Theme + preferences ----------------
@@ -397,6 +426,7 @@ const ctx = {
   openPrivate: () => openWindow({ isPrivate: true }),
   openWindow: (opts) => openWindow(opts || {}),
   get notes() { return notes; },
+  get perms() { return perms; },
   saveSession: (w, snap) => { if (!windows.has(w)) return; sessions.set(w, snap); saveSessions(); },
   onClosed: (w) => {
     windows.delete(w);
@@ -455,6 +485,25 @@ function registerIpc() {
   on('window:new', () => openWindow());
   // Clipboard text for Burrow's own text boxes (Paste in the right-click menu). Websites can't read it.
   handle('clip:read', () => clipboard.readText());
+  // Site permissions: the bar's answer, and Settings → Site permissions
+  on('perm:answer', (_w, id, allow) => perms.answer(Number(id), !!allow));
+  handle('perm:list', () => perms.list());
+  handle('perm:set', (_w, origin, kind, value) => perms.set(String(origin || ''), String(kind || ''), value === 'allow' || value === 'block' ? value : null));
+  // Clear browsing data (normal windows; private windows forget everything on close anyway)
+  handle('data:clear', (w, range, what) => (w.isPrivate ? null : clearData(String(range || ''), {
+    history: !!what?.history, cookies: !!what?.cookies, cache: !!what?.cache, downloads: !!what?.downloads,
+  })));
+  // Default browser
+  handle('browser:default-state', () => ({ isDefault: app.isDefaultProtocolClient('https'), packaged: app.isPackaged }));
+  on('browser:make-default', () => {
+    if (app.isPackaged) { app.setAsDefaultProtocolClient('http'); app.setAsDefaultProtocolClient('https'); }
+    // Windows only lets you pick the default browser yourself, in Settings.
+    shell.openExternal('ms-settings:defaultapps').catch(() => {});
+  });
+  // Updates
+  handle('update:state', () => updates.state);
+  handle('update:check', () => updates.check());
+  on('update:install', () => updates.install());
   // Import from other browsers (Settings → Import, Ctrl+K)
   // Mochi, helpful
   on('care:eye-done', () => { stats.event('eyes'); fun.earn('eye'); });
@@ -847,12 +896,14 @@ function registerIpc() {
 // ---------------- App lifecycle ----------------
 // Only one Burrow at a time (two copies would fight over the saved-state file).
 if (!app.requestSingleInstanceLock()) app.quit();
-app.on('second-instance', () => {
-  const w = normalWindows().pop();
-  if (!w) return openWindow();
+app.on('second-instance', (_e, argv) => {
+  // Burrow is already open: a link from another app (or the Start menu) opens a tab here.
+  const link = linkFromArgs(argv);
+  const w = normalWindows().find((x) => x.win.isFocused()) || normalWindows().pop();
+  if (!w) return openWindow(link ? { url: link } : {});
   if (w.win.isMinimized()) w.win.restore();
   w.win.focus();
-  w.tabs.create(NEWTAB);
+  w.tabs.create(link || NEWTAB);
 });
 
 app.whenReady().then(() => {
@@ -877,7 +928,17 @@ app.whenReady().then(() => {
     onRisky: (d) => normalWindows().forEach((w) => w.send('download-risky', d)),
   });
   protocol.handle('burrow', serveBurrow);
+  perms = new Permissions({ store, windowFor: (wc) => winOfPage(wc) || null });
   setupSession(session.defaultSession);
+  updates = new Updates({
+    onState: (st) => {
+      everyWindow((w) => w.send('update-state', st));
+      if (st.status === 'ready') {
+        const w = normalWindows().find((x) => x.win.isFocused()) || normalWindows()[0];
+        w?.send('mochi-say', { text: `Update ready. Click me to restart into v${st.version}`, pose: 'celebrate', essential: true, ms: 15000, opens: 'update' });
+      }
+    },
+  });
   registerIpc();
   nativeTheme.on('updated', broadcastTheme);
   systemPreferences.on?.('accent-color-changed', broadcastTheme);
@@ -888,12 +949,14 @@ app.whenReady().then(() => {
   Tabs.reserveWsIds(saved.flatMap((w) => w.workspaces.map((ws) => ws.id)));
   if (saved.length) saved.forEach((snapshot) => openWindow({ snapshot }));
   else openWindow();
+  const startLink = linkFromArgs(process.argv);
+  if (startLink && mainWin) mainWin.tabs.create(startLink);
   // First time: Mochi's welcome tour (the self-test opens it itself).
   if (!store.get('onboarded') && !SELFTEST) mainWin.tabs.create('burrow://welcome/');
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care, getFun: () => fun, setNight,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care, getFun: () => fun, setNight, getPerms: () => perms, getUpdates: () => updates, linkFromArgs, clearData,
     });
   }
 });

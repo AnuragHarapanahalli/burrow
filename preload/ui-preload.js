@@ -18,6 +18,24 @@ contextBridge.exposeInMainWorld('burrow', {
   openWindow: send('window:new'),
   otherWindows: () => ipcRenderer.invoke('windows:others'),
   readClipboard: () => ipcRenderer.invoke('clip:read'),
+  perms: {
+    onAsk: listen('perm-ask'),
+    onDone: listen('perm-done'),
+    answer: send('perm:answer'),
+    list: () => ipcRenderer.invoke('perm:list'),
+    set: (origin, kind, value) => ipcRenderer.invoke('perm:set', origin, kind, value),
+  },
+  clearData: (range, what) => ipcRenderer.invoke('data:clear', range, what),
+  defaultBrowser: {
+    state: () => ipcRenderer.invoke('browser:default-state'),
+    make: send('browser:make-default'),
+  },
+  updates: {
+    state: () => ipcRenderer.invoke('update:state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: send('update:install'),
+    onState: listen('update-state'),
+  },
   care: {
     onEye: listen('care-eye'),
     eyeDone: send('care:eye-done'),

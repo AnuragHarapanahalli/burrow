@@ -44,6 +44,9 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 | 2026-11-18 | Phase 14 adds browser basics: **site permission prompts, clear browsing data, default browser, crash page + remembered split view** | Leave for later | Your picks; these are what people expect from a real browser |
 | 2026-11-18 | App icon: **Mochi's pixel face on a Signal-red square** | Full body, peeking, face on dark, "B." wordmark | Your pick; bold colour, readable even at 16 px in the taskbar |
 | 2026-11-18 | Releases are always **run by you** (`npm run release` with your GitHub token); Burrow never publishes anything by itself | Automatic publishing from the build | Publishing is public and permanent, so a person should press the button |
+| 2026-11-18 | Text on the accent colour must reach 4.5:1: when neither white nor black does, the accent is nudged a little darker or lighter (Signal red: #E63027 → #E5271E) | Accept 4.4:1 | Readable buttons for everyone; the change is invisible |
+| 2026-11-18 | Clear browsing data: the time range applies to history and the downloads list; **cookies and the cache are always cleared completely** | Pretend to clear cookies by date | Electron can't clear cookies or cache by date, and the screen says so honestly |
+| 2026-11-18 | A crashed tab reuses the offline page ("Mochi fainted", Reload) and never reloads by itself | A separate crash page; auto-reload | Less code; auto-reloading a page that crashes could crash over and over |
 | 2026-11-18 | Clicking Mochi on the new tab opens **a menu of things to do** (petting is one of them); private windows get only Pet and Mochi Hop | Keep clicking = a random line | You asked for Mochi to do stuff; a menu makes Mochi's features easy to find |
 | 2026-11-18 | Self-test speed-ups: Mochi's eat animation runs 4× faster *in tests only*; timer checks call Burrow's once-a-second timer directly; "pause then check" became "check until true" — except checks that something does **not** happen, which keep their pause | Shorter pauses everywhere | Faster without weakening what the tests prove |
 | 2026-11-18 | **Mochi Hop** is our own game: Mochi hops puddles and pebbles and collects carrots, drawn from Mochi's own sprite and your theme colours; five game carrots earn one real carrot (five a day) | A copy of a well-known offline game | Original, on-brand, and gives the carrots a playful source |
@@ -249,6 +252,13 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Bedtime: heads-up, night mode (warm, dim Burrow + warm tint on pages), gentle "it's late", ends at 06:00 | ✅ done (tested) |
 | Click Mochi on the new tab: pet, Mochi Hop, focus session, tidy up, my week, wardrobe, night mode, settings | ✅ done (tested) |
 | Welcome tour: "Mochi" step (what Mochi does + eye breaks and bedtime), right-click in the shortcuts | ✅ done (tested) |
+| Readable text with every colour (4.5:1 or more, all presets + any custom colour, light and dark) | ✅ done (tested with 200 random colours) |
+| Site permission prompts (camera, microphone, location, notifications) + Settings → Site permissions | ✅ done (tested) |
+| Clear browsing data (Settings + Ctrl+Shift+Delete) | ✅ done (tested) |
+| Default browser: installer registration, Settings button, links from other apps open as tabs | ✅ done (link handling tested; registration checked in the installed app) |
+| Crash page ("Mochi fainted") + split view remembered after a restart | ✅ done (tested with a forced crash) |
+| PDF links open in the tab (Chromium's built-in viewer) | ✅ done |
+| App icon (Mochi's face on red), one-click installer + portable .exe, auto-update from GitHub Releases, Settings → About | ✅ done (built locally; update flow tested with simulated events) |
 | Windows installer | planned |
 
 ---
@@ -262,6 +272,8 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ permissions.js      site permissions: ask (bar), remember per site, private windows never remember
+│  ├─ updates.js          auto-update from GitHub Releases (installed app only)
 │  ├─ fun.js              carrots + outfits, Mochi Hop scores, bedtime arithmetic
 │  ├─ care.js             Mochi's helpful side: eye/stretch breaks, tab tidy-up, tab reminders
 │  ├─ importer.js         finds other browsers' profiles and reads their bookmarks + history (read-only copies)
@@ -298,6 +310,7 @@ WOAHDAMN/
    ├─ mochi-react.js      Mochi's little reactions (bookmarks, workspaces, late nights…)
    ├─ focus-ui.js         the countdown chip, focus-session bar, and Mochi eating a tab
    ├─ volume.js           the tab volume slider
+   ├─ site-ui.js          the permission bar; Settings → Site permissions, Clear browsing data, About Burrow
    ├─ fun-ui.js           the wardrobe and bedtime settings
    ├─ care-ui.js          eye-break countdown, tidy-up list, "remind me" picker, risky-download warning
    ├─ ctxmenu.js          right-click menus: the menu itself, tabs, strip, bookmarks bar, text boxes, drop marker
@@ -309,6 +322,8 @@ WOAHDAMN/
    ├─ pages/gate/         the Burrow gate shown when a site is closed (gate.html / .css / .js)
    ├─ pages/report/       the weekly report (report.html / .css / .js)
    └─ pages/offline/      "no internet" / "can't reach" page with Mochi Hop (offline.html / .css / .js)
+scripts/make-icon.js      draws the app icon from Mochi's sprite → build/icon.ico (16–256 px), build/icon.png, ui/icon.png
+build/installer.nsh       extra installer steps: registers Burrow as a browser with Windows (and removes it on uninstall)
 scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen parts) and prints a summary
 ```
 
@@ -321,10 +336,12 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 1. Install [Node.js](https://nodejs.org) (v20 or newer).
 2. In this folder, run `npm install` once (downloads Electron, ~100 MB).
 3. Run `npm start` to open Burrow.
+4. To make the Windows installer and portable copy: `npm run dist` → `dist/Burrow-Setup-<version>.exe` and `dist/Burrow-<version>-portable.exe` (nothing is uploaded).
+5. To release a new version (you, not Burrow): `npm version minor`, then set a GitHub token (`$env:GH_TOKEN = "…"`, a token with "repo" access) and run `npm run release` — it builds and uploads to GitHub Releases, and every installed Burrow updates itself.
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
-- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, phase14, windows. Several work too: `npm test -- phase7 phase8`.
 - `npm test -- --slow` also lists the 30 slowest checks, to see where time goes.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
@@ -469,21 +486,25 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Self-test: 162 s → 119 s while adding 19 checks. Each check's time is now recorded (`npm test -- --slow`). About half the run had been fixed pauses; 46 of them now wait only as long as needed, and 23 that prove something does *not* happen were left alone (one more was left alone on purpose because it would have passed without proving anything).
 - Small fix found from a screenshot: Mochi's hello bubble could appear under the open menu.
 
+**2026-11-18 — Phase 14 done**
+- Accessibility: readable colours everywhere (checked with all presets and 200 random colours), names on every button and field (checked automatically), Mochi's messages announced to screen readers; the existing "reduce animations" handling covers every page.
+- Browser basics: site permission prompts, clear browsing data, default browser + links from other apps, a crash page, split view after a restart, PDF viewing.
+- Installer: `npm run dist` makes a one-click installer and a portable .exe with the Mochi icon; installed copies update themselves from GitHub Releases.
+- The self-test's download check now uses a local test server (no internet needed for it).
+- npm's audit flags some build tools (electron-builder's helpers); they only run on your PC to package Burrow and are not inside the app — the app's own packages have no known problems.
+
 ## 10. Known issues / next up
-- White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
-- Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
-- Tabs in other workspaces keep running in the background (uses memory) until tab sleeping is built.
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 14):** polish, accessibility check, Windows installer.
+- **Next:** your first release (v0.2.0) when you're ready; then the parked items (phase 15 password manager, "Ask AI about this page", Mochi answers).
+- Installers are **unsigned**: the first install shows "Windows protected your PC" (More info → Run anyway). Signing (SignPath or Microsoft Store) can be added later.
+- Updates only work in the installed copy; the portable .exe has to be replaced by hand.
 - Night mode's page tint is a see-through layer on top of each page; a few sites with unusual layering may show it slightly differently.
 - Imported bookmark folders are shown as labels, not real folders you can open and close.
 - Right-click menus on media inside embedded frames (a YouTube video embedded on another site) may not control the video; the menu still shows. Phase 5b ("Ask AI about this page") is still postponed.
 - The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
 - Volume control only reaches audio/video on the page itself, not inside embedded frames; sites that play sound through Web Audio (some games) aren't affected by the slider.
 - Time limits use the site's address (youtube.com covers m.youtube.com too) — apps on other domains (e.g. youtu.be short links) redirect first, so they're caught when they land.
-- Split view isn't remembered after a restart yet (the two tabs come back as normal tabs).
-- One self-test check (downloads) needs the internet (it downloads example.com); it failed once when the site was slow and passed on the re-run.
 - Ask AI relies on Claude's and ChatGPT's "question in the address" links; if they ever change them, the question may stop being filled in (the site still opens).
 
 ### Roadmap at a glance
@@ -501,7 +522,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | ✅ done |
 | 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | ✅ done |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | ✅ done |
-| 14 | Polish, accessibility, site permissions, clear data, default browser, crash page, installer + auto-update (v0.2.0) | next (planned) |
+| 14 | Polish, accessibility, site permissions, clear data, default browser, crash page, installer + auto-update | ✅ done |
 | 15 | Password manager + password import | later |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 

@@ -111,6 +111,14 @@ class Downloads {
   cancel(id) { this.live.get(Number(id))?.cancel(); }
   pause(id) { const it = this.live.get(Number(id)); if (it) it.isPaused() ? it.resume() : it.pause(); }
 
+  // Clear browsing data: forget finished downloads started since a moment (the files stay on disk).
+  clearSince(since) {
+    const before = this.list.length;
+    this.list = this.list.filter((d) => this.live.has(d.id) || d.started < since);
+    this.save();
+    return before - this.list.length;
+  }
+
   clear() {
     this.list = this.list.filter((d) => this.live.has(d.id));
     this.save();

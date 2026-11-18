@@ -27,6 +27,15 @@ function render() {
     return;
   }
   if (!info) return;
+  if (info.code === -999) {
+    // The page crashed (not a network problem): Mochi fainted; Reload tries again.
+    $('kicker').textContent = 'THIS TAB CRASHED';
+    $('title').innerHTML = 'Mochi fainted<span class="dot">.</span>';
+    $('lead').textContent = `${info.host || 'This page'} stopped working. Reload to try again — your other tabs are fine.`;
+    $('retry').textContent = 'Reload';
+    document.title = 'Tab crashed';
+    return;
+  }
   const offline = info.code === -106 || !navigator.onLine;
   $('kicker').textContent = offline ? 'NO INTERNET' : "CAN'T REACH THIS SITE";
   $('title').innerHTML = offline ? 'You’re offline<span class="dot">.</span>' : `${esc(info.host || 'This site')} isn’t answering<span class="dot">.</span>`;
@@ -40,6 +49,7 @@ function render() {
 let checking = false;
 async function retry(manual) {
   if (playOnly || checking || !info?.url) return;
+  if (info.code === -999 && !manual) return; // after a crash, only reload when you ask
   checking = true;
   $('status').textContent = manual ? 'CHECKING…' : '';
   const ok = await P.offlineRetry(!game.running);

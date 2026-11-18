@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare, getFun }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare, getFun, getPerms, getUpdates, linkFromArgs, clearData }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -76,7 +76,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui', 'fun-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui', 'fun-ui', 'site-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     if (section('basics')) {
     // --- Search engine chooser on the new tab ---
@@ -180,9 +180,12 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await until(async () => (await js("document.querySelectorAll('#histList .item').length") >= 1)), 'history panel lists visits');
     await shot('03-history');
 
-    // --- Downloads ---
-    tabs.active.view.webContents.downloadURL('https://example.com/');
+    // --- Downloads (from a tiny local server, so this needs no internet) ---
+    const dlSrv = require('http').createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/plain', 'content-disposition': 'attachment; filename="notes.txt"' }); res.end('Burrow download test. '.repeat(200)); });
+    await new Promise((r) => dlSrv.listen(0, '127.0.0.1', r));
+    tabs.active.view.webContents.downloadURL('http://127.0.0.1:' + dlSrv.address().port + '/notes.txt');
     await until(() => downloads.state().some((d) => d.state === 'completed'), 15000);
+    dlSrv.close();
     const done = downloads.state().find((d) => d.state === 'completed');
     check(!!done, `download completes (${done ? done.filename : 'none'})`);
     await js("openPanel('downloads')");
@@ -191,7 +194,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(!(await js("document.getElementById('dlBtn').hidden")), 'downloads button appears after a download');
     await js("openPanel('settings')");
     check(await until(async () => (await js("document.querySelectorAll('#engines .engine').length") === 6)), 'settings lists search engines');
-    check(await js("document.querySelectorAll('#panel details.sect').length") === 9, 'settings has nine dropdown sections');
+    check(await js("document.querySelectorAll('#panel details.sect').length") === 12, 'settings has twelve dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
     await wait(400);
@@ -1711,6 +1714,168 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await ready(tabs.active);
     check((await tabs.active.view.webContents.executeJavaScript('document.title')) === 'Mochi Hop', 'as its own page');
     tabs.close(tabs.active.id);
+    }
+    if (section('phase14')) {
+    // ================= Phase 14: accessibility, permissions, clear data, crash page, updates =================
+    // --- Every colour choice is readable (AA, 4.5:1) ---
+    const Theme14 = require('../shared/theme');
+    const pairs = [['fg', 'bg'], ['fg', 'surface'], ['muted', 'bg'], ['muted', 'surface'], ['accentInk', 'bg'], ['accentInk', 'surface'], ['onAccent', 'accent']];
+    const seeds = [...Theme14.PRESETS.map((p) => p.hex), '#C8762B'];
+    let rnd = 12345;
+    for (let i = 0; i < 200; i++) { rnd = (rnd * 1103515245 + 12345) % 2147483648; seeds.push('#' + (rnd % 0xffffff).toString(16).padStart(6, '0')); }
+    let worst = { c: 99 };
+    for (const sd of seeds) for (const dk of [false, true]) {
+      const t = Theme14.build(sd, dk);
+      for (const [a, b] of pairs) { const c = Theme14.contrast(t[a], t[b]); if (c < worst.c) worst = { c, at: sd + (dk ? ' dark ' : ' light ') + a + '/' + b }; }
+    }
+    check(worst.c >= 4.5, 'text is readable (4.5:1 or more) with every preset and 200 random colours, light and dark (worst ' + worst.c.toFixed(2) + ' at ' + worst.at + ')');
+    // --- Every button and field has a name screen readers can say ---
+    const unnamed = (code) => code.executeJavaScript("[...document.querySelectorAll('button, [role=button], input:not([type=hidden]), select, textarea')].filter((el) => !(el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('aria-labelledby') || (el.labels && el.labels.length) || el.textContent.trim() || el.getAttribute('placeholder'))).map((el) => el.id || el.className || el.tagName)");
+    const missUi = await unnamed(ui.webContents);
+    check(missUi.length === 0, 'every button and field in the interface has a name for screen readers' + (missUi.length ? ' (missing: ' + missUi.join(', ') + ')' : ''));
+    const nt14 = tabs.create();
+    await ready(nt14);
+    const missNt = await unnamed(nt14.view.webContents);
+    check(missNt.length === 0, 'and on the new tab' + (missNt.length ? ' (missing: ' + missNt.join(', ') + ')' : ''));
+    tabs.close(nt14.id);
+
+    // --- Site permissions ---
+    const http14 = require('http');
+    const page14 = '<!doctype html><title>Asker</title><p id="p">Hello</p><script>'
+      + 'window.notif = () => Notification.requestPermission().then((r) => { window.lastN = r; });'
+      + 'window.geo = () => new Promise((res) => navigator.geolocation.getCurrentPosition(() => res("ok"), (e) => res("err" + e.code), { timeout: 4000 })).then((r) => { window.lastG = r; });'
+      + '</script>';
+    const srv14 = http14.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(page14); });
+    await new Promise((r) => srv14.listen(0, '127.0.0.1', r));
+    const base14 = 'http://127.0.0.1:' + srv14.address().port;
+    store.set('sitePerms', {});
+    const pt14 = tabs.create(base14 + '/');
+    await ready(pt14);
+    const p14 = (c) => pt14.view.webContents.executeJavaScript(c, true);
+    p14('notif()');
+    check(await until(() => js("!document.getElementById('permBar').hidden && /show notifications/.test(document.getElementById('permText').textContent) && /127\\.0\\.0\\.1/.test(document.getElementById('permText').textContent)")), 'a site asking to show notifications gets a bar: "127.0.0.1 wants to show notifications"');
+    await shot('52-permission-bar');
+    await js("document.getElementById('permAllow').click()");
+    check(await until(() => p14('window.lastN === "granted"')), 'Allow lets it');
+    check((store.get('sitePerms')[base14] || {}).notifications === 'allow', 'and is remembered for that site');
+    check(await until(() => js("document.getElementById('permBar').hidden")), 'the bar goes away');
+    pt14.view.webContents.reload();
+    await ready(pt14);
+    await p14('window.lastN = null; notif()');
+    check(await until(() => p14('window.lastN === "granted"')) && (await js('UI.permAsks.length')) === 0, 'next time it is not asked again');
+    p14('geo()');
+    check(await until(() => js("!document.getElementById('permBar').hidden && /know your location/.test(document.getElementById('permText').textContent)")), 'location gets its own question');
+    await js("document.getElementById('permBlock').click()");
+    check(await until(() => p14('window.lastG === "err1"')), 'Block refuses it (the site is told "permission denied")');
+    await p14('window.lastG = null; geo()');
+    check(await until(() => p14('window.lastG === "err1"')) && (await js('UI.permAsks.length')) === 0, 'a blocked site is refused without asking again');
+    // Navigating away before answering counts as "no"
+    store.set('sitePerms', {});
+    p14('geo()');
+    await until(() => js('UI.permAsks.length === 1'));
+    pt14.view.webContents.loadURL(base14 + '/other');
+    check(await until(() => js('UI.permAsks.length === 0 && document.getElementById("permBar").hidden')), 'leaving the page before answering closes the question');
+    await ready(pt14);
+    // Settings → Site permissions
+    store.set('sitePerms', { [base14]: { notifications: 'allow', location: 'block' } });
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('permSect').open = true; renderSitePerms()");
+    check(await until(() => js("document.querySelectorAll('#permList .perm-row').length === 2")), 'Settings → Site permissions lists what each site may do');
+    await js("const sel = document.querySelector('#permList [data-kind=notifications]'); sel.value = ''; sel.dispatchEvent(new Event('change', { bubbles: true }))");
+    check(await until(() => !(store.get('sitePerms')[base14] || {}).notifications), '"Ask next time" forgets a decision');
+    await js("closePanel()");
+    // Private windows ask every time and remember nothing
+    const saved14 = JSON.stringify(store.get('sitePerms'));
+    const pv14b = openWindow({ isPrivate: true });
+    await until(() => pv14b.tabs.active, 5000);
+    const ppt = pv14b.tabs.create(base14 + '/private');
+    await ready(ppt);
+    ppt.view.webContents.executeJavaScript('notif()', true);
+    check(await until(() => pv14b.ui.webContents.executeJavaScript("!document.getElementById('permBar').hidden && /asked again next time/.test(document.getElementById('permText').textContent)")), 'a private window asks too (and says it will ask again)');
+    await pv14b.ui.webContents.executeJavaScript("document.getElementById('permAllow').click()");
+    check(await until(() => ppt.view.webContents.executeJavaScript('window.lastN === "granted"')) && JSON.stringify(store.get('sitePerms')) === saved14, '…and the answer is not saved');
+    pv14b.win.close();
+    await wait(300);
+    tabs.close(pt14.id);
+
+    // --- Clear browsing data ---
+    library.visit(base14 + '/recent', 'Recent');
+    library.visit(base14 + '/old', 'Old');
+    library.byUrl.get(base14 + '/old').last = Date.now() - 3 * 864e5;
+    await session.defaultSession.cookies.set({ url: base14, name: 'c14', value: '1', expirationDate: Date.now() / 1000 + 3600 });
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('clearSect').open = true; document.getElementById('clearRange').value = 'day'; document.getElementById('clrHistory').checked = true; document.getElementById('clrCookies').checked = true; document.getElementById('clrCache').checked = false; document.getElementById('clrDownloads').checked = false; document.getElementById('clearGo').click()");
+    check(await until(() => js("/^Cleared /.test(document.getElementById('clearResult').textContent)"), 8000), 'Clear data reports what it cleared');
+    check(!library.searchHistory('/recent').length && library.searchHistory('/old').length === 1, 'history from the last 24 hours goes; older history stays');
+    check((await session.defaultSession.cookies.get({ url: base14 })).length === 0, 'cookies and site data are cleared');
+    await shot('53-clear-data');
+    await js("closePanel()");
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Delete', modifiers: ['control', 'shift'] });
+    check(await until(() => js("!document.getElementById('panel').hidden && document.getElementById('clearSect').open")), 'Ctrl+Shift+Delete opens it');
+    await js("closePanel()");
+
+    // --- Default browser: links from other apps ---
+    check(linkFromArgs(['Burrow.exe', '--flag', 'https://example.com/a']) === 'https://example.com/a', 'a web address given by Windows is recognised');
+    const htmlFile = path.join(dir, 'page14.html');
+    fs.writeFileSync(htmlFile, '<!doctype html><title>Local file</title><p>Local');
+    check((linkFromArgs(['Burrow.exe', htmlFile]) || '').startsWith('file:///'), 'so is an .html file opened from Explorer');
+    const before14 = tabs.tabs.length;
+    app.emit('second-instance', {}, ['Burrow.exe', base14 + '/from-another-app']);
+    check(await until(() => tabs.tabs.length === before14 + 1 && tabs.tabs.some((t) => t.url === base14 + '/from-another-app')), 'a link opened in another app arrives as a new tab in Burrow');
+    tabs.close(tabs.tabs.find((t) => t.url === base14 + '/from-another-app').id);
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.getElementById('aboutSect').open = true; renderDefault()");
+    check(await until(() => js("document.getElementById('defaultState').textContent.length > 10")), 'Settings → About says whether Burrow is the default browser');
+
+    // --- Updates ---
+    const upd = getUpdates();
+    check(['dev', 'portable', 'idle', 'latest'].includes(upd.state.status), 'while developing there is nothing to update (' + upd.state.status + ')');
+    await js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
+    upd.set({ status: 'ready', version: '9.9.9' });
+    check(await until(() => js("UI.mochiLog.some((m) => /^Update ready\\. Click me to restart into v9\\.9\\.9/.test(m.text))")), 'when an update has downloaded, Mochi says "Update ready"');
+    check(await until(() => js("!document.getElementById('updateRestart').hidden && /9\\.9\\.9 is ready/.test(document.getElementById('updateStatus').textContent)")), 'and Settings → About offers "Restart to update"');
+    await shot('54-about-update');
+    upd.set({ status: 'dev', version: null });
+    await js("closePanel()");
+
+    // --- Crash page ---
+    const ct14 = tabs.create(base14 + '/crashy');
+    await ready(ct14);
+    ct14.view.webContents.forcefullyCrashRenderer();
+    check(await until(() => ct14.url.startsWith('burrow://offline') && ct14.url.includes('e=-999') && !ct14.loading, 8000), 'when a page crashes, Burrow shows its own page instead of a blank tab');
+    await ready(ct14);
+    check(await until(async () => (await ct14.view.webContents.executeJavaScript("document.getElementById('title').textContent")).startsWith('Mochi fainted')), 'Mochi fainted');
+    check(await until(() => js("document.getElementById('address').value === " + JSON.stringify(base14 + '/crashy'))), 'the address bar keeps the page address');
+    await shot('55-crash-page', true);
+    await ct14.view.webContents.executeJavaScript("document.getElementById('retry').click()");
+    check(await until(() => ct14.url === base14 + '/crashy' && !ct14.loading, 8000), 'Reload brings the page back');
+    tabs.close(ct14.id);
+
+    // --- Split view comes back after a restart ---
+    const sa = tabs.create(base14 + '/left');
+    const sb = tabs.create(base14 + '/right', { activate: false, after: sa.id });
+    await ready(sa);
+    tabs.activate(sa.id);
+    tabs.splitWith(sb.id);
+    tabs.setSplitRatio(0.6);
+    const snap14 = tabs.snapshot();
+    check(snap14.split && Math.abs(snap14.split.ratio - 0.6) < 0.01, 'split view is saved with the session');
+    tabs.unsplit();
+    const rw = openWindow({ snapshot: snap14 });
+    await until(() => rw.tabs.split, 5000);
+    const L = rw.tabs.get(rw.tabs.split?.a), R = rw.tabs.get(rw.tabs.split?.b);
+    check(L?.url === base14 + '/left' && R?.url === base14 + '/right' && Math.abs(rw.tabs.split.ratio - 0.6) < 0.01, 'and comes back side by side after a restart');
+    rw.win.close();
+    tabs.close(sa.id); tabs.close(sb.id);
+    await wait(300);
+
+    // --- App icon ---
+    const icoBuf = fs.readFileSync(path.join(__dirname, '..', 'build', 'icon.ico'));
+    check(icoBuf.readUInt16LE(2) === 1 && icoBuf.readUInt16LE(4) === 6, 'the app icon has all six sizes (16–256 px)');
+    srv14.close();
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

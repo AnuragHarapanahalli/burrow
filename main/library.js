@@ -54,6 +54,15 @@ class Library {
     this.saveHistory();
   }
 
+  // Clear browsing data: everything visited since a moment (0 = all time). Returns how many went.
+  clearHistorySince(since) {
+    const before = this.history.length;
+    this.history = this.history.filter((h) => h.last < since);
+    this.byUrl = new Map(this.history.map((h) => [h.url, h]));
+    this.saveHistory();
+    return before - this.history.length;
+  }
+
   clearHistory() {
     this.history = [];
     this.byUrl.clear();

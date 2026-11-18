@@ -7,15 +7,20 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "test": "node scripts/selftest.js"
+    "test": "node scripts/selftest.js",
+    "icon": "node scripts/make-icon.js",
+    "dist": "node scripts/make-icon.js && electron-builder --win --publish never",
+    "release": "node scripts/make-icon.js && electron-builder --win --publish always"
   },
   "dependencies": {
     "@fontsource/inter-tight": "^5.1.0",
     "@fontsource/silkscreen": "^5.1.0",
-    "@mozilla/readability": "^0.6.0"
+    "@mozilla/readability": "^0.6.0",
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
-    "electron": "^45.3.2"
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
   },
   "allowScripts": {
     "electron@45.3.2": true
@@ -26,5 +31,61 @@
   },
   "bugs": {
     "url": "https://github.com/AnuragHarapanahalli/burrow/issues"
+  },
+  "build": {
+    "appId": "io.github.anuragharapanahalli.burrow",
+    "productName": "Burrow",
+    "copyright": "Made with love by Anurag",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main/**",
+      "preload/**",
+      "shared/**",
+      "ui/**",
+      "package.json",
+      "!**/*.md"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "Burrow"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Burrow",
+      "include": "build/installer.nsh",
+      "artifactName": "Burrow-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Burrow-${version}-portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AnuragHarapanahalli",
+        "repo": "burrow",
+        "releaseType": "release"
+      }
+    ]
   }
 }

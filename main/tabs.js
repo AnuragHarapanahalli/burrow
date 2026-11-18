@@ -85,6 +85,7 @@ class Tabs {
       webPreferences: {
         preload: path.join(__dirname, '..', 'preload', 'tab-preload.js'),
         contextIsolation: true, sandbox: true, nodeIntegration: false,
+        plugins: true, // Chromium's built-in PDF viewer (PDF links open in the tab instead of downloading)
         ...(this.session ? { session: this.session } : {}),
       },
     });
@@ -107,6 +108,15 @@ class Tabs {
     wc.on('audio-state-changed', (e) => update({ audible: !!e.audible }));
     wc.on('media-started-playing', () => { update({ media: true, playing: true }); T().applyVolume(tab); });
     wc.on('dom-ready', () => { T().applyVolume(tab); tab.nightKey = null; T().applyNight(tab); });
+    // The page crashed: Burrow's page with Mochi (and a Reload button) instead of a blank tab.
+    wc.on('render-process-gone', (_e, details) => {
+      if (details?.reason === 'clean-exit' || tab.asleep || !tab.view || tab.view.webContents !== wc) return;
+      const original = readerOriginal(tab.url) || tab.url;
+      setImmediate(() => {
+        if (wc.isDestroyed() || !tab.owner?.get(tab.id)) return;
+        wc.loadURL(`burrow://offline/?u=${encodeURIComponent(/^https?:/i.test(original) ? original : '')}&e=-999&r=${encodeURIComponent(details?.reason || '')}`).catch(() => {});
+      });
+    });
     // No internet (or the site can't be reached): Burrow's own page, with Mochi Hop.
     wc.on('did-fail-load', (_e, code, _desc, failedUrl, isMain) => {
       if (!isMain || !NET_ERRORS.has(code) || !/^https?:/i.test(failedUrl || '')) return;
@@ -691,7 +701,15 @@ class Tabs {
 
   // What gets saved for this window so it can come back after a restart.
   snapshot() {
+    // Split view comes back after a restart: saved as positions within its workspace.
+    let split = null;
+    const a = this.get(this.split?.a), b = this.get(this.split?.b);
+    if (a && b && a.ws === b.ws) {
+      const list = this.tabs.filter((t) => t.ws === a.ws);
+      split = { ws: a.ws, a: list.indexOf(a), b: list.indexOf(b), ratio: this.split.ratio };
+    }
     return {
+      split,
       current: this.currentWs,
       workspaces: this.workspaces.map((w) => {
         const tabs = this.tabs.filter((t) => t.ws === w.id);
@@ -749,6 +767,17 @@ class Tabs {
       if (pick) ws.activeId = pick.id;
     });
     const current = this.ws(Number(s?.current)) ? Number(s.current) : this.workspaces[0].id;
+    // Split view, if it was on when Burrow closed.
+    const sp = s?.split;
+    const wsIndex = sp ? saved.findIndex((w) => Number(w.id) === Number(sp.ws)) : -1;
+    if (wsIndex >= 0) {
+      const list = this.tabs.filter((t) => t.ws === this.workspaces[wsIndex].id);
+      const ta = list[Number(sp.a)], tb = list[Number(sp.b)];
+      if (ta && tb && ta !== tb) {
+        this.split = { a: ta.id, b: tb.id, ratio: Math.min(0.8, Math.max(0.2, Number(sp.ratio) || 0.5)) };
+        this.workspaces[wsIndex].activeId = ta.id;
+      }
+    }
     this.switchWorkspace(current);
   }
 }

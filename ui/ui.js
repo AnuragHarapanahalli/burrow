@@ -261,12 +261,13 @@ $('stripMochi').addEventListener('click', () => {
   if (UI.stripClickOpens === 'report') B.openReport();
   else if (UI.stripClickOpens === 'tidy') window.openTidy?.();
   else if (UI.stripClickOpens === 'night') B.fun.night(true);
+  else if (UI.stripClickOpens === 'update') B.updates.install();
   else if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
 });
 // Messages from the main process (tabs put to sleep, "question copied", …).
 B.onMochiSay((msg) => {
   const m = typeof msg === 'string' ? { text: msg } : (msg || {});
-  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: m.ms || 6000, opens: ['report', 'night'].includes(m.opens) ? m.opens : null });
+  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: m.ms || 6000, opens: ['report', 'night', 'update'].includes(m.opens) ? m.opens : null });
 });
 
 // ---------- Theme + preferences ----------
