@@ -12,6 +12,7 @@ const { Focus, pretty: sitePretty } = require('./focus');
 const { Stats } = require('./stats');
 const { Importer, topSites } = require('./importer');
 const { Care } = require('./care');
+const { Fun, NIGHT_SEED } = require('./fun');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -61,7 +62,7 @@ if (SELFTEST) {
   app.commandLine.appendSwitch('disable-background-timer-throttling');
 }
 
-let store, library, downloads, notes, focus, stats, care;
+let store, library, downloads, notes, focus, stats, care, fun;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -72,7 +73,7 @@ function servePath(url) {
   const u = new URL(url);
   const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '');
   let base, file;
-  if (['newtab', 'reader', 'welcome', 'gate', 'report'].includes(u.host)) {
+  if (['newtab', 'reader', 'welcome', 'gate', 'report', 'offline'].includes(u.host)) {
     base = path.join(ROOT, 'ui', 'pages', u.host);
     file = path.join(base, rel || `${u.host}.html`);
   } else if (u.host === 'app') {
@@ -117,7 +118,9 @@ function themePayload(isPrivate = false) {
   const source = ['light', 'dark'].includes(settings.mode) ? settings.mode : 'system';
   if (nativeTheme.themeSource !== source) nativeTheme.themeSource = source;
   // Private windows are always dark, so you can tell them apart at a glance.
-  const tokens = Theme.build(seed, isPrivate || nativeTheme.shouldUseDarkColors);
+  // Night mode (bedtime): a warm, dim Burrow until morning. Your own theme is untouched.
+  const night = !isPrivate && !!store.get('nightMode');
+  const tokens = night ? Theme.build(NIGHT_SEED, true) : Theme.build(seed, isPrivate || nativeTheme.shouldUseDarkColors);
   const prefs = {
     searchEngine: store.get('searchEngine'),
     searchChosen: store.get('searchChosen'),
@@ -130,6 +133,11 @@ function themePayload(isPrivate = false) {
     sleep: store.get('sleep'),
     mochiMode: store.get('mochiMode'),
     eyeBreaks: Number(store.get('eyeBreaks')) || 0,
+    outfit: store.get('outfit') || null,
+    carrots: store.get('carrots') || 0,
+    bedtime: store.get('bedtime') || '',
+    nightTint: store.get('nightTint') !== false,
+    nightMode: night,
     reportOn: store.get('reportOn') !== false,
     engines: Object.entries(ENGINES).map(([id, e]) => ({ id, name: e.name, host: new URL(e.url).host.replace(/^www\./, '') })),
   };
@@ -160,6 +168,8 @@ function setPrefs(patch) {
   if (['lively', 'quiet', 'off'].includes(patch?.mochiMode)) store.set('mochiMode', patch.mochiMode);
   if (typeof patch?.reportOn === 'boolean') store.set('reportOn', patch.reportOn);
   if ([0, 20, 30, 45].includes(patch?.eyeBreaks)) store.set('eyeBreaks', patch.eyeBreaks);
+  if (typeof patch?.bedtime === 'string' && (patch.bedtime === '' || /^([01]\d|2[0-3]):[0-5]\d$/.test(patch.bedtime))) store.set('bedtime', patch.bedtime);
+  if (typeof patch?.nightTint === 'boolean') { store.set('nightTint', patch.nightTint); setNight(!!store.get('nightMode')); }
   if (patch?.sleep && typeof patch.sleep === 'object') {
     const cur = { ...store.get('sleep') };
     if (typeof patch.sleep.on === 'boolean') cur.on = patch.sleep.on;
@@ -221,7 +231,7 @@ function startFocus() {
   focus = new Focus({
     getWindows: () => [...windows],
     onCount: (seen, hasLimits) => stats.count(seen, hasLimits),
-    onEvent: (name) => stats.event(name),
+    onEvent: (name) => { stats.event(name); if (name === 'focus' || name === 'dayWithin') fun.earn(name); },
     onWarn: (site, mins) => {
       for (const w of windowsShowing(site)) {
         w.send('mochi-say', { text: `${mins} min left on ${sitePretty(site)} today`, pose: mins <= 1 ? 'oops' : 'wave', essential: true });
@@ -252,6 +262,21 @@ function startFocus() {
   });
 }
 
+// ---------------- Mochi, fun: carrots, outfits, night mode ----------------
+const focusedWindow = () => normalWindows().find((x) => x.win.isFocused()) || normalWindows()[0];
+function setNight(on) {
+  store.set('nightMode', !!on);
+  broadcastTheme();
+  // The warm tint follows night mode (and your "tint pages" setting).
+  for (const w of normalWindows()) for (const t of w.tabs.tabs) w.tabs.applyNight(t);
+}
+function startFun() {
+  fun = new Fun({
+    store,
+    say: (text, opts) => focusedWindow()?.send('mochi-say', { text, ...opts }),
+  });
+}
+
 // ---------------- Mochi, helpful: breaks, tidy-up, reminders ----------------
 const remindersChanged = () => everyWindow((w) => w.send('reminders', care.list()));
 function startCare() {
@@ -260,6 +285,15 @@ function startCare() {
     getWindows: () => [...windows],
     mochiOn: () => store.get('mochiMode') !== 'off',
     onEye: (w) => w.send('care-eye', { seconds: 20 }),
+    onWelcomeBack: (w) => w.send('mochi-say', { text: 'Welcome back!', pose: 'wave', essential: false }),
+    setNight: (on) => setNight(on),
+    onBedtime: (kind) => {
+      const w = focusedWindow();
+      if (!w) return;
+      if (kind === 'soon') w.send('mochi-say', { text: 'Bedtime in 30 minutes. Time to wind down?', pose: 'sleepy', essential: true, ms: 8000 });
+      else if (kind === 'now') w.send('mochi-say', { text: "It's bedtime. Click me for night mode", pose: 'sleepy', essential: true, ms: 12000, opens: 'night' });
+      else w.send('mochi-say', { text: "It's late. Tomorrow-you will thank you", pose: 'sleepy', essential: true, ms: 8000 });
+    },
     onStretch: (w) => w.send('mochi-say', { text: "90 minutes in. Stand up and stretch for a minute?", pose: 'wave', essential: true, ms: 9000 }),
     onTidy: (w, offer) => w.send('care-tidy', offer),
     onReminder: (r) => {
@@ -423,7 +457,13 @@ function registerIpc() {
   handle('clip:read', () => clipboard.readText());
   // Import from other browsers (Settings → Import, Ctrl+K)
   // Mochi, helpful
-  on('care:eye-done', () => stats.event('eyes'));
+  on('care:eye-done', () => { stats.event('eyes'); fun.earn('eye'); });
+  // Carrots and the wardrobe
+  handle('fun:state', () => fun.state());
+  handle('fun:buy', (_w, id) => { const ok = fun.buy(String(id || '')); if (ok) broadcastTheme(); return ok; });
+  handle('fun:wear', (_w, id) => { const ok = fun.wear(id ? String(id) : null); if (ok) broadcastTheme(); return ok; });
+  on('night:set', (w, on) => { if (!w.isPrivate) setNight(!!on); });
+  on('hop:open', (w) => w.tabs.create('burrow://offline/?play=1'));
   handle('care:tidy', (w) => (w.isPrivate ? null : care.offerTidy(w, true)));
   on('care:close-tabs', (w, ids) => { for (const id of (Array.isArray(ids) ? ids : []).slice(0, 200)) w.tabs.close(Number(id), { keepWindow: true }); });
   handle('tab:remind', (w, id, at) => {
@@ -705,6 +745,36 @@ function registerIpc() {
     else if (action === 'open' && /^https?:\/\//i.test(String(value || ''))) g.w.tabs.navigateFrom(wc, String(value));
     else if (action === 'continue' && g.original && !focus.gateFor(g.original)) g.w.tabs.navigateFrom(wc, g.original);
   });
+  // ---- Offline / can't-reach pages (burrow://offline only) ----
+  const offlinePage = (e) => {
+    if (!e.sender.getURL().startsWith('burrow://offline')) return null;
+    const w = winOfPage(e.sender);
+    if (!w) return null;
+    const q = new URL(e.sender.getURL()).searchParams;
+    const u = q.get('u') || '';
+    return { w, url: /^https?:\/\//i.test(u) ? u : null, code: Number(q.get('e')) || 0 };
+  };
+  ipcMain.handle('page:offline-info', (e) => {
+    const o = offlinePage(e);
+    if (!o) return null;
+    let host = '';
+    try { host = o.url ? new URL(o.url).host.replace(/^www\./, '') : ''; } catch { host = ''; }
+    return { url: o.url, host, code: o.code, best: fun.state().hopBest };
+  });
+  // Is the site back? A quick check; if it answers (and you're not mid-game) the tab goes back to it.
+  ipcMain.handle('page:offline-retry', async (e, go) => {
+    const o = offlinePage(e);
+    if (!o?.url) return false;
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 5000);
+      await net.fetch(o.url, { method: 'HEAD', signal: ctl.signal, bypassCustomProtocolHandlers: true });
+      clearTimeout(t);
+    } catch { return false; }
+    if (go) o.w.tabs.navigateFrom(e.sender, o.url);
+    return true;
+  });
+  ipcMain.handle('page:hop-score', (e, score, collected) => (offlinePage(e) ? fun.hopScore(score, collected) : null));
   // ---- A password box on a page without HTTPS (any web page may send this; it only shows a warning) ----
   const warnedPages = new Set();
   ipcMain.on('page:insecure-password', (e) => {
@@ -773,6 +843,7 @@ app.whenReady().then(() => {
     }),
   });
   // Normal windows share one session, so they share one downloads list.
+  startFun();
   startFocus();
   startCare();
   notes = new Notes({ onChange: (host) => everyWindow((w) => w.send('notes-changed', host)) });
@@ -799,7 +870,7 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care, getFun: () => fun, setNight,
     });
   }
 });

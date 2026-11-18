@@ -104,6 +104,7 @@ class BurrowWindow {
     });
     this.tabs.onFind = (r) => this.send('find-result', { active: r.activeMatchOrdinal, matches: r.matches });
     this.tabs.onContextMenu = (tab, params) => this.showPageMenu(tab, params);
+    this.tabs.nightOn = () => !isPrivate && !!ctx.store.get('nightMode') && ctx.store.get('nightTint') !== false;
     // The last tab closed (or dragged away): close this window.
     this.tabs.onEmpty = () => {
       this.closedEmpty = true;

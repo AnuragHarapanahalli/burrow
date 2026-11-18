@@ -195,3 +195,5 @@ body.ask-mode #qHint { color: var(--accent-ink); border-color: var(--accent-ink)
 body.mochi-off .mochi-spot { display: none; }
 .stat.has-stat { color: var(--fg); }
 .stat.has-stat::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 2px 0; background: var(--accent); }
+#mochi.hop { animation: mochi-hop .5s cubic-bezier(.3, .7, .4, 1); }
+@keyframes mochi-hop { 40% { transform: translateY(-10px); } }

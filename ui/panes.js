@@ -295,6 +295,8 @@ palActions = function () {
   list.push(sess
     ? A('End the focus session', () => B.focus.session('end'), '', 'focus pomodoro timer stop')
     : A('Start a focus session (25 min)', () => B.focus.session('start'), '', 'focus pomodoro timer work study'));
+  list.push(A('Play Mochi Hop', () => B.fun.hop(), '', 'game play offline dino hop mochi fun'));
+  if (!UI.state.isPrivate) list.push(A(UI.theme?.prefs.nightMode ? 'Night mode off' : 'Night mode on', () => B.fun.night(!UI.theme?.prefs.nightMode), '', 'bedtime warm dim dark sleep'));
   if (!UI.state.isPrivate) {
     list.push(A('Tidy up tabs (duplicates, forgotten)', () => window.crTidyNow?.(), '', 'clean close duplicate old tabs mochi'));
     for (const r of UI.reminders || []) {

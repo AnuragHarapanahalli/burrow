@@ -10,11 +10,15 @@ const Volume = require('./volume');
 
 // In reader view the tab's address is burrow://reader/?k=…&u=<original>; this gets the original.
 function readerOriginal(url) {
-  if (!String(url).startsWith('burrow://reader') && !String(url).startsWith('burrow://gate')) return null;
+  if (!/^burrow:\/\/(reader|gate|offline)/.test(String(url))) return null;
   try { const u = new URL(url).searchParams.get('u'); return /^https?:\/\//i.test(u || '') ? u : null; } catch { return null; }
 }
 
 const MAX_CLOSED = 25;
+// Chromium's network error codes that mean "no internet" or "can't reach the site".
+const NET_ERRORS = new Set([-7, -15, -21, -100, -101, -102, -104, -105, -106, -109, -118, -137, -324]);
+// Night mode: a gentle warm tint over web pages (it never blocks clicks).
+const NIGHT_CSS = 'html::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2147483647;background:rgba(255,140,40,.13);mix-blend-mode:multiply}';
 // IDs are unique across every window, so a tab can move between windows without clashing.
 let nextTabId = 1;
 let nextWsId = 1;
@@ -102,7 +106,12 @@ class Tabs {
     // Sound + video: a speaker on the tab, and the picture-in-picture button.
     wc.on('audio-state-changed', (e) => update({ audible: !!e.audible }));
     wc.on('media-started-playing', () => { update({ media: true, playing: true }); T().applyVolume(tab); });
-    wc.on('dom-ready', () => T().applyVolume(tab));
+    wc.on('dom-ready', () => { T().applyVolume(tab); tab.nightKey = null; T().applyNight(tab); });
+    // No internet (or the site can't be reached): Burrow's own page, with Mochi Hop.
+    wc.on('did-fail-load', (_e, code, _desc, failedUrl, isMain) => {
+      if (!isMain || !NET_ERRORS.has(code) || !/^https?:/i.test(failedUrl || '')) return;
+      setImmediate(() => { if (!wc.isDestroyed()) wc.loadURL(`burrow://offline/?u=${encodeURIComponent(failedUrl)}&e=${code}`).catch(() => {}); });
+    });
     wc.on('media-paused', () => update({ playing: false }));
     // Ctrl + mouse wheel zooms, like other browsers.
     wc.on('zoom-changed', (_e, dir) => T().stepZoom(dir === 'in' ? 1 : -1, tab));
@@ -250,9 +259,32 @@ class Tabs {
   // After a page loads, quietly check whether it looks like an article (shows the reader button).
   checkReader(tab) {
     if (!/^https?:/i.test(tab.url)) return;
-    Reader.isReaderable(tab.view.webContents).then((ok) => {
-      if (tab.readerable !== ok) { tab.readerable = ok; tab.owner.emit(); }
+    Reader.isReaderable(tab.view.webContents).then(async (ok) => {
+      let readMin = 0;
+      if (ok) {
+        // Reading time for articles, at about 230 words a minute.
+        try {
+          const r = await tab.view.webContents.executeJavaScriptInIsolatedWorld(1004, [{ code: "((document.querySelector('article') || document.querySelector('main') || document.body).innerText || '').split(/\\s+/).filter(Boolean).length" }]);
+          const words = Number(Array.isArray(r) ? r[0] : r) || 0;
+          readMin = Math.max(1, Math.round(words / 230));
+        } catch { readMin = 0; }
+      }
+      if (tab.readerable !== ok || tab.readMin !== readMin) { tab.readerable = ok; tab.readMin = readMin; tab.owner.emit(); }
     });
+  }
+
+  // Night mode's warm tint on web pages.
+  applyNight(tab) {
+    const wc = tab.view?.webContents;
+    if (!wc || wc.isDestroyed() || !/^https?:/i.test(tab.url || '')) return;
+    const on = !!this.nightOn?.();
+    if (on && !tab.nightKey) {
+      tab.nightKey = 'pending';
+      wc.insertCSS(NIGHT_CSS).then((k) => { tab.nightKey = k; }).catch(() => { tab.nightKey = null; });
+    } else if (!on && tab.nightKey && tab.nightKey !== 'pending') {
+      wc.removeInsertedCSS(tab.nightKey).catch(() => {});
+      tab.nightKey = null;
+    }
   }
   // Open the active tab in reader view, or go back to the original page.
   async toggleReader(tab = this.active) {
@@ -642,6 +674,7 @@ class Tabs {
           canForward: nav ? nav.canGoForward() : false,
           asleep: !!t.asleep,
           insecure: insecurePage(t.url),
+          readMin: t.readerable ? t.readMin || 0 : 0,
           volume: this.volumeOf(t),
           volumeRemembered: this.siteVolume(t) !== undefined,
           boostOk: t.boostOk !== false,

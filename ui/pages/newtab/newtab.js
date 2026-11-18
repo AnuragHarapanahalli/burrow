@@ -82,11 +82,45 @@ let pose = 'idle', poke = 0, bubbleTimer;
 
 let isPrivate = false;
 // In a private window Mochi wears sunglasses.
+let look = null; // Mochi's eyes follow the pointer
 function drawMochi() {
   if (!tokens) return;
   const p = isPrivate && (pose === 'idle' || pose === 'blink') ? 'shades' : pose;
-  $('mochi').innerHTML = window.Mochi.svg(tokens, p, 84);
+  $('mochi').innerHTML = window.Mochi.svg(tokens, p, 84, { look: pose === 'idle' || pose === 'blink' ? look : null });
 }
+
+// ---------- Mochi's idle life: watches the pointer, naps when you're away, fidgets now and then ----------
+let lastActive = Date.now();
+const napAfter = () => window.NAP_AFTER_MS || 60000;
+function wakeUp() {
+  lastActive = Date.now();
+  if (pose !== 'sleepy') return;
+  pose = 'wave'; drawMochi();
+  setTimeout(() => { if (pose === 'wave') { pose = 'idle'; drawMochi(); } }, 1200);
+}
+document.addEventListener('mousemove', (e) => {
+  wakeUp();
+  const r = $('mochi').getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const next = e.clientX < cx - 90 ? 'left' : e.clientX > cx + 90 ? 'right' : null;
+  if (next !== look) { look = next; if (pose === 'idle') drawMochi(); }
+});
+['keydown', 'wheel', 'pointerdown'].forEach((ev) => document.addEventListener(ev, wakeUp, { passive: true }));
+setInterval(() => {
+  if (pose === 'idle' && Date.now() - lastActive > napAfter()) { pose = 'sleepy'; drawMochi(); }
+}, 500);
+let nextFidget = Date.now() + 9000 + Math.random() * 6000;
+setInterval(() => {
+  if (Date.now() < nextFidget || pose !== 'idle' || document.hidden) return;
+  nextFidget = Date.now() + 9000 + Math.random() * 7000;
+  if (Math.random() < 0.5 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const m = $('mochi');
+    m.classList.remove('hop'); void m.offsetWidth; m.classList.add('hop');
+  } else {
+    pose = 'celebrate'; drawMochi(); // a little stretch
+    setTimeout(() => { if (pose === 'celebrate') { pose = 'idle'; drawMochi(); } }, 700);
+  }
+}, 1000);
 let mochiMode = 'lively';
 // `explicit` = you did something (clicked Mochi, picked an engine): shown even in Quiet mode.
 function say(text, ms = 4000, explicit = false) {
@@ -151,6 +185,7 @@ $('engineGrid').addEventListener('click', (e) => {
 
 // ---------- Theme ----------
 function applyTheme(payload) {
+  if (payload?.prefs) window.Mochi.wear = payload.prefs.outfit || null;
   if (!payload) return;
   mochiMode = payload.prefs?.mochiMode || 'lively';
   document.body.classList.toggle('mochi-off', mochiMode === 'off');

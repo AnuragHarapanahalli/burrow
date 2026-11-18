@@ -509,3 +509,19 @@ body.split-resizing .split-bar { transition: none; }
 .remind-pop input { height: 32px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 0 8px; font: inherit; color-scheme: light dark; }
 .remind-pop .pop-btns { padding: 0; }
 .dl-warn { color: var(--accent-ink); }
+
+/* ---------- Mochi, fun ---------- */
+.read-chip { flex: none; align-self: center; margin-right: 6px; padding: 2px 6px; font-size: 10px; color: var(--muted); border: 1px solid var(--line); }
+.read-chip[hidden] { display: none; }
+.wardrobe { display: grid; grid-template-columns: repeat(3, 1fr); border-left: var(--hair); border-top: var(--hair); }
+.wr-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; border-right: var(--hair); border-bottom: var(--hair); }
+.wr-item.on { background: var(--hover); }
+.wr-name { font-size: 12px; font-weight: 600; }
+.wr-btn { font-size: 11.5px; padding: 2px 8px; border: 1px solid var(--fg); font-weight: 600; transition: background-color .12s; }
+.wr-btn:hover:not(:disabled) { background: var(--fg); color: var(--bg); }
+.wr-btn:disabled { opacity: .45; border-style: dashed; cursor: default; }
+.wr-btn.buy::before { content: ''; display: inline-block; width: 5px; height: 7px; background: var(--accent); margin-right: 5px; vertical-align: -1px; }
+.bed-row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.bed-row select { height: 28px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 12.5px; }
+.bed-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.bed-row input { accent-color: var(--accent); }

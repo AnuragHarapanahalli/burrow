@@ -43,6 +43,7 @@
         <button type="button" class="addr-chip" id="pipBtn" hidden title="Picture in picture: pop the video out" aria-label="Picture in picture">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2z"/><path class="pip-inner" d="M8 8h5v4H8z"/></svg>
         </button>
+        <span class="read-chip pixel" id="readChip" hidden title="About how long this article takes to read"></span>
         <span class="sec-chip pixel" id="secChip" hidden title="This page doesn't use HTTPS. Don't type passwords or card numbers here.">NOT SECURE</span>
         <span class="focus-chip pixel" id="focusChip" hidden title="Time left today"></span>
         <button type="button" class="addr-chip zoom-chip pixel" id="zoomBtn" hidden title="Reset zoom (Ctrl+0)"></button>
@@ -221,11 +222,21 @@
           <div class="sect-sub pixel">EYE BREAKS</div>
           <div class="seg" id="eyeSeg" role="radiogroup" aria-label="Eye breaks">
             <button data-eye="0" role="radio">Off</button>
-            <button data-eye="20" role="radio">Every 20 min</button>
+            <button data-eye="20" role="radio">20 min</button>
             <button data-eye="30" role="radio">30 min</button>
             <button data-eye="45" role="radio">45 min</button>
           </div>
           <p class="sect-note">Mochi asks you to look at something far away for 20 seconds, and to stretch after about 90 minutes. Only while you're using Burrow; not during fullscreen video.</p>
+          <div class="sect-sub pixel">WARDROBE <span id="carrotCount"></span></div>
+          <div class="wardrobe" id="wardrobe"></div>
+          <p class="sect-note">Mochi earns carrots for focus sessions (3), days within your limits (2), eye breaks (1) and Mochi Hop. They're never taken away.</p>
+          <div class="sect-sub pixel">BEDTIME</div>
+          <div class="bed-row">
+            <select id="bedtime" aria-label="Bedtime"></select>
+            <label><input type="checkbox" id="nightTint"> Warm tint on pages</label>
+          </div>
+          <p class="sect-note">From bedtime, Mochi offers night mode (a warm, dim Burrow) and reminds you gently a few times. It ends at 06:00.</p>
+          <button class="text-btn" id="nightNow">Night mode now</button>
           <div class="mochi-gallery" id="mochiGallery" aria-label="Mochi's poses"></div>
         </div>
       </details>
@@ -366,5 +377,6 @@
   <script src="burrow://app/ui/volume.js"></script>
   <script src="burrow://app/ui/ctxmenu.js"></script>
   <script src="burrow://app/ui/care-ui.js"></script>
+  <script src="burrow://app/ui/fun-ui.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 // One timer, once a second. Screen time only counts while a Burrow window is in front and you're
 // active; 5 minutes away resets it.
 const { powerMonitor } = require('electron');
+const { nightOf, sinceBedtime } = require('./fun');
 
 const STRETCH_MIN = 90;          // a stretch nudge after this much screen time in one go
 const AWAY_RESET_SEC = 300;      // away this long → the break timers start over
@@ -26,7 +27,8 @@ class Care {
     this.timer = setInterval(() => this.tick(), 1000);
   }
 
-  // (The self-test replaces these two.)
+  // (The self-test replaces these three.)
+  now() { return Date.now(); }
   idleSeconds() { return powerMonitor.getSystemIdleTime(); }
   winActive(w) { return !w.win.isDestroyed() && w.win.isFocused() && !w.win.isMinimized(); }
 
@@ -44,8 +46,33 @@ class Care {
       if (every && this.eyeSec >= every * 60) { this.eyeSec = 0; this.h.onEye(win); }
       else if (this.longSec >= STRETCH_MIN * 60) { this.longSec = 0; this.h.onStretch(win); }
     }
-    if (this.ticks % 30 === 0) this.checkReminders();
+    if (this.ticks % 30 === 0) { this.checkReminders(); this.bedtimeTick(); }
+    // Back after a long time away: Mochi waves (Lively only).
+    if (idle >= 600) this.away = true;
+    else if (this.away && idle < 5 && win) { this.away = false; this.h.onWelcomeBack?.(win); }
     if (this.ticks % TIDY_EVERY_SEC === 0 && win && !win.isPrivate && this.h.mochiOn()) this.offerTidy(win, false);
+  }
+
+  // ---------- Bedtime ----------
+  // 30 minutes before: a heads-up. At bedtime: offer night mode. Then a soft "it's late" every 30
+  // minutes, 3 times at most. Night mode ends by itself at 06:00.
+  bedtimeTick() {
+    const store = this.h.store;
+    const now = this.now();
+    const hour = new Date(now).getHours();
+    if (store.get('nightMode') && hour >= 6 && hour < 18) this.h.setNight(false);
+    const m = sinceBedtime(store.get('bedtime'), now);
+    if (m === null || !this.h.mochiOn()) return null;
+    const night = nightOf(now);
+    let st = store.get('bedtimeState') || {};
+    if (st.night !== night) st = { night, warned: false, offered: false, nudges: 0, last: 0 };
+    let said = null;
+    if (m >= -30 && m < 0 && !st.warned) { st.warned = true; said = 'soon'; }
+    else if (m >= 0 && m < 360 && !st.offered) { st.offered = true; st.last = now; said = 'now'; }
+    else if (m >= 30 && m < 360 && st.offered && st.nudges < 3 && now - st.last >= 30 * 60000) { st.nudges++; st.last = now; said = 'late'; }
+    store.set('bedtimeState', st);
+    if (said) this.h.onBedtime(said);
+    return said;
   }
 
   // ---------- Tab tidy-up ----------

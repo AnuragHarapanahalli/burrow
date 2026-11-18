@@ -143,6 +143,7 @@ $('settings').onclick = () => P.reportAction('settings');
 function applyTheme(p) {
   if (!p?.tokens) return;
   tokens = p.tokens;
+  window.Mochi.wear = p.prefs?.outfit || null;
   window.BurrowTheme.apply(tokens);
   render();
 }

@@ -172,6 +172,7 @@ function apply(p) {
   if (!p) return;
   payload = p;
   tokens = p.tokens;
+  window.Mochi.wear = p.prefs?.outfit || null;
   window.BurrowTheme.apply(p.tokens);
   drawMochi();
   render();

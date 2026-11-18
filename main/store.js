@@ -13,6 +13,12 @@ const SETTINGS_DEFAULTS = {
   bookmarksBar: true,
   onboarded: false,
   sleep: { on: true, minutes: 30, never: [] }, // tab sleeping: unload tabs you haven't looked at for a while
+  carrots: 0,            // earned by focus sessions, eye breaks, days within limits, Mochi Hop
+  outfitsOwned: [],
+  outfit: null,          // what Mochi is wearing
+  bedtime: '',           // "23:00", or '' for off
+  nightTint: true,       // night mode tints web pages warm
+  nightMode: false,
   eyeBreaks: 20,         // minutes between "look far away" nudges (0 = off)
   reminders: [],         // tabs Mochi will bring back later
   reportOn: true,        // record time for the weekly report (Settings → Focus)

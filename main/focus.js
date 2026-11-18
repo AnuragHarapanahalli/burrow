@@ -60,6 +60,7 @@ class Focus {
     if (this.day) {
       const gap = Math.max(1, Math.round((new Date(t) - new Date(this.day)) / 864e5));
       const yesterdayOk = !Object.keys(this.hit).length;
+      if (yesterdayOk && Object.keys(this.limits).length) setImmediate(() => this.h.onEvent?.('dayWithin'));
       this.streak = yesterdayOk ? { days: this.streak.days + gap, last: this.day } : { days: gap - 1, last: this.day };
     }
     this.day = t;

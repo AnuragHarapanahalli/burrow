@@ -22,6 +22,10 @@ if (location.protocol === 'burrow:') {
     gateAction: (action, value) => ipcRenderer.send('page:gate-action', String(action || ''), String(value || '')),
     welcome: (action, value) => ipcRenderer.send('page:welcome', String(action || ''), String(value || '')),
     importSources: () => ipcRenderer.invoke('page:import-sources'),
+    // The offline page (burrow://offline only)
+    offlineInfo: () => ipcRenderer.invoke('page:offline-info'),
+    offlineRetry: (go) => ipcRenderer.invoke('page:offline-retry', !!go),
+    hopScore: (score, collected) => ipcRenderer.invoke('page:hop-score', Number(score) || 0, Number(collected) || 0),
     importRun: (id, want) => ipcRenderer.invoke('page:import-run', String(id || ''), { bookmarks: want?.bookmarks !== false, history: want?.history !== false }),
     importQuickLinks: (sites) => ipcRenderer.invoke('page:import-quicklinks', Array.isArray(sites) ? sites.slice(0, 8).map((x) => ({ name: String(x?.name || ''), url: String(x?.url || '') })) : []),
     setQuickLinks: (links) => ipcRenderer.send('page:quick-links', links),

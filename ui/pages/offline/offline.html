@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'; img-src 'self' burrow: data:">
+  <title>Offline</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <link rel="stylesheet" href="offline.css">
+</head>
+<body>
+  <main class="off">
+    <section class="text">
+      <p class="pixel kicker" id="kicker">NO INTERNET</p>
+      <h1 id="title">You're offline<span class="dot">.</span></h1>
+      <p class="lead" id="lead"></p>
+      <div class="btns" id="btns">
+        <button class="primary" id="retry">Try again</button>
+        <button id="back">&larr; Go back</button>
+        <span class="pixel status" id="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="game" aria-label="Mochi Hop, a little game">
+      <div class="game-head">
+        <span class="pixel">MOCHI HOP</span>
+        <span class="pixel score"><span id="score">0</span> &middot; <span class="carrot-ico" aria-hidden="true"></span><span id="carrots">0</span> &middot; BEST <span id="best">0</span></span>
+      </div>
+      <canvas id="hop" width="760" height="220" tabindex="0" aria-label="Press Space to hop"></canvas>
+      <p class="hint pixel" id="hint">PRESS SPACE OR CLICK TO HOP &middot; TWICE FOR A DOUBLE-HOP</p>
+      <p class="back-online" id="backOnline" hidden>You're back online. <button id="goBack">Return to the page &rarr;</button></p>
+    </section>
+  </main>
+
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/shared/mochi.js"></script>
+  <script src="offline.js"></script>
+</body>
+</html>

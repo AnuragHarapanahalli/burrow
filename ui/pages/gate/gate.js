@@ -116,6 +116,7 @@ setInterval(async () => {
 function applyTheme(p) {
   if (!p?.tokens) return;
   tokens = p.tokens;
+  window.Mochi.wear = p.prefs?.outfit || null;
   window.BurrowTheme.apply(tokens);
   $('mochi').innerHTML = window.Mochi.svg(tokens, 'sleepy', 120);
 }

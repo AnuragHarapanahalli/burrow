@@ -157,6 +157,9 @@ function renderToolbar() {
   $('reload').setAttribute('aria-label', t?.loading ? 'Stop' : 'Reload');
   if (!UI.editing) address.value = t?.url || '';
   $('secChip').hidden = !t?.insecure;
+  const rc = $('readChip');
+  rc.hidden = !(t?.readMin >= 2) || UI.editing;
+  rc.textContent = t?.readMin >= 2 ? `${t.readMin} MIN READ` : '';
   address.placeholder = `Search ${engineName()} or type a URL`;
   // Zoom chip: only shows when the page isn't at 100%; click resets.
   const zoomBtn = $('zoomBtn');
@@ -257,16 +260,18 @@ $('stripMochi').addEventListener('click', () => {
   $('stripMochi').hidden = true;
   if (UI.stripClickOpens === 'report') B.openReport();
   else if (UI.stripClickOpens === 'tidy') window.openTidy?.();
+  else if (UI.stripClickOpens === 'night') B.fun.night(true);
   else if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
 });
 // Messages from the main process (tabs put to sleep, "question copied", …).
 B.onMochiSay((msg) => {
   const m = typeof msg === 'string' ? { text: msg } : (msg || {});
-  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: m.ms || 6000, opens: m.opens === 'report' ? 'report' : null });
+  mochiSay(String(m.text || ''), { pose: m.pose || 'happy', essential: m.essential !== false, ms: m.ms || 6000, opens: ['report', 'night'].includes(m.opens) ? m.opens : null });
 });
 
 // ---------- Theme + preferences ----------
 B.theme.onChange((payload) => {
+  window.Mochi.wear = payload?.prefs?.outfit || null;
   UI.theme = payload;
   UI.state.tabsMode = payload.prefs.tabsMode;
   window.BurrowTheme.apply(payload.tokens);

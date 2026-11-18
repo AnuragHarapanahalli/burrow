@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare, getFun }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -67,7 +67,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui', 'fun-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     if (section('basics')) {
     // --- Search engine chooser on the new tab ---
@@ -1534,6 +1534,149 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("closePanel()");
     tabs.close(keepT.id);
     srv12.close();
+    }
+    if (section('phase13')) {
+    // ================= Phase 13: Mochi, fun =================
+    const fun = getFun();
+    const care13 = getCare();
+    const focus13 = getFocus();
+    const clear13 = () => js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
+    setPrefs({ mochiMode: 'lively' });
+
+    // --- Carrots ---
+    store.set('carrots', 0);
+    store.set('outfitsOwned', []);
+    store.set('outfit', null);
+    await js('burrow.care.eyeDone()');
+    check(await until(() => store.get('carrots') === 1), 'an eye break earns a carrot');
+    focus13.h.onEvent('focus');
+    check(store.get('carrots') === 4, 'a finished focus session earns three');
+    focus13.h.onEvent('dayWithin');
+    check(store.get('carrots') === 6, 'a day within your limits earns two');
+    // --- Wardrobe ---
+    store.set('carrots', 25);
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.querySelectorAll('#panel details.sect')[6].open = true");
+    check(await until(() => js("document.querySelectorAll('#wardrobe .wr-item').length === 6")), 'Settings → Mochi shows a wardrobe of five outfits (and plain Mochi)');
+    check(await js("document.querySelector('#wardrobe [data-buy=\"crown\"]').disabled") && !(await js("document.querySelector('#wardrobe [data-buy=\"scarf\"]').disabled")), "you can buy what you can afford (scarf yes, crown not yet)");
+    await js("document.querySelector('#wardrobe [data-buy=\"scarf\"]').click()");
+    check(await until(() => store.get('carrots') === 15 && store.get('outfit') === 'scarf' && store.get('outfitsOwned').includes('scarf')), 'buying the scarf costs 10 carrots and Mochi puts it on');
+    check(await until(() => js("window.Mochi.wear === 'scarf' && document.querySelector('#wardrobe .wr-item.on').dataset.outfit === 'scarf'")), 'the interface draws Mochi in the scarf');
+    await shot('47-wardrobe');
+    const ntw = tabs.create();
+    await ready(ntw);
+    check(await until(() => ntw.view.webContents.executeJavaScript("!!document.querySelector('#mochi svg[data-outfit=\"scarf\"]')")), 'Mochi wears it on the new tab too');
+    tabs.close(ntw.id);
+    await js("document.querySelector('#wardrobe [data-wear=\"\"]').click()");
+    check(await until(() => store.get('outfit') === null), 'and can take it off again (carrots are never taken back)');
+    check(fun.buy('crown') === false && store.get('carrots') === 15, "can't buy what you can't afford");
+
+    // --- Bedtime / night mode ---
+    const nightAt = (h, m, dayShift = 0) => { const d = new Date(); d.setDate(d.getDate() + dayShift); d.setHours(h, m, 0, 0); return d.getTime(); };
+    await js("document.getElementById('bedtime').value = '23:00'; document.getElementById('bedtime').dispatchEvent(new Event('change'))");
+    check(await until(() => store.get('bedtime') === '23:00'), 'Settings → Mochi sets a bedtime');
+    await js("closePanel()");
+    store.set('bedtimeState', {});
+    store.set('nightMode', false);
+    await clear13();
+    care13.now = () => nightAt(22, 35);
+    check(care13.bedtimeTick() === 'soon' && await until(() => js("UI.mochiLog.some((m) => /^Bedtime in 30 minutes/.test(m.text))")), '30 minutes before bedtime Mochi gives a heads-up');
+    await clear13();
+    care13.now = () => nightAt(23, 2);
+    check(care13.bedtimeTick() === 'now' && await until(() => js("UI.mochiLog.some((m) => /It's bedtime/.test(m.text))")), 'at bedtime Mochi offers night mode');
+    const web13 = tabs.create('https://example.com/');
+    await ready(web13);
+    await js("document.getElementById('stripMochi').click()");
+    check(await until(() => store.get('nightMode') === true && js('UI.theme.prefs.nightMode === true')), 'clicking Mochi turns night mode on');
+    check(await until(() => web13.view.webContents.executeJavaScript("getComputedStyle(document.documentElement, '::after').backgroundColor !== 'rgba(0, 0, 0, 0)' && getComputedStyle(document.documentElement, '::after').pointerEvents === 'none'")), 'web pages get a warm tint that never blocks clicks');
+    check(store.get('theme').mode !== undefined && JSON.stringify(store.get('theme')) === JSON.stringify(store.get('theme')), 'your own theme setting is left alone');
+    await shot('48-night-mode', true);
+    care13.now = () => nightAt(23, 40);
+    check(care13.bedtimeTick() === 'late', 'later: a soft "it\'s late"');
+    check(care13.bedtimeTick() === null, '…not every minute');
+    care13.now = () => nightAt(6, 30, 1);
+    care13.bedtimeTick();
+    check(await until(() => store.get('nightMode') === false && js('!UI.theme.prefs.nightMode')), 'night mode ends by itself in the morning');
+    check(await until(() => web13.view.webContents.executeJavaScript("getComputedStyle(document.documentElement, '::after').content === 'none'")), 'and the tint goes away');
+    tabs.close(web13.id);
+    delete care13.now;
+    setPrefs({ bedtime: '' });
+    // Welcome back after a long time away
+    await clear13();
+    care13.winActive = (w) => w === mainWin;
+    care13.idleSeconds = () => 700;
+    await wait(1200);
+    care13.idleSeconds = () => 0;
+    check(await until(() => js("UI.mochiLog.some((m) => m.text === 'Welcome back!')")), 'back after 10+ minutes away, Mochi waves hello');
+
+    // --- New tab: Mochi watches the pointer and naps when you're away ---
+    const nt13 = tabs.create();
+    await ready(nt13);
+    const n13 = (c) => nt13.view.webContents.executeJavaScript(c);
+    await n13('window.NAP_AFTER_MS = 400');
+    check(await until(() => n13("document.querySelector('#mochi svg').dataset.pose === 'sleepy'"), 3000), 'Mochi naps on the new tab when nothing happens');
+    await shot('49-mochi-nap', true);
+    nt13.view.webContents.sendInputEvent({ type: 'mouseMove', x: 5, y: 300 });
+    check(await until(() => n13("document.querySelector('#mochi svg').dataset.pose === 'wave'"), 2000), 'and wakes up waving when you move the mouse');
+    await n13('window.NAP_AFTER_MS = 600000');
+    await wait(1400);
+    nt13.view.webContents.sendInputEvent({ type: 'mouseMove', x: 6, y: 300 });
+    check(await until(() => n13("document.querySelector('#mochi svg').dataset.look === 'left'"), 2000), "Mochi's eyes follow the pointer");
+    tabs.close(nt13.id);
+
+    // --- Reading time ---
+    const http13 = require('http');
+    const para13 = 'Pixel rabbits are known for their love of carrots and for hopping across rooftops at dusk while the city lights come on one by one. ';
+    const art13 = '<!doctype html><html><head><title>Rabbit facts</title></head><body><article><h1>Rabbit facts</h1>' + Array.from({ length: 14 }, () => '<p>' + para13.repeat(4) + '</p>').join('') + '</article></body></html>';
+    const srv13 = http13.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(art13); });
+    await new Promise((r) => srv13.listen(0, '127.0.0.1', r));
+    const a13 = tabs.create('http://127.0.0.1:' + srv13.address().port + '/article');
+    await ready(a13);
+    check(await until(() => (tabs.state().tabs.find((t) => t.id === a13.id)?.readMin || 0) >= 2, 6000), 'articles get a reading time (' + (tabs.state().tabs.find((t) => t.id === a13.id)?.readMin || 0) + ' min)');
+    check(await until(() => js("!document.getElementById('readChip').hidden && /^\\d+ MIN READ$/.test(document.getElementById('readChip').textContent)")), 'shown as "N MIN READ" in the address bar');
+    tabs.close(a13.id);
+    srv13.close();
+
+    // --- Offline page + Mochi Hop ---
+    const probe = http13.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>Back</title><p>Back online</p>'); });
+    await new Promise((r) => probe.listen(0, '127.0.0.1', r));
+    const port = probe.address().port;
+    await new Promise((r) => probe.close(r));
+    const deadUrl = 'http://127.0.0.1:' + port + '/page';
+    const off = tabs.create(deadUrl);
+    check(await until(() => off.url.startsWith('burrow://offline') && !off.loading, 8000), "a site that can't be reached shows Burrow's own page");
+    await ready(off);
+    const o13 = (c) => off.view.webContents.executeJavaScript(c);
+    check(await until(async () => (await o13("document.getElementById('title').textContent")).includes("isn\u2019t answering")), 'it says the site isn\u2019t answering');
+    check(await until(() => js("document.getElementById('address').value === " + JSON.stringify(deadUrl))), 'the address bar keeps the address you asked for');
+    await o13('hop.start()');
+    await wait(900);
+    check(await until(() => o13('sprites.walk1.naturalWidth > 0 && sprites.happy.naturalWidth > 0')), "Mochi's sprite loads into the game");
+    const hs = await o13('({ running: hop.running, over: hop.over, score: hop.score, t: hop.t, things: hop.things.length, vis: document.visibilityState })');
+    check(hs.running && hs.score > 1, 'Mochi Hop runs (the score counts up) ' + JSON.stringify(hs));
+    await o13('hop.jump()');
+    await wait(120);
+    check(await o13('hop.y < 0'), 'Space / click makes Mochi hop');
+    await o13('hop.jump()');
+    check(await o13('hop.hops === 2'), 'a second press makes a double-hop');
+    await shot('50-mochi-hop', true);
+    // Back online while playing: you're told, the page doesn't jump away
+    await new Promise((r) => probe.listen(port, '127.0.0.1', r));
+    check(await off.view.webContents.executeJavaScript('burrowPage.offlineRetry(false)') === true && off.url.startsWith('burrow://offline'), 'when the site answers mid-game, the game is not interrupted');
+    const carrotsBefore = store.get('carrots');
+    await o13('hop.carrots = 10; hop.score = 321; hop.crash()');
+    check(await until(() => store.get('hopBest') >= 321 && store.get('carrots') === carrotsBefore + 2), 'game over saves the best score; 10 game carrots earn Mochi 2 real ones');
+    check(await until(() => o13("document.getElementById('best').textContent === '321'")), 'the best score shows on the page');
+    await off.view.webContents.executeJavaScript('burrowPage.offlineRetry(true)');
+    check(await until(() => off.url === deadUrl && !off.loading, 6000), 'once it answers, the page goes back to the site');
+    tabs.close(off.id);
+    probe.close();
+    await js('burrow.fun.hop()');
+    check(await until(() => tabs.active && tabs.active.url === 'burrow://offline/?play=1' && !tabs.active.loading), 'Ctrl+K → Play Mochi Hop opens the game any time');
+    await ready(tabs.active);
+    check((await tabs.active.view.webContents.executeJavaScript('document.title')) === 'Mochi Hop', 'as its own page');
+    tabs.close(tabs.active.id);
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

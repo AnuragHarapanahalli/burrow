@@ -30,6 +30,13 @@ contextBridge.exposeInMainWorld('burrow', {
     openReminder: send('reminders:open'),
     cancelReminder: send('reminders:cancel'),
   },
+  fun: {
+    state: () => ipcRenderer.invoke('fun:state'),
+    buy: (id) => ipcRenderer.invoke('fun:buy', id),
+    wear: (id) => ipcRenderer.invoke('fun:wear', id),
+    night: send('night:set'),
+    hop: send('hop:open'),
+  },
   importer: {
     sources: () => ipcRenderer.invoke('import:sources'),
     run: (id, want) => ipcRenderer.invoke('import:run', id, want),
