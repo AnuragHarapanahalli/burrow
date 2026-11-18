@@ -39,6 +39,8 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | Clicking Mochi on the new tab opens **a menu of things to do** (petting is one of them); private windows get only Pet and Mochi Hop | Keep clicking = a random line | You asked for Mochi to do stuff; a menu makes Mochi's features easy to find |
+| 2026-11-18 | Self-test speed-ups: Mochi's eat animation runs 4× faster *in tests only*; timer checks call Burrow's once-a-second timer directly; "pause then check" became "check until true" — except checks that something does **not** happen, which keep their pause | Shorter pauses everywhere | Faster without weakening what the tests prove |
 | 2026-11-18 | **Mochi Hop** is our own game: Mochi hops puddles and pebbles and collects carrots, drawn from Mochi's own sprite and your theme colours; five game carrots earn one real carrot (five a day) | A copy of a well-known offline game | Original, on-brand, and gives the carrots a playful source |
 | 2026-11-18 | **Night mode never changes your saved theme**: it's a temporary override (warm amber, dark) that ends at 06:00 or when you switch it off; the page tint can be turned off separately | Switch your theme to dark | Morning-you gets your own theme back without doing anything |
 | 2026-11-18 | Outfits are a few pixels placed relative to each pose's head, eyes and feet | Separate drawings per pose | Works in every pose (walking, eating, sleeping) automatically |
@@ -240,6 +242,8 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Reading time chip ("7 MIN READ") on articles | ✅ done (tested) |
 | Mochi's idle life on the new tab: naps when you're away, wakes waving, eyes follow the pointer, fidgets; "Welcome back!" | ✅ done (tested) |
 | Bedtime: heads-up, night mode (warm, dim Burrow + warm tint on pages), gentle "it's late", ends at 06:00 | ✅ done (tested) |
+| Click Mochi on the new tab: pet, Mochi Hop, focus session, tidy up, my week, wardrobe, night mode, settings | ✅ done (tested) |
+| Welcome tour: "Mochi" step (what Mochi does + eye breaks and bedtime), right-click in the shortcuts | ✅ done (tested) |
 | Windows installer | planned |
 
 ---
@@ -316,6 +320,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
 - `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- --slow` also lists the 30 slowest checks, to see where time goes.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
@@ -452,6 +457,12 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Fun Mochi: Mochi Hop on Burrow's own offline / can't-reach page, carrots and a five-outfit wardrobe, a reading-time chip, Mochi's idle life on the new tab, and bedtime with night mode.
 - Bug found by the self-test: Mochi's sprite didn't appear in the game, and the game froze. An SVG drawn as a picture needs a namespace line that inline SVG doesn't; the failed picture then broke the game loop. Both are fixed, and the loop now survives a bad frame.
 - How "back online" works: the offline page asks Burrow every 5 seconds (and the moment Windows reports a connection) to check whether the site answers. If it does and you're not mid-game, the tab goes back to the site; mid-game, a "Return to the page" link appears instead.
+
+**2026-11-18 — Mochi menu, tour update, faster self-test (389/389 checks, 119 s)**
+- Clicking Mochi on the new tab opens a menu: Pet Mochi, Play Mochi Hop, start/end a focus session, tidy up tabs, my week, wardrobe, night mode, Mochi settings — with your carrots shown.
+- The welcome tour has a new "Mochi" step (now 8 steps): six cards for Mochi's jobs, plus eye breaks and bedtime you can set right there. The shortcuts step now mentions right-click menus, and the summary includes Mochi's settings.
+- Self-test: 162 s → 119 s while adding 19 checks. Each check's time is now recorded (`npm test -- --slow`). About half the run had been fixed pauses; 46 of them now wait only as long as needed, and 23 that prove something does *not* happen were left alone (one more was left alone on purpose because it would have passed without proving anything).
+- Small fix found from a screenshot: Mochi's hello bubble could appear under the open menu.
 
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.

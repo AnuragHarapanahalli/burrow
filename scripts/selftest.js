@@ -2,6 +2,7 @@
 //   npm test                    everything
 //   npm test -- phase8          just one part
 //   npm test -- phase7 phase8   several parts
+//   npm test -- --slow          also list the slowest checks (to find what to speed up)
 // Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, windows
 // Screenshots and the full log go to .selftest/ in the project (ignored by Git).
 const { spawn } = require('child_process');
@@ -12,11 +13,13 @@ const electron = require('electron');
 const root = path.join(__dirname, '..');
 const out = path.join(root, '.selftest');
 fs.rmSync(out, { recursive: true, force: true });
-const only = process.argv.slice(2).join(',');
+const args = process.argv.slice(2);
+const slow = args.includes('--slow'); // also list the 30 slowest checks
+const only = args.filter((a) => a !== '--slow').join(',');
 const t0 = Date.now();
 const child = spawn(electron, ['.'], {
   cwd: root,
-  env: { ...process.env, BURROW_SELFTEST: out, BURROW_SELFTEST_ONLY: only },
+  env: { ...process.env, BURROW_SELFTEST: out, BURROW_SELFTEST_ONLY: only, ...(slow ? { BURROW_SELFTEST_SLOW: '1' } : {}) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let buf = '';

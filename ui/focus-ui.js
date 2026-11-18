@@ -32,7 +32,8 @@ const FU_CAPTION_SPACE = 158; // Windows' minimise / maximise / close buttons (1
 let fuBusy = false;
 UI.eatLog = []; // what happened (the self-test reads this)
 
-const fuWait = (ms) => new Promise((r) => setTimeout(r, ms));
+// (UI.animSpeed is a test-only setting that speeds Mochi up; normally 1.)
+const fuWait = (ms) => new Promise((r) => setTimeout(r, ms * (UI.animSpeed || 1)));
 function fuPose(pose) { fuStop?.(); fuStop = null; fuSprite.innerHTML = window.Mochi.svg(UI.theme.tokens, pose, 32); }
 function fuAnimate(frames, fps) { fuStop?.(); fuStop = window.Mochi.play(fuSprite, UI.theme.tokens, frames, { fps, size: 32 }); }
 // Move Mochi to x (px from the left) at walking pace.
@@ -40,7 +41,7 @@ async function fuWalkTo(x) {
   const from = parseFloat(fuEater.style.left) || x;
   const ms = Math.max(300, Math.min(1600, Math.abs(x - from) * 2.2));
   fuAnimate(['walk1', 'walk2'], 8);
-  fuEater.style.transition = `left ${ms}ms linear`;
+  fuEater.style.transition = `left ${ms * (UI.animSpeed || 1)}ms linear`;
   fuEater.style.left = x + 'px';
   await fuWait(ms);
   fuEater.style.transition = '';

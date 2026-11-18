@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('burrow', {
     onEye: listen('care-eye'),
     eyeDone: send('care:eye-done'),
     onTidy: listen('care-tidy'),
+    onTidyOpen: listen('care-tidy-open'),
     tidy: () => ipcRenderer.invoke('care:tidy'),
     closeTabs: send('care:close-tabs'),
     remind: (id, at) => ipcRenderer.invoke('tab:remind', id, at),

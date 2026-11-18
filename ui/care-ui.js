@@ -40,6 +40,7 @@ function openTidy(offer = UI.tidyOffer) {
   $('tidyClose').focus();
 }
 window.openTidy = openTidy;
+B.care.onTidyOpen((offer) => openTidy(offer));
 $('tidyClose').onclick = () => {
   const ids = [...crTidy.querySelectorAll('[data-tab]:checked')].map((c) => Number(c.dataset.tab));
   hideOverlay();

@@ -3,13 +3,14 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
 
-const STEPS = ['Hello', 'Bring', 'Look', 'Search', 'AI', 'Keys', 'Go'];
+const STEPS = ['Hello', 'Bring', 'Look', 'Search', 'AI', 'Mochi', 'Keys', 'Go'];
 const SAY = [
   "Hi! I'll show you around.",
   'Moving in? I can carry boxes.',
   'Ooh, pick a colour you like.',
   'Your searches, your choice.',
   'Sign in once, ask anything later.',
+  "These are my favourite jobs.",
   'Ctrl+K is my favourite.',
   "Let's go! I'll be around.",
 ];
@@ -21,9 +22,9 @@ const KEYS = [
   ['Ctrl Shift A', 'AI panel', 'Your AI chat docked beside any page.'],
   ['F9', 'Reader view', 'Just the article, nothing else.'],
   ['Ctrl Shift E', 'Notes', 'A note for every website.'],
-  ['Ctrl F', 'Find in page', 'Enter for next, Shift+Enter for previous.'],
+  ['Right-click', 'Menus everywhere', 'Links, tabs, text: split view, ask AI, remind me later.'],
   ['Ctrl Shift N', 'Private window', 'No history, cookies wiped on close.'],
-  ['Drag a tab', 'Move tabs', 'Reorder, or pull it off to open a new window.'],
+  ['Drag a tab', 'Move tabs', 'Reorder, pull it into a new window, or drop it on another.'],
 ];
 
 let step = 0;
@@ -57,6 +58,21 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(step - 1); }
 });
 function finish() { window.burrowPage.welcome('done'); }
+
+// ---------- Mochi step: eye breaks and bedtime, right here ----------
+$('eyeSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-eyes]');
+  if (b) { window.burrowPage.welcome('eyes', b.dataset.eyes); say(b.dataset.eyes === '0' ? 'Okay, no eye breaks.' : "I'll remind you to look away."); }
+});
+$('bedSel').addEventListener('change', (e) => {
+  window.burrowPage.welcome('bedtime', e.target.value);
+  say(e.target.value ? `I'll tuck you in at ${e.target.value}.` : 'No bedtime. Night owl!');
+});
+function renderMochiStep(prefs) {
+  const eyes = Number(prefs.eyeBreaks) ? '20' : '0';
+  document.querySelectorAll('#eyeSeg [data-eyes]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.eyes === eyes)));
+  if (document.activeElement !== $('bedSel')) $('bedSel').value = [...$('bedSel').options].some((o) => o.value === prefs.bedtime) ? prefs.bedtime : '';
+}
 
 // ---------- Bring your stuff: import from other browsers ----------
 let impLoaded = false;
@@ -104,6 +120,7 @@ function render() {
   $('engines').innerHTML = prefs.engines.map((e) =>
     `<button class="card" role="radio" aria-checked="${prefs.searchChosen && e.id === prefs.searchEngine}" data-engine="${e.id}">
       <span class="n">${esc(e.name)}</span><span class="h">${esc(e.host)}</span></button>`).join('');
+  renderMochiStep(prefs);
   $('ais').innerHTML = prefs.aiProviders.map((p) => `
     <div class="card ai-card${p.id === prefs.aiProvider ? ' chosen' : ''}">
       <span class="n">${esc(p.name)}</span><span class="h">${esc(p.host)}</span>
@@ -147,6 +164,7 @@ function renderSummary() {
     ...(imported.length ? [['Brought', `Bookmarks and history from ${imported.join(', ')}`]] : []),
     ['Look',`${cap(settings.mode === 'system' ? 'follow Windows' : settings.mode)} · ${colour}`],
     ['Search', engine],
+    ['Mochi', `Eye breaks ${Number(prefs.eyeBreaks) ? `every ${prefs.eyeBreaks} min` : 'off'} \u00b7 bedtime ${prefs.bedtime || 'off'}`],
     ['AI', `${ai}${signedIn.size ? ` · opened sign-in for ${[...signedIn].map((id) => prefs.aiProviders.find((p) => p.id === id)?.name).join(', ')}` : ''}`],
   ].map(([k, v]) => `<dt class="pixel">${k.toUpperCase()}</dt><dd>${esc(v)}</dd>`).join('');
 }

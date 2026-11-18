@@ -17,7 +17,16 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
   const log = [];
   let failures = 0;
   const note = (s) => { log.push(s); console.log('[selftest]', s); };
-  const check = (ok, what) => { if (!ok) failures++; note(`${ok ? 'PASS' : 'FAIL'} ${what}`); };
+  // How long each check took (time since the previous one), so slow spots are easy to find.
+  let lastCheck = Date.now();
+  const timings = [];
+  const check = (ok, what) => {
+    if (!ok) failures++;
+    const now = Date.now();
+    timings.push({ ms: now - lastCheck, what, section: current ? current.name : '' });
+    lastCheck = now;
+    note(`${ok ? 'PASS' : 'FAIL'} ${what}`);
+  };
   const js = async (code) => {
     // Several statements run as a block; a single expression (incl. a "(() => {...})()" snippet) returns its value.
     const isBlock = code.includes(';') && !code.trim().startsWith('(');
@@ -91,8 +100,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
 
     // --- Report a bug ---
     await pjs("document.getElementById('bugBtn').click()");
-    await wait(200);
-    check(await pjs("!document.getElementById('bugScrim').hidden"), 'Report a bug opens the form');
+    check(await until(async () => (await pjs("!document.getElementById('bugScrim').hidden"))), 'Report a bug opens the form');
     await shot('00c-bug-form', true);
     await pjs("document.getElementById('bugForm').requestSubmit()");
     await wait(200);
@@ -119,13 +127,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await menuTab.view.webContents.executeJavaScript("!document.getElementById('bugScrim').hidden"), 'Menu \u2192 Report a bug opens the form directly');
     tabs.close(menuTab.id);
     await wait(300);
-    await wait(200);
-    check(await pjs("document.querySelectorAll('#links .ql').length") === 4, 'Edit shows editable links');
+    check(await until(async () => (await pjs("document.querySelectorAll('#links .ql').length") === 4)), 'Edit shows editable links');
     await pjs("document.querySelector('[data-edit=\"0\"]').click(); document.getElementById('lfName').value='Gmail'; document.getElementById('lfUrl').value='mail.google.com'; document.getElementById('linkForm').requestSubmit()");
     check(await until(() => store.get('quickLinks')[0].name === 'Gmail'), 'renaming a link saves it');
     await pjs("document.querySelector('[data-add]').click(); document.getElementById('lfName').value=''; document.getElementById('lfUrl').value='not a url'; document.getElementById('linkForm').requestSubmit()");
-    await wait(200);
-    check((await pjs("document.getElementById('lfError').textContent")).length > 0, 'a bad address shows an error');
+    check(await until(async () => ((await pjs("document.getElementById('lfError').textContent")).length > 0)), 'a bad address shows an error');
     await pjs("document.getElementById('lfName').value='Moodle'; document.getElementById('lfUrl').value='moodle.org'; document.getElementById('linkForm').requestSubmit()");
     check(await until(() => store.get('quickLinks').length === 5 && store.get('quickLinks')[4].url === 'https://moodle.org/'), 'adding a link saves it');
     await shot('00b-links-edit', true);
@@ -155,28 +161,23 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(rows >= 2, `address suggestions appear (${rows} rows)`);
     await shot('01-suggest');
     await js("document.getElementById('address').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
-    await wait(300);
-    check(await js("document.getElementById('overlay').hidden"), 'Escape closes suggestions');
+    check(await until(async () => (await js("document.getElementById('overlay').hidden"))), 'Escape closes suggestions');
     await js("const a=document.getElementById('address'); a.focus(); a.value='examp'; a.dispatchEvent(new Event('input'))");
     await wait(600);
     await js("openPanel('bookmarks')");
-    await wait(300);
-    check(await js("document.getElementById('overlay').hidden"), 'opening a panel closes suggestions');
+    check(await until(async () => (await js("document.getElementById('overlay').hidden"))), 'opening a panel closes suggestions');
     await js("closePanel()");
 
     // --- Library panel ---
     // --- Main menu ---
     await js("document.getElementById('menuBtn').click()");
-    await wait(300);
-    check(await js("document.querySelectorAll('#mainMenu [data-cmd]').length") >= 18 && await js("document.querySelectorAll('#mainMenu .cc-tool').length") === 8, 'menu opens as a control centre (search, new, zoom, 8 tools, library)');
+    check(await until(async () => (await js("document.querySelectorAll('#mainMenu [data-cmd]').length") >= 18 && await js("document.querySelectorAll('#mainMenu .cc-tool').length") === 8)), 'menu opens as a control centre (search, new, zoom, 8 tools, library)');
     await shot('01b-menu');
     await js("document.querySelector('#mainMenu [data-cmd=bookmarks]').click()");
-    await wait(700);
-    check(await js("document.querySelectorAll('#bmList .item').length") === 1, 'bookmarks panel lists the bookmark');
+    check(await until(async () => (await js("document.querySelectorAll('#bmList .item').length") === 1)), 'bookmarks panel lists the bookmark');
     await shot('02-bookmarks');
     await js("openPanel('history')");
-    await wait(700);
-    check(await js("document.querySelectorAll('#histList .item').length") >= 1, 'history panel lists visits');
+    check(await until(async () => (await js("document.querySelectorAll('#histList .item').length") >= 1)), 'history panel lists visits');
     await shot('03-history');
 
     // --- Downloads ---
@@ -189,8 +190,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await shot('04-downloads');
     check(!(await js("document.getElementById('dlBtn').hidden")), 'downloads button appears after a download');
     await js("openPanel('settings')");
-    await wait(500);
-    check(await js("document.querySelectorAll('#engines .engine').length") === 6, 'settings lists search engines');
+    check(await until(async () => (await js("document.querySelectorAll('#engines .engine').length") === 6)), 'settings lists search engines');
     check(await js("document.querySelectorAll('#panel details.sect').length") === 9, 'settings has nine dropdown sections');
     check(await js("document.getElementById('sumEngine').textContent") === 'DuckDuckGo', 'closed dropdown shows the current engine');
     await js("document.querySelector('#panel details.sect').open = true");
@@ -202,8 +202,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await js("!document.getElementById('bmbar').hidden"), 'bookmarks bar is shown by default');
     check(await js("document.querySelectorAll('#bmItems .bm').length") === 1, 'bookmarks bar shows the bookmark');
     setPrefs({ bookmarksBar: false });
-    await wait(300);
-    check(await js("document.getElementById('bmbar').hidden"), 'bookmarks bar can be hidden');
+    check(await until(async () => (await js("document.getElementById('bmbar').hidden"))), 'bookmarks bar can be hidden');
     setPrefs({ bookmarksBar: true });
     await wait(300);
 
@@ -214,15 +213,13 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("document.getElementById('backdrop').dispatchEvent(new MouseEvent('mousedown',{bubbles:true}))");
     const homeTabs = tabs.visible.length;
     tabs.createWorkspace('College');
-    await wait(800);
-    check(tabs.visible.length === 1 && tabs.workspaces.length === 2, 'new workspace starts with one tab');
+    check(await until(async () => (tabs.visible.length === 1 && tabs.workspaces.length === 2)), 'new workspace starts with one tab');
     // Quick link only for this workspace
     await ready(tabs.active);
     const cpage = tabs.active.view.webContents;
     const cjs = (code) => cpage.executeJavaScript(code);
     await cjs("document.getElementById('linksEdit').click(); document.querySelector('[data-add]').click()");
-    await wait(200);
-    check((await cjs("document.getElementById('scopeWs').textContent")) === 'Only College', 'link form offers "Only College"');
+    check(await until(async () => ((await cjs("document.getElementById('scopeWs').textContent")) === 'Only College')), 'link form offers "Only College"');
     await cjs("document.querySelector('[data-scope=ws]').click(); document.getElementById('lfName').value='Lectures'; document.getElementById('lfUrl').value='lectures.example.edu'; document.getElementById('linkForm').requestSubmit()");
     await wait(500);
     const collegeId = tabs.currentWs;
@@ -238,11 +235,9 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check((await homeNew.view.webContents.executeJavaScript("document.getElementById('links').textContent")).includes('Lectures') === false, 'Home new tab does not show the College-only link');
     tabs.close(homeNew.id);
     tabs.switchWorkspace(collegeId);
-    await wait(300);
-    check(await js("document.getElementById('wsName').textContent") === 'COLLEGE', 'strip shows the workspace name');
+    check(await until(async () => (await js("document.getElementById('wsName').textContent") === 'COLLEGE')), 'strip shows the workspace name');
     tabs.switchWorkspaceIndex(0);
-    await wait(500);
-    check(tabs.visible.length === homeTabs, 'switching back restores Home tabs');
+    check(await until(async () => (tabs.visible.length === homeTabs)), 'switching back restores Home tabs');
 
     // --- Reopen closed tab ---
     const before = tabs.visible.length;
@@ -250,12 +245,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(web.id);
     await wait(40);
     check(await js("!!document.querySelector('.closing')"), 'closed tab shrinks away');
-    await wait(300);
-    check(tabs.visible.length === before - 1, 'closing a tab removes it');
+    check(await until(async () => (tabs.visible.length === before - 1)), 'closing a tab removes it');
     await wait(300);
     tabs.reopenClosed();
-    await wait(800);
-    check(tabs.visible.length === before, 'Ctrl+Shift+T reopens the closed tab');
+    check(await until(async () => (tabs.visible.length === before)), 'Ctrl+Shift+T reopens the closed tab');
 
     }
     if (section('phase3')) {
@@ -264,8 +257,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     const ex = tabs.create('https://example.com/');
     await ready(ex);
     mainWin.send('find-open');
-    await wait(300);
-    check(await js("!document.getElementById('findbar').hidden"), 'Ctrl+F opens the find bar');
+    check(await until(async () => (await js("!document.getElementById('findbar').hidden"))), 'Ctrl+F opens the find bar');
     await js("const f=document.getElementById('findInput'); f.value='domain'; f.dispatchEvent(new Event('input'))");
     await wait(900);
     const c1 = await js("document.getElementById('findCount').textContent");
@@ -276,13 +268,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(c2.startsWith('2/'), `next match moves on (${c2})`);
     await shot('07-find', true);
     await js("document.getElementById('findClose').click()");
-    await wait(200);
-    check(await js("document.getElementById('findbar').hidden"), 'find bar closes');
+    check(await until(async () => (await js("document.getElementById('findbar').hidden"))), 'find bar closes');
 
     // --- Zoom, remembered per site ---
     tabs.stepZoom(1);
-    await wait(400);
-    check(Math.abs(ex.view.webContents.getZoomFactor() - 1.1) < 0.01, 'Ctrl+= zooms to 110%');
+    check(await until(async () => (Math.abs(ex.view.webContents.getZoomFactor() - 1.1) < 0.01)), 'Ctrl+= zooms to 110%');
     check(await js("document.getElementById('zoomBtn').textContent") === '110%', 'address bar shows 110%');
     check((store.get('zoom') || {})['example.com'] === 1.1, 'zoom is remembered for example.com');
     const ex2 = tabs.create('https://example.com/');
@@ -308,13 +298,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(ms.media, 'playing video shows the picture-in-picture button');
     check(ms.audible, 'tab playing sound shows a speaker');
     const pipResult = await mainWin.pip();
-    await wait(800);
-    check(pipResult === 'ok' && await mt.view.webContents.executeJavaScript('!!document.pictureInPictureElement'), `picture-in-picture pops the video out (${pipResult})`);
+    check(await until(async () => (pipResult === 'ok' && await mt.view.webContents.executeJavaScript('!!document.pictureInPictureElement'))), `picture-in-picture pops the video out (${pipResult})`);
     await shot('08-media', true);
     await mainWin.pip(); // bring it back
     tabs.toggleMute(mt.id);
-    await wait(300);
-    check(tabs.state().tabs.find((t) => t.id === mt.id).muted, 'a tab can be muted');
+    check(await until(async () => (tabs.state().tabs.find((t) => t.id === mt.id).muted)), 'a tab can be muted');
     tabs.close(mt.id);
 
     // --- Private window ---
@@ -352,12 +340,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.navigate = (u) => { went.push(u); };
     const typeAddress = (text) => js(`(() => { const a = document.getElementById('address'); a.focus(); a.value = ${JSON.stringify(text)}; a.dispatchEvent(new Event('input')); })()`);
     await typeAddress('how do volcanoes work');
-    await wait(300);
-    check(await js("document.querySelector('#suggest .sg').classList.contains('sg-ask')"), 'a question puts "Ask Claude" first in the address bar');
+    check(await until(async () => (await js("document.querySelector('#suggest .sg').classList.contains('sg-ask')"))), 'a question puts "Ask Claude" first in the address bar');
     await shot('11-address-ask');
     await js("document.getElementById('addressForm').requestSubmit()");
-    await wait(300);
-    check(went.includes('https://claude.ai/new?q=how%20do%20volcanoes%20work'), 'Enter asks Claude with the question filled in');
+    check(await until(async () => (went.includes('https://claude.ai/new?q=how%20do%20volcanoes%20work'))), 'Enter asks Claude with the question filled in');
     await typeAddress('cheap flights to goa');
     await wait(300);
     check(await js("document.querySelector('#suggest .sg').classList.contains('sg-search')"), 'a normal search keeps Search first');
@@ -375,35 +361,30 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await ready(nt);
     const ntjs = (code) => nt.view.webContents.executeJavaScript(code);
     await ntjs("(() => { const q = document.getElementById('q'); q.value = 'why is the sky blue'; q.dispatchEvent(new Event('input')); })()");
-    await wait(200);
-    check(await ntjs("document.body.classList.contains('ask-mode')"), 'new tab flips to Ask when you type a question');
+    check(await until(async () => (await ntjs("document.body.classList.contains('ask-mode')"))), 'new tab flips to Ask when you type a question');
     await shot('11b-newtab-ask', true);
     let askedFrom = '';
     const realFrom = tabs.navigateFrom.bind(tabs);
     tabs.navigateFrom = (_wc, u) => { askedFrom = u; };
     await ntjs("document.getElementById('search').requestSubmit()");
-    await wait(300);
-    check(askedFrom === 'https://claude.ai/new?q=why%20is%20the%20sky%20blue', 'new tab Ask opens Claude with the question');
+    check(await until(async () => (askedFrom === 'https://claude.ai/new?q=why%20is%20the%20sky%20blue')), 'new tab Ask opens Claude with the question');
     tabs.navigateFrom = realFrom;
     tabs.close(nt.id);
     await wait(300);
 
     // Settings: AI assistant
     await js("openPanel('settings')");
-    await wait(300);
-    check(await js("document.querySelectorAll('#aiList .engine').length") === 3, 'Settings offers Claude, ChatGPT and Gemini');
+    check(await until(async () => (await js("document.querySelectorAll('#aiList .engine').length") === 3)), 'Settings offers Claude, ChatGPT and Gemini');
     check((await js("document.getElementById('sumAI').textContent")).startsWith('Claude'), 'Settings shows Claude as the current AI');
     await js("closePanel()");
 
     // Ctrl+K palette
     ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'K', modifiers: ['control'] });
-    await wait(600);
-    check(await js("!document.getElementById('palette').hidden"), 'Ctrl+K opens the command palette');
+    check(await until(async () => (await js("!document.getElementById('palette').hidden"))), 'Ctrl+K opens the command palette');
     const typePalette = (text) => js(`(() => { const p = document.getElementById('palInput'); p.value = ${JSON.stringify(text)}; p.dispatchEvent(new Event('input')); })()`);
     const paletteKey = (key) => js(`document.getElementById('palInput').dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', bubbles: true }))`);
     await typePalette('dark');
-    await wait(300);
-    check((await js("document.querySelector('#palList .pal-row .main').textContent")).includes('dark theme'), 'typing "dark" finds "Switch to dark theme"');
+    check(await until(async () => ((await js("document.querySelector('#palList .pal-row .main').textContent")).includes('dark theme'))), 'typing "dark" finds "Switch to dark theme"');
     await shot('12-palette');
     await paletteKey('Enter');
     await wait(400);
@@ -412,14 +393,12 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     mainWin.send('palette-open');
     await wait(500);
     await typePalette('example');
-    await wait(500);
-    check(await js("document.querySelector('#palList .pal-row').classList.contains('pal-tab')"), 'typing a site name finds its open tab');
+    check(await until(async () => (await js("document.querySelector('#palList .pal-row').classList.contains('pal-tab')"))), 'typing a site name finds its open tab');
     await paletteKey('Escape');
     mainWin.send('palette-open');
     await wait(500);
     await typePalette('how do I center a div');
-    await wait(400);
-    check(await js("document.querySelector('#palList .pal-row').classList.contains('pal-ask')"), 'a question in the palette puts Ask first');
+    check(await until(async () => (await js("document.querySelector('#palList .pal-row').classList.contains('pal-ask')"))), 'a question in the palette puts Ask first');
     await shot('12b-palette-ask');
     await paletteKey('Escape');
     await wait(200);
@@ -459,11 +438,9 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // Clicking into the right side makes it the active tab
     const right = tabs.get(tabs.split.b);
     right.view.webContents.focus();
-    await wait(400);
-    check(tabs.activeId === right.id, 'clicking into the right side makes it the active tab');
+    check(await until(async () => (tabs.activeId === right.id)), 'clicking into the right side makes it the active tab');
     tabs.swapSplit();
-    await wait(300);
-    check(tabs.shownTabs[0].id === right.id, 'swap puts the right tab on the left');
+    check(await until(async () => (tabs.shownTabs[0].id === right.id)), 'swap puts the right tab on the left');
     tabs.unsplit();
     await wait(400);
     check(!tabs.split && tabs.shownTabs.length === 1 && tabs.shownTabs[0].view.getBounds().width === tabs.bounds.width, 'closing split view shows one full-width page');
@@ -519,8 +496,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.activate(art.id);
     await wait(300);
     await js("openPanel('notes')");
-    await wait(500);
-    check((await js("document.getElementById('noteHost').textContent")) === '127.0.0.1:' + server.address().port, 'Notes opens for the current site');
+    check(await until(async () => ((await js("document.getElementById('noteHost').textContent")) === '127.0.0.1:' + server.address().port)), 'Notes opens for the current site');
     await js("(() => { const t = document.getElementById('noteText'); t.value = 'Remember: magma is hot'; t.dispatchEvent(new Event('input')); })()");
     // Notes save 0.4 s after you stop typing; on a busy computer that can take longer, so keep checking.
     const notesSvc = getNotes();
@@ -540,8 +516,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     mainWin.loadAI = (url) => { aiLoads.push(url || 'home'); realLoadAI('about:blank'); };
     const fullWidth = tabs.bounds.width;
     mainWin.setAI(true);
-    await wait(800);
-    check(mainWin.aiOpen && mainWin.aiView, 'Ctrl+Shift+A opens the AI panel');
+    check(await until(async () => (mainWin.aiOpen && mainWin.aiView)), 'Ctrl+Shift+A opens the AI panel');
     const aiB = mainWin.aiView.getBounds();
     check(tabs.bounds.width < fullWidth && aiB.x >= tabs.bounds.x + tabs.bounds.width, 'pages shrink to make room for the AI panel on the right');
     check(await js("!document.getElementById('aiPanel').hidden && document.querySelectorAll('#aiSeg button').length === 3"), 'the AI panel header offers Claude, ChatGPT and Gemini');
@@ -564,7 +539,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     const wjs = (code) => wt.view.webContents.executeJavaScript(code);
     check((await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith("Hi. I'm Mochi"), 'the tour opens with Mochi saying hello');
-    check(await wjs("document.querySelectorAll('#stepList li').length") === 7, 'the tour has seven steps');
+    check(await wjs("document.querySelectorAll('#stepList li').length") === 8, 'the tour has eight steps');
     await shot('17-welcome-hello', true);
     await wjs("document.getElementById('next').click()");
     check(await until(async () => (await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith('Bring your stuff')), 'step 2 offers to bring your stuff from another browser');
@@ -596,17 +571,24 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(signinOpened.includes('https://chatgpt.com/auth/login'), "Sign in opens ChatGPT's own sign-in page");
     await shot('17c-welcome-ai', true);
     await wjs("document.getElementById('next').click()");
-    await wait(300);
-    check(await wjs("document.querySelectorAll('#keys .key').length") === 10, 'step 5 lists ten shortcuts');
+    check(await until(async () => (await wjs("document.querySelector('.step:not([hidden]) h1').textContent")).startsWith("I'm more than a mascot")), 'a Mochi step shows what Mochi can do');
+    check(await wjs("document.querySelectorAll('.mochi-cards .card').length") === 6, 'six of Mochi\'s jobs: limits, focus, your week, tab helpers, carrots, Mochi Hop');
+    await wjs("document.querySelector('#eyeSeg [data-eyes=\"0\"]').click()");
+    await wjs("document.getElementById('bedSel').value = '23:00'; document.getElementById('bedSel').dispatchEvent(new Event('change'))");
+    check(await until(() => store.get('eyeBreaks') === 0 && store.get('bedtime') === '23:00'), 'eye breaks and bedtime can be set right in the tour');
+    await shot('17e-welcome-mochi', true);
+    await wjs("document.getElementById('next').click()");
+    check(await until(async () => (await wjs("document.querySelectorAll('#keys .key').length") === 10)), 'the shortcuts step lists ten (incl. right-click menus)');
+    check((await wjs("document.getElementById('keys').textContent")).includes('Right-click'), 'right-click menus are among them');
     await shot('17d-welcome-keys', true);
     await wjs("document.getElementById('next').click()");
-    await wait(300);
-    check((await wjs("document.getElementById('summary').textContent")).includes('Bing'), 'the last step sums up your choices');
+    check(await until(async () => ((await wjs("document.getElementById('summary').textContent")).includes('Bing'))), 'the last step sums up your choices');
+    check((await wjs("document.getElementById('summary').textContent")).includes('bedtime 23:00'), 'including Mochi\'s settings');
     await wjs("document.getElementById('go').click()");
     check(await until(async () => store.get('onboarded') === true && wt.url.startsWith('burrow://newtab')), 'Start browsing finishes the tour and opens a new tab');
     tabs.close(wt.id);
     setTheme({ mode: 'light', seed: '#E63027' });
-    setPrefs({ aiProvider: 'claude' });
+    setPrefs({ aiProvider: 'claude', eyeBreaks: 20, bedtime: '' });
     await wait(300);
 
     }
@@ -618,8 +600,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await until(() => sleepy.url.includes('?second') && !sleepy.loading, 8000);
     sleepy.lastActive = 0; // pretend it's been out of sight for ages
     sweepSleep();
-    await wait(300);
-    check(sleepy.asleep && !sleepy.view, 'a tab out of sight for a while goes to sleep (its page is unloaded)');
+    check(await until(async () => (sleepy.asleep && !sleepy.view)), 'a tab out of sight for a while goes to sleep (its page is unloaded)');
     check(await until(() => js(`!!document.querySelector('[data-id="${sleepy.id}"].asleep')`)), 'a sleeping tab shows "zz" in the tab strip');
     await shot('18-sleeping-tab');
     tabs.activate(sleepy.id);
@@ -679,14 +660,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(200);
     await js("mochiLastChat = 0, document.getElementById('stripMochi').hidden = true");
     await js("mochiSay('Testing, testing', { essential: true })");
-    await wait(150);
-    check(await js("!document.getElementById('stripMochi').hidden && document.getElementById('stripMochi').classList.contains('walking')"), 'Mochi walks into the tab strip before speaking');
-    await wait(900);
-    check(await js("document.querySelector('#stripSprite .mochi-svg').dataset.pose === 'happy' && !document.getElementById('stripMochi').classList.contains('walking')"), 'then stops and shows the right pose');
+    check(await until(async () => (await js("!document.getElementById('stripMochi').hidden && document.getElementById('stripMochi').classList.contains('walking')"))), 'Mochi walks into the tab strip before speaking');
+    check(await until(async () => (await js("document.querySelector('#stripSprite .mochi-svg').dataset.pose === 'happy' && !document.getElementById('stripMochi').classList.contains('walking')"))), 'then stops and shows the right pose');
     await shot('19-mochi-strip');
     setPrefs({ mochiMode: 'quiet' });
-    await wait(300);
-    check(await js("mochiLastChat = 0, mochiSay('chatter') === false && mochiSay('important', { essential: true }) === true"), 'Quiet mode: Mochi only says important things');
+    check(await until(async () => (await js("mochiLastChat = 0, mochiSay('chatter') === false && mochiSay('important', { essential: true }) === true"))), 'Quiet mode: Mochi only says important things');
     setPrefs({ mochiMode: 'off' });
     await wait(300);
     check(await js("mochiSay('important', { essential: true }) === false"), 'Off: Mochi stays out of sight');
@@ -707,8 +685,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js("openPanel('settings')");
     await wait(300);
     await js("document.querySelectorAll('#panel details.sect')[6].open = true");
-    await wait(400);
-    check(await js("document.querySelectorAll('#mochiGallery figure').length") === 7, 'Settings → Mochi shows the pose gallery');
+    check(await until(async () => (await js("document.querySelectorAll('#mochiGallery figure').length") === 7)), 'Settings → Mochi shows the pose gallery');
     await shot('19b-mochi-settings');
     await js("closePanel()");
 
@@ -717,6 +694,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     if (section('phase8')) {
     // ================= Phase 8: focus tools, per-tab volume, control centre =================
     const focus = getFocus();
+    await js('UI.animSpeed = 0.25'); // Mochi's walk / countdown / chomp run 4x faster in the test
     const http8 = require('http');
     // Volume test pages: one with same-origin audio (may be boosted), one with audio from another origin (may not).
     const wav = (() => {
@@ -811,8 +789,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(g1.id);
     await wait(300);
     tabs.reopenClosed();
-    await wait(300);
-    check(await gated(tabs.active), 'Ctrl+Shift+T lands on the gate too');
+    check(await until(async () => (await gated(tabs.active))), 'Ctrl+Shift+T lands on the gate too');
     tabs.close(tabs.active.id);
     const gt = tabs.create();
     await wait(800);
@@ -871,20 +848,19 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await shot('26-focus-session', true);
     await gt.view.webContents.executeJavaScript("document.querySelector('[data-act=\"end-session\"]').click()");
     check(await until(() => !focus.session && gt.url === feedUrl, 8000), 'ending the session early reopens the site');
-    // Counting: only while the site is on screen in a focused window
-    mainWin.win.focus();
-    await wait(300);
-    if (mainWin.win.isFocused()) {
-      const u0 = focus.used[site] || 0;
-      await wait(2300);
-      check((focus.used[site] || 0) >= u0 + 1, 'time counts while the site is on screen');
-      tabs.create();
-      await wait(300);
-      const u1 = focus.used[site] || 0;
-      await wait(2100);
-      check((focus.used[site] || 0) === u1, 'and stops when you switch away');
-      tabs.close(tabs.active.id);
-    } else note('(skipped the counting check: the test window is not focused)');
+    // Counting: only while the site is on screen in the window you're using. (The once-a-second
+    // timer is called directly here instead of waiting real seconds.)
+    focus.winActive = (w) => w === mainWin;
+    const u0 = focus.used[site] || 0;
+    focus.tick(); focus.tick();
+    check((focus.used[site] || 0) >= u0 + 2, 'time counts while the site is on screen');
+    tabs.create();
+    await wait(150);
+    const u1 = focus.used[site] || 0;
+    focus.tick(); focus.tick();
+    check((focus.used[site] || 0) === u1, 'and stops when you switch away');
+    tabs.close(tabs.active.id);
+    delete focus.winActive;
     delete focus.limits[site];
     focus.save();
     tabs.close(gt.id);
@@ -945,15 +921,16 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await ready(pt9);
     focus.winActive = (w) => w === pw9; // you're looking at the private window
     stats.clear();
-    await wait(2300);
+    focus.tick(); focus.tick();
     check(!stats.day().sites[host9], 'private windows are never recorded');
     focus.winActive = (w) => w === mainWin;
-    check(await until(() => (stats.day().sites[host9] || 0) >= 2, 5000), 'time on a site is recorded while it is on screen');
+    focus.tick(); focus.tick();
+    check((stats.day().sites[host9] || 0) >= 2, 'time on a site is recorded while it is on screen');
     check(stats.day().total >= 2 && stats.day().limited === 0, 'the day total grows; nothing counted as limited');
     pw9.win.close();
     setPrefs({ reportOn: false });
     const frozen = stats.day().sites[host9];
-    await wait(2200);
+    focus.tick(); focus.tick();
     check(stats.day().sites[host9] === frozen, 'switching the weekly report off stops recording');
     setPrefs({ reportOn: true });
     delete focus.winActive;
@@ -1062,8 +1039,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await shot('31-report-settings');
     await js("closePanel()");
     await js("document.getElementById('menuBtn').click()");
-    await wait(300);
-    check(await js("document.querySelectorAll('#mainMenu .cc-lib button').length") === 4, 'the menu has a Report tile next to the library');
+    check(await until(async () => (await js("document.querySelectorAll('#mainMenu .cc-lib button').length") === 4)), 'the menu has a Report tile next to the library');
     await js("document.querySelector('#mainMenu [data-cmd=report]').click()");
     check(await until(() => tabs.active && tabs.active.url.startsWith('burrow://report')), '☰ → Report opens the report');
     tabs.close(tabs.active.id);
@@ -1415,7 +1391,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     // --- Eye breaks ---
     setPrefs({ eyeBreaks: 20, mochiMode: 'lively' });
     await clearStrip();
-    care.eyeSec = 20 * 60 - 2;
+    care.eyeSec = 20 * 60 - 1;
+    care.tick();
     check(await until(() => js("UI.mochiLog.some((m) => m.text === 'Look at something far away for 20 seconds')"), 5000), 'after 20 minutes of screen time Mochi asks you to look far away');
     check(await until(() => js("/Look far away\u2026 1[0-9]/.test(document.getElementById('stripBubble').textContent)"), 3000), 'with a 20-second countdown');
     await shot('42-eye-break');
@@ -1426,9 +1403,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await clearStrip();
     care.eyeSec = 99999;
     care.longSec = 0;
-    await wait(1500);
+    care.tick(); care.tick();
+    await wait(200);
     check(!(await js("UI.mochiLog.some((m) => /far away/.test(m.text))")), 'eye breaks can be switched off');
     care.longSec = 90 * 60 - 1;
+    care.tick();
     check(await until(() => js("UI.mochiLog.some((m) => /90 minutes in/.test(m.text))"), 4000), 'after 90 minutes in one go, a stretch nudge');
     await js("openPanel('settings')");
     await wait(300);
@@ -1606,10 +1585,65 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await clear13();
     care13.winActive = (w) => w === mainWin;
     care13.idleSeconds = () => 700;
-    await wait(1200);
+    care13.tick();
     care13.idleSeconds = () => 0;
+    care13.tick();
     check(await until(() => js("UI.mochiLog.some((m) => m.text === 'Welcome back!')")), 'back after 10+ minutes away, Mochi waves hello');
 
+
+    // --- Click Mochi on the new tab: things to do together ---
+    const mt14 = tabs.create();
+    await ready(mt14);
+    const m14 = (c) => mt14.view.webContents.executeJavaScript(c);
+    const openMM = async () => { await m14("document.getElementById('mochi').click()"); return until(() => m14("!document.getElementById('mochiMenu').hidden && document.querySelectorAll('#mmItems .mm-item').length > 0")); };
+    const pickMM = (a) => m14("document.querySelector('#mmItems [data-mm=\"" + a + "\"]').click()");
+    store.set('carrots', 7);
+    check(await openMM(), 'clicking Mochi on the new tab opens a menu');
+    check(await m14("document.querySelectorAll('#mmItems .mm-item').length") === 8 && (await m14("document.getElementById('mmCarrots').textContent")) === '7 CARROTS', 'eight things to do, and your carrots');
+    await shot('51-mochi-menu', true);
+    await m14("document.getElementById('mochiMenu').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    check(await until(() => m14("document.getElementById('mochiMenu').hidden")), 'Esc closes it');
+    await openMM();
+    await pickMM('pet');
+    check(await until(() => m14("!document.getElementById('bubble').hidden && document.querySelector('#mochi svg').dataset.pose === 'happy'")), 'Pet Mochi: a happy Mochi says something');
+    await openMM();
+    await pickMM('focus');
+    check(await until(() => focus13.session?.phase === 'focus'), 'Start a focus session from Mochi');
+    await openMM();
+    check((await m14("document.querySelector('#mmItems [data-mm=\"focus\"]').textContent")).includes('End the focus session'), 'the menu then offers to end it');
+    await pickMM('focus');
+    check(await until(() => !focus13.session), 'and ending works');
+    await openMM();
+    await pickMM('night');
+    check(await until(() => store.get('nightMode') === true), 'Night mode from Mochi');
+    await openMM();
+    await pickMM('night');
+    check(await until(() => store.get('nightMode') === false), 'and back off');
+    await openMM();
+    await pickMM('wardrobe');
+    check(await until(() => js("!document.getElementById('panel').hidden && document.getElementById('mochiSect').open")), 'Wardrobe opens Settings at Mochi');
+    await js("closePanel()");
+    await openMM();
+    await pickMM('tidy');
+    check(await until(async () => (await js("UI.mochiLog.some((m) => /All tidy/.test(m.text))")) || (await js("!document.getElementById('tidyPop').hidden"))), 'Tidy up my tabs (here: all tidy)');
+    await js("hideOverlay()");
+    await openMM();
+    await pickMM('report');
+    check(await until(() => mt14.url.startsWith('burrow://report')), 'My week opens the weekly report');
+    mt14.view.webContents.loadURL('burrow://newtab/');
+    await ready(mt14);
+    await openMM();
+    await pickMM('hop');
+    check(await until(() => mt14.url === 'burrow://offline/?play=1'), 'Play Mochi Hop opens the game');
+    tabs.close(mt14.id);
+    const pv14 = openWindow({ isPrivate: true });
+    await until(() => pv14.tabs.active, 5000);
+    await ready(pv14.tabs.active);
+    const p14 = (c) => pv14.tabs.active.view.webContents.executeJavaScript(c);
+    await p14("document.getElementById('mochi').click()");
+    check(await until(() => p14("document.querySelectorAll('#mmItems .mm-item').length === 2")), 'in a private window: just Pet Mochi and Mochi Hop');
+    pv14.win.close();
+    await wait(300);
     // --- New tab: Mochi watches the pointer and naps when you're away ---
     const nt13 = tabs.create();
     await ready(nt13);
@@ -1687,11 +1721,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     const winsAtStart = normals().length;
     ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'N', modifiers: ['control'] });
     await until(() => normals().length === winsAtStart + 1, 5000);
-    await wait(500);
-    check(normals().length === 2, 'Ctrl+N opens a new window');
+    check(await until(async () => (normals().length === 2)), 'Ctrl+N opens a new window');
     const w2 = normals().find((w) => w !== mainWin);
-    check(w2 && w2.tabs.visible.length === 1 && w2.tabs.active.url.startsWith('burrow://newtab'), 'new window starts with a new tab');
-    check((store.get('session').windows || []).length === 2, 'both windows are saved for next time');
+    check(await until(() => w2 && w2.tabs.visible.length === 1 && w2.tabs.active?.url.startsWith('burrow://newtab')), 'new window starts with a new tab');
+    check(await until(() => (store.get('session').windows || []).length === 2), 'both windows are saved for next time');
 
     // --- Drag to reorder ---
     while (tabs.visible.length < 4) tabs.create(undefined, { activate: false });
@@ -1726,13 +1759,11 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
       await wait(500);
       const moved = w3.tabs.detach(t.id);
       mainWin.tabs.adopt(moved);
-      await wait(500);
-      check(mainWin.tabs.get(t.id) && t.owner === mainWin.tabs, 'a tab dropped on another window joins it');
+      check(await until(async () => (mainWin.tabs.get(t.id) && t.owner === mainWin.tabs)), 'a tab dropped on another window joins it');
       w3.win.close();
     }
     w2.win.close();
-    await wait(800);
-    check(normals().length === 1 && (store.get('session').windows || []).length === 1, 'closing extra windows forgets their tabs (like Chrome)');
+    check(await until(async () => (normals().length === 1 && (store.get('session').windows || []).length === 1)), 'closing extra windows forgets their tabs (like Chrome)');
 
     // --- Sidebar beyond 8 tabs ---
     for (let i = 0; i < 8; i++) tabs.create(undefined, { activate: i === 7 });
@@ -1746,6 +1777,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
   } catch (err) {
     failures++;
     note('ERROR ' + (err && err.stack || err));
+  }
+  if (process.env.BURROW_SELFTEST_SLOW) {
+    note('SLOWEST CHECKS (time spent before each):');
+    timings.sort((a, b) => b.ms - a.ms).slice(0, 30).forEach((t) => note(`  ${(t.ms / 1000).toFixed(1)}s  [${t.section}] ${t.what.slice(0, 90)}`));
   }
   note(`${failures ? `${failures} problem(s)` : 'ALL PASSED'} in ${Math.round((Date.now() - started) / 1000)}s`);
   fs.writeFileSync(path.join(dir, 'log.txt'), log.join('\n'));

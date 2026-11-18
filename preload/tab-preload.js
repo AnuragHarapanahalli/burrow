@@ -12,6 +12,8 @@ if (location.protocol === 'burrow:') {
     readerArticle: (key) => ipcRenderer.invoke('page:reader', String(key || '')),
     // New tab: the one stat line. Weekly report page: its numbers.
     statLine: () => ipcRenderer.invoke('page:statline'),
+    mochiInfo: () => ipcRenderer.invoke('page:mochi-info'),
+    mochiAction: (action) => ipcRenderer.send('page:mochi', String(action || '')),
     report: (offset) => ipcRenderer.invoke('page:report', Number(offset) || 0),
     reportAction: (action) => ipcRenderer.send('page:report-action', String(action || '')),
     // Welcome tour only (the main process ignores these from any other page).

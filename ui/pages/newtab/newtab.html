@@ -58,7 +58,11 @@
 
     <div class="mochi-spot">
       <div class="bubble" id="bubble" hidden></div>
-      <button id="mochi" class="mochi-btn" aria-label="Mochi, your companion"></button>
+      <div class="mochi-menu" id="mochiMenu" hidden role="menu" aria-label="Things to do with Mochi">
+        <div class="mm-head pixel"><span>MOCHI</span><span id="mmCarrots"></span></div>
+        <div class="mm-items" id="mmItems"></div>
+      </div>
+      <button id="mochi" class="mochi-btn" aria-label="Mochi: things to do" aria-haspopup="menu" aria-expanded="false"></button>
     </div>
   </main>
 

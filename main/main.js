@@ -703,6 +703,8 @@ function registerIpc() {
     else if (action === 'seed') setTheme({ seed: String(value), useWindowsAccent: false });
     else if (action === 'search') setPrefs({ searchEngine: String(value) });
     else if (action === 'ai') setPrefs({ aiProvider: String(value) });
+    else if (action === 'eyes') setPrefs({ eyeBreaks: Number(value) });
+    else if (action === 'bedtime') setPrefs({ bedtime: String(value) });
     else if (action === 'signin') {
       // Opens the AI's own sign-in page in a normal tab — you sign in on their site; Burrow never sees it.
       const p = AI.PROVIDERS[String(value)];
@@ -789,6 +791,27 @@ function registerIpc() {
     w?.send('mochi-say', { text: `${u.host} isn't secure. Don't type passwords here`, pose: 'oops', essential: true, ms: 9000 });
   });
   // ---- New tab: the stat line (and the weekly nudge) ----
+  // ---- Mochi's menu on the new tab (burrow://newtab only) ----
+  const newtabPage = (e) => isBurrowPage(e.sender) && e.sender.getURL().startsWith('burrow://newtab') && winOfPage(e.sender);
+  ipcMain.handle('page:mochi-info', (e) => {
+    const w = newtabPage(e);
+    if (!w) return null;
+    return { isPrivate: w.isPrivate, carrots: fun.state().carrots, session: focus.session?.phase || null, night: !!store.get('nightMode') };
+  });
+  ipcMain.on('page:mochi', (e, action) => {
+    const w = newtabPage(e);
+    if (!w) return;
+    if (action === 'hop') w.tabs.navigateFrom(e.sender, 'burrow://offline/?play=1');
+    if (w.isPrivate) return; // the rest is for normal windows
+    if (action === 'focus') { if (focus.session) focus.endSession(); else focus.startSession(); }
+    else if (action === 'tidy') {
+      const offer = care.offerTidy(w, true);
+      if (offer) w.send('care-tidy-open', offer);
+      else w.send('mochi-say', { text: 'All tidy! No duplicates or forgotten tabs.', pose: 'happy', essential: true });
+    } else if (action === 'report') w.tabs.navigateFrom(e.sender, REPORT);
+    else if (action === 'wardrobe' || action === 'settings') w.openPanel('settings:mochi');
+    else if (action === 'night') setNight(!store.get('nightMode'));
+  });
   ipcMain.handle('page:statline', (e) => {
     const w = isBurrowPage(e.sender) && e.sender.getURL().startsWith('burrow://newtab') && winOfPage(e.sender);
     if (!w) return null;

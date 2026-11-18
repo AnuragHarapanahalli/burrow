@@ -60,14 +60,42 @@
         <p class="note">Sign in opens the service's own page in a tab. You sign in on their site &mdash; Burrow never sees your password.</p>
       </div>
 
-      <div class="step" data-step="5" aria-labelledby="h4" hidden>
-        <p class="pixel kicker">06 &mdash; KEYS</p>
+      <div class="step" data-step="5" aria-labelledby="hm" hidden>
+        <p class="pixel kicker">06 &mdash; MOCHI</p>
+        <h1 id="hm">I'm more than a mascot<span class="dot">.</span></h1>
+        <p class="lead">A few things I do &mdash; only when you want them. You can change all of this later in Settings.</p>
+        <div class="cards cards-3 mochi-cards">
+          <div class="card"><span class="n">Daily limits</span><span class="h">Give a site a daily budget. I warn you near the end, then eat the tab. Settings &rarr; Focus.</span></div>
+          <div class="card"><span class="n">Focus sessions</span><span class="h">25 minutes of focus, 5 of rest. Limited sites wait at a closed door. &#9776; &rarr; Focus.</span></div>
+          <div class="card"><span class="n">Your week</span><span class="h">Every Monday: where your time went, compared with last week. It stays on this PC.</span></div>
+          <div class="card"><span class="n">Tab helpers</span><span class="h">Right-click a tab &rarr; Remind me. I spot duplicate and forgotten tabs, and warn about risky downloads.</span></div>
+          <div class="card"><span class="n">Carrots &amp; outfits</span><span class="h">Focus, rest your eyes, keep your limits: earn carrots and dress me up. Click me on a new tab.</span></div>
+          <div class="card"><span class="n">Mochi Hop</span><span class="h">No internet? We play. Or any time: <kbd>Ctrl</kbd> <kbd>K</kbd> &rarr; &ldquo;Mochi Hop&rdquo;.</span></div>
+        </div>
+        <div class="mochi-set">
+          <div class="ms-row"><span class="pixel">EYE BREAKS</span>
+            <div class="seg" id="eyeSeg" role="radiogroup" aria-label="Eye breaks">
+              <button data-eyes="20" role="radio">Every 20 min</button>
+              <button data-eyes="0" role="radio">Off</button>
+            </div>
+          </div>
+          <div class="ms-row"><span class="pixel">BEDTIME</span>
+            <select id="bedSel" aria-label="Bedtime">
+              <option value="">Off</option><option value="22:00">22:00</option><option value="22:30">22:30</option>
+              <option value="23:00">23:00</option><option value="23:30">23:30</option><option value="00:00">00:00</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="step" data-step="6" aria-labelledby="h4" hidden>
+        <p class="pixel kicker">07 &mdash; KEYS</p>
         <h1 id="h4">Shortcuts worth knowing<span class="dot">.</span></h1>
         <div class="keys" id="keys"></div>
       </div>
 
-      <div class="step" data-step="6" aria-labelledby="h5" hidden>
-        <p class="pixel kicker">07 &mdash; GO</p>
+      <div class="step" data-step="7" aria-labelledby="h5" hidden>
+        <p class="pixel kicker">08 &mdash; GO</p>
         <h1 id="h5">You're all set<span class="dot">.</span></h1>
         <dl class="summary" id="summary"></dl>
         <button class="go" id="go">Start browsing &rarr;</button>
@@ -76,7 +104,7 @@
 
       <footer class="nav">
         <button class="back" id="back">&larr; Back</button>
-        <span class="pixel count" id="count">01 / 07</span>
+        <span class="pixel count" id="count">01 / 08</span>
         <button class="next" id="next">Next &rarr;</button>
       </footer>
     </section>

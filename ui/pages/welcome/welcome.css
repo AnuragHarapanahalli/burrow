@@ -119,3 +119,11 @@ button.card[aria-checked="true"] .h { color: var(--accent); }
 #impCards .card[aria-checked="true"] .imp-state { color: var(--accent); }
 .link-btn { border-bottom: 1px solid currentColor; font-weight: 600; padding: 0; }
 .link-btn:hover { color: var(--accent-ink); }
+
+/* Mochi step */
+.mochi-cards .card { display: flex; flex-direction: column; gap: 6px; }
+.mochi-cards .h { line-height: 1.45; }
+.mochi-set { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 18px; }
+.ms-row { display: flex; align-items: center; gap: 12px; }
+.ms-row .pixel { font-size: 11px; color: var(--muted); }
+.ms-row select { height: 34px; border: 1px solid var(--fg); background: var(--surface); color: var(--fg); font: inherit; padding: 0 8px; }

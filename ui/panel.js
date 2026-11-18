@@ -26,7 +26,11 @@ window.openPanel = openPanel;
 $('dlBtn').onclick = () => (!panel.hidden && section === 'downloads' ? closePanel() : openPanel('downloads'));
 $('panelClose').onclick = closePanel;
 $('panelNav').addEventListener('click', (e) => { const b = e.target.closest('[data-section]'); if (b) openPanel(b.dataset.section); });
-B.onOpenPanel((name) => openPanel(name));
+B.onOpenPanel((name) => {
+  const [p, sect] = String(name || '').split(':');
+  openPanel(p);
+  if (sect) setTimeout(() => { const d = $(sect + 'Sect'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); } }, 80);
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !panel.hidden && !UI.editing && overlay.hidden) closePanel();
 });

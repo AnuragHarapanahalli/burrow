@@ -125,6 +125,7 @@ let mochiMode = 'lively';
 // `explicit` = you did something (clicked Mochi, picked an engine): shown even in Quiet mode.
 function say(text, ms = 4000, explicit = false) {
   if (mochiMode === 'off' || (mochiMode === 'quiet' && !explicit)) return;
+  if (!explicit && !$('mochiMenu').hidden) return; // don't talk over the open menu
   const b = $('bubble');
   b.textContent = text;
   b.hidden = false;
@@ -138,11 +139,68 @@ function blink() {
 }
 setInterval(blink, 4200);
 
-$('mochi').addEventListener('click', () => {
+function pet() {
   pose = 'happy'; drawMochi();
   say(POKES[poke++ % POKES.length], 2500, true);
   setTimeout(() => { pose = 'idle'; drawMochi(); }, 900);
+}
+
+// ---------- Click Mochi: a little menu of things to do together ----------
+const MM_ICON = { pet: '\u2665', hop: '\u25B2', focus: '\u25F7', tidy: '\u2713', report: '\u2261', wardrobe: '\u25C6', night: '\u263E', settings: '\u2026' };
+async function openMochiMenu() {
+  const info = (await window.burrowPage.mochiInfo?.()) || { isPrivate: true };
+  const items = [
+    ['pet', 'Pet Mochi'],
+    ['hop', 'Play Mochi Hop'],
+  ];
+  if (!info.isPrivate) {
+    items.push(null,
+      ['focus', info.session === 'focus' ? 'End the focus session' : info.session === 'break' ? 'Skip the break' : 'Start a 25-minute focus session'],
+      ['tidy', 'Tidy up my tabs'],
+      ['report', 'My week in Burrow'],
+      null,
+      ['wardrobe', 'Wardrobe'],
+      ['night', info.night ? 'Night mode off' : 'Night mode on'],
+      ['settings', 'Mochi settings']);
+  }
+  $('mmCarrots').textContent = info.isPrivate ? '' : `${info.carrots || 0} CARROT${info.carrots === 1 ? '' : 'S'}`;
+  $('mmItems').innerHTML = items.map((it) => (it
+    ? `<button class="mm-item" role="menuitem" data-mm="${it[0]}"><span class="ico" aria-hidden="true">${MM_ICON[it[0]]}</span>${it[1]}</button>`
+    : '<div class="mm-sep" role="separator"></div>')).join('');
+  $('bubble').hidden = true;
+  $('mochiMenu').hidden = false;
+  $('mochi').setAttribute('aria-expanded', 'true');
+  pose = 'wave'; drawMochi();
+  $('mmItems').querySelector('.mm-item')?.focus();
+}
+function closeMochiMenu() {
+  if ($('mochiMenu').hidden) return;
+  $('mochiMenu').hidden = true;
+  $('mochi').setAttribute('aria-expanded', 'false');
+  if (pose === 'wave') { pose = 'idle'; drawMochi(); }
+}
+window.openMochiMenu = openMochiMenu;
+$('mochi').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if ($('mochiMenu').hidden) openMochiMenu(); else closeMochiMenu();
 });
+$('mmItems').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mm]');
+  if (!b) return;
+  const act = b.dataset.mm;
+  closeMochiMenu();
+  if (act === 'pet') pet();
+  else window.burrowPage.mochiAction(act);
+});
+$('mochiMenu').addEventListener('keydown', (e) => {
+  const items = [...$('mmItems').querySelectorAll('.mm-item')];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+  } else if (e.key === 'Escape') { e.preventDefault(); closeMochiMenu(); $('mochi').focus(); }
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#mochiMenu')) closeMochiMenu(); });
 
 try {
   if (!sessionStorage.getItem('mochi-greeted')) {
