@@ -39,6 +39,7 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | **Releases are made by pushing a version tag** (GitHub Actions builds on Windows and publishes with GitHub's built-in token) | Release on every push to main; keep releasing from your PC | Every commit would otherwise reach everyone's Burrow at once; tags make releasing a deliberate step, and no personal token is needed on your PC |
 | 2026-11-18 | **Google sign-in:** on accounts.google.com only, Burrow presents itself as Firefox (request headers, the page's navigator.userAgent, no Chromium client hints); everywhere else it stays Chrome | Leave it (Google blocks sign-in); pretend to be Google Chrome everywhere | Google refuses sign-in from browsers it sees as embedded Chromium. Presenting as Firefox only there is the usual approach of independent browsers and changes nothing for other sites. Google could change its checks later |
 | 2026-11-18 | **MIT licence**; README with screenshots, issue templates (blank issues stay on for the in-app Report a bug) | GPL-3.0; no licence | Your pick: simple and common, and keeps the free SignPath signing option open |
 | 2026-11-18 | **Release via GitHub Releases with auto-update, unsigned for now** (phase 14) | SignPath free signing (needs an open-source licence); Microsoft Store; installer only | Simplest that really updates itself; signing can be added later without changing anything. Cost: a one-time SmartScreen warning on first install |
@@ -339,7 +340,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 2. In this folder, run `npm install` once (downloads Electron, ~100 MB).
 3. Run `npm start` to open Burrow.
 4. To make the Windows installer and portable copy: `npm run dist` → `dist/Burrow-Setup-<version>.exe` and `dist/Burrow-<version>-portable.exe` (nothing is uploaded).
-5. To release a new version (you, not Burrow): `npm version minor`, then set a GitHub token (`$env:GH_TOKEN = "…"`, a token with "repo" access) and run `npm run release` — it builds and uploads to GitHub Releases, and every installed Burrow updates itself.
+5. **To release a new version** (you decide when): `npm version patch` (or `minor`), then `git push --follow-tags`. Pushing the version tag makes GitHub build Burrow on its own Windows machine and publish the release (see `.github/workflows/release.yml`, progress under the repo's **Actions** tab); every installed Burrow then updates itself. Ordinary pushes without a tag never release anything. Backup, from your own PC: `$env:GH_TOKEN = [Environment]::GetEnvironmentVariable("GH_TOKEN", "User"); npm run release`.
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.

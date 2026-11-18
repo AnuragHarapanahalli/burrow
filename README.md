@@ -78,6 +78,8 @@ npm test           # Burrow's self-test (~2 minutes; `npm test -- phase8` for on
 npm run dist       # make the installer and portable .exe in dist/
 ```
 
+Releases: `npm version patch` then `git push --follow-tags` — GitHub builds and publishes the new version, and installed copies update themselves.
+
 Plain HTML, CSS and JavaScript on [Electron](https://www.electronjs.org) — no build step. How it all fits together, and why each decision was made, is in [PROJECT_JOURNAL.md](PROJECT_JOURNAL.md).
 
 ## Licence
