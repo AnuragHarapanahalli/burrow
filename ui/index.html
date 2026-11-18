@@ -43,6 +43,7 @@
         <button type="button" class="addr-chip" id="pipBtn" hidden title="Picture in picture: pop the video out" aria-label="Picture in picture">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2z"/><path class="pip-inner" d="M8 8h5v4H8z"/></svg>
         </button>
+        <span class="sec-chip pixel" id="secChip" hidden title="This page doesn't use HTTPS. Don't type passwords or card numbers here.">NOT SECURE</span>
         <span class="focus-chip pixel" id="focusChip" hidden title="Time left today"></span>
         <button type="button" class="addr-chip zoom-chip pixel" id="zoomBtn" hidden title="Reset zoom (Ctrl+0)"></button>
         <button type="button" class="addr-chip" id="readerBtn" hidden title="Reader view (F9)" aria-label="Reader view" aria-pressed="false">
@@ -217,6 +218,14 @@
             <button data-mochi="off" role="radio" title="No Mochi in the tab strip or on new tabs">Off</button>
           </div>
           <p class="sect-note" id="mochiNote"></p>
+          <div class="sect-sub pixel">EYE BREAKS</div>
+          <div class="seg" id="eyeSeg" role="radiogroup" aria-label="Eye breaks">
+            <button data-eye="0" role="radio">Off</button>
+            <button data-eye="20" role="radio">Every 20 min</button>
+            <button data-eye="30" role="radio">30 min</button>
+            <button data-eye="45" role="radio">45 min</button>
+          </div>
+          <p class="sect-note">Mochi asks you to look at something far away for 20 seconds, and to stretch after about 90 minutes. Only while you're using Burrow; not during fullscreen video.</p>
           <div class="mochi-gallery" id="mochiGallery" aria-label="Mochi's poses"></div>
         </div>
       </details>
@@ -295,6 +304,19 @@
     <div class="menu main-menu" id="mainMenu" hidden role="menu" aria-label="Menu"></div>
     <div class="menu bm-menu" id="bmMenu" hidden role="menu" aria-label="More bookmarks"></div>
     <div class="suggest" id="suggest" hidden role="listbox" aria-label="Suggestions"></div>
+    <div class="menu tidy-pop" id="tidyPop" hidden role="dialog" aria-label="Tidy up tabs">
+      <div class="menu-label pixel" id="tidyTitle">TIDY UP</div>
+      <div class="tidy-list" id="tidyList"></div>
+      <div class="pop-btns"><button type="button" id="tidyLater">Not now</button><button type="button" class="primary" id="tidyClose">Close ticked tabs</button></div>
+    </div>
+    <div class="menu remind-pop" id="remindPop" hidden role="dialog" aria-label="Remind me about this tab">
+      <div class="menu-label pixel">REMIND ME</div>
+      <form id="remindForm" novalidate>
+        <label>Bring this tab back at<input type="datetime-local" id="remindAt"></label>
+        <p class="bm-edit-err" id="remindErr" hidden>Pick a time later than now (up to 60 days ahead).</p>
+        <div class="pop-btns"><button type="button" id="remindCancel">Cancel</button><button type="submit" class="primary">Remind me</button></div>
+      </form>
+    </div>
     <div class="menu ctx-menu" id="ctxMenu" hidden role="menu" tabindex="-1" aria-label="Menu"></div>
     <div class="menu bm-edit" id="bmEdit" hidden role="dialog" aria-label="Edit bookmark">
       <div class="menu-label pixel">EDIT BOOKMARK</div>
@@ -343,5 +365,6 @@
   <script src="burrow://app/ui/focus-ui.js"></script>
   <script src="burrow://app/ui/volume.js"></script>
   <script src="burrow://app/ui/ctxmenu.js"></script>
+  <script src="burrow://app/ui/care-ui.js"></script>
 </body>
 </html>

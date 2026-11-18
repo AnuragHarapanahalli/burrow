@@ -48,6 +48,7 @@ class BurrowWindow {
         session: this.session, persist: false,
         onChange: (list) => this.send('downloads', list),
         onDone: (d) => this.send('download-done', d),
+        onRisky: (d) => this.send('download-risky', d),
       });
     } else {
       this.session = null; // default session

@@ -39,6 +39,9 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | Risky downloads are saved under a **temporary name** until you press Keep | Pause the download until you decide | Pausing races with the download starting; a temporary name can't be opened by accident and works even after a restart |
+| 2026-11-18 | "NOT SECURE" shows on every web page without HTTPS (your own computer's test servers excepted); Mochi only speaks up when you start typing a password | Warn on every such page | The chip is quiet and always there; Mochi only interrupts when it matters |
+| 2026-11-18 | Tab tidy-up keeps the copy you're looking at (or used last) and never offers tabs that are playing sound or kept awake; closed ones can be reopened | Close all duplicates | Nothing you're using disappears, and nothing is lost |
 | 2026-11-18 | Imported bookmarks keep their **folder as a label**; only the other browser's **bar items** go on Burrow's bookmarks bar | Put everything on the bar; build real folders | Burrow's bar showed every bookmark — 300 imported ones would bury yours. Real folders can come later |
 | 2026-11-18 | History is read with **Node's built-in SQLite** (in Electron 45), from a temporary copy | Add a SQLite library | Nothing extra to install; the copy works while the other browser is open and can't change its files |
 | 2026-11-17 | **Phases 10–13 planned** (details in PLAN.md): 10 right-click menus + window fixes, 11 import from other browsers, 12 helpful Mochi, 13 fun Mochi. The polish/installer phase moves to 14 | Do them inside the polish phase | Each is big enough to build, test and merge on its own |
@@ -224,6 +227,11 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Last tab closes the window | ✅ done (tested, incl. workspace and Mochi exceptions) |
 | Drag a window's only tab onto another window; drop where you let go, with a marker | ✅ done (tested) |
 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox (Settings → Import, welcome tour, Ctrl+K) | ✅ done (tested with fake profiles; counts checked on your real Chrome + Edge) |
+| Eye breaks (20 s every 20/30/45 min) + 90-minute stretch nudge | ✅ done (tested) |
+| Tab tidy-up: duplicates + tabs not opened in 3 days, with a review list | ✅ done (tested) |
+| Remind me about this tab (1 h, this evening, tomorrow morning, pick a time) | ✅ done (tested) |
+| "NOT SECURE" chip + Mochi warning before typing a password without HTTPS | ✅ done (tested) |
+| Risky downloads (.exe, .bat…) held until you press Keep or Discard | ✅ done (tested) |
 | Windows installer | planned |
 
 ---
@@ -237,6 +245,7 @@ WOAHDAMN/
 ├─ main/                  ── the "brain" (Node.js, runs once) ──
 │  ├─ main.js             starts the app; settings, theme, burrow:// pages, permissions; routes messages to windows
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
+│  ├─ care.js             Mochi's helpful side: eye/stretch breaks, tab tidy-up, tab reminders
 │  ├─ importer.js         finds other browsers' profiles and reads their bookmarks + history (read-only copies)
 │  ├─ ctxmenu.js          right-click menus for web pages: what to offer, and running the chosen item
 │  ├─ stats.js            weekly report data: time per site per day + daily counts, kept 5 weeks (stats.json)
@@ -271,6 +280,7 @@ WOAHDAMN/
    ├─ mochi-react.js      Mochi's little reactions (bookmarks, workspaces, late nights…)
    ├─ focus-ui.js         the countdown chip, focus-session bar, and Mochi eating a tab
    ├─ volume.js           the tab volume slider
+   ├─ care-ui.js          eye-break countdown, tidy-up list, "remind me" picker, risky-download warning
    ├─ ctxmenu.js          right-click menus: the menu itself, tabs, strip, bookmarks bar, text boxes, drop marker
    └─ pages/newtab/       the new-tab page (clock, search, Mochi, search-engine chooser)
       ├─ quicklinks.js    the editable quick links
@@ -294,7 +304,7 @@ scripts/selftest.js       `npm test`: runs the self-test (all of it, or chosen p
 
 **Checking nothing broke (the self-test):**
 - `npm test` runs every check (about 200, under 2 minutes). Burrow opens, drives itself, then closes. Don't click in its window while it runs.
-- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, windows. Several work too: `npm test -- phase7 phase8`.
+- `npm test -- phase8` runs one part only (about 40 s). Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, windows. Several work too: `npm test -- phase7 phase8`.
 - It prints only the parts, how long each took, and anything that failed. Screenshots and the full log go to `.selftest/` (not saved in Git). It uses its own throwaway profile, so your real Burrow is untouched.
 
 Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. Delete it to reset Burrow. History, bookmarks and the downloads list sit next to it in `history.json`, `bookmarks.json` and `downloads.json`.
@@ -421,13 +431,19 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Gotcha found: Chrome stores visit times as microseconds since the year 1601 — numbers too big for ordinary JavaScript numbers. They're read as "BigInts" and converted.
 - The self-test builds fake Chrome (two profiles), Edge and Firefox profiles in its own folder, so it never reads your real browsers. Separately, a counts-only check on your real Chrome and Edge confirmed the real formats read correctly (nothing imported).
 
+**2026-11-18 — Phase 12 done (331/331 self-test checks pass, ~2.5 min)**
+- Helpful Mochi: eye breaks and stretch nudges, tab tidy-up, "remind me about this tab", a NOT SECURE chip with a password warning, and risky downloads held for Keep / Discard.
+- Bug found by the self-test: when picking which duplicate to keep, a copy opened later could win over the one on screen. The tab on screen now always wins.
+- Mochi's warnings were shortened after a screenshot showed the strip cutting off "click me".
+- When you last looked at each tab is now saved with your session, so "not opened in 3 days" still works after a restart.
+
 ## 10. Known issues / next up
 - White text on the accent colour is 4.4:1 for Signal red (light) and Klein (dark), just under the 4.5:1 accessibility target.
 - Websites can't use camera, mic, location or notifications yet (blocked until there's a permission prompt).
 - Tabs in other workspaces keep running in the background (uses memory) until tab sleeping is built.
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
-- **Next (phase 12):** helpful Mochi. Then fun Mochi (13), polish + installer (14).
+- **Next (phase 13):** fun Mochi. Then polish + installer (14).
 - Imported bookmark folders are shown as labels, not real folders you can open and close.
 - Right-click menus on media inside embedded frames (a YouTube video embedded on another site) may not control the video; the menu still shows. Phase 5b ("Ask AI about this page") is still postponed.
 - The weekly report counts time by website address, so a site's time is split if it uses several addresses (e.g. youtube.com and youtu.be).
@@ -450,8 +466,8 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 9 | New-tab stat + weekly report | ✅ done |
 | 10 | Right-click menus, last tab closes the window, drag tabs back between windows | ✅ done |
 | 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | ✅ done |
-| 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | next (planned) |
-| 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | planned |
+| 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | ✅ done |
+| 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | next (planned) |
 | 14 | Polish, accessibility, Windows installer | planned |
 | 15 | Password manager + password import | later |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |

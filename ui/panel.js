@@ -122,7 +122,11 @@ function renderDownloads() {
     ? list.map((d) => {
       const pct = d.total ? Math.round((d.received / d.total) * 100) : 0;
       let status, actions = '';
-      if (d.state === 'progressing' || d.state === 'paused') {
+      if (d.held) {
+        status = `<span class="dl-warn">A program from ${esc(host(d.url))}. Keep it only if you trust this site.</span>`;
+        actions = `<button class="text-btn" data-act="keep" data-id="${d.id}">Keep</button>
+          <button class="text-btn" data-act="discard" data-id="${d.id}">Discard</button>`;
+      } else if (d.state === 'progressing' || d.state === 'paused') {
         status = `${size(d.received)}${d.total ? ' of ' + size(d.total) : ''}${d.state === 'paused' ? ' &middot; paused' : ''}`;
         actions = `<button class="text-btn" data-act="pause" data-id="${d.id}">${d.state === 'paused' ? 'Resume' : 'Pause'}</button>
           <button class="text-btn" data-act="cancel" data-id="${d.id}">Cancel</button>`;
@@ -130,7 +134,7 @@ function renderDownloads() {
         status = d.exists ? `${size(d.total || d.received)} &middot; ${esc(host(d.url))}` : 'File moved or deleted';
         if (d.exists) actions = `<button class="text-btn" data-act="open" data-id="${d.id}">Open</button>
           <button class="text-btn" data-act="show" data-id="${d.id}">Show in folder</button>`;
-      } else status = d.state === 'cancelled' ? 'Cancelled' : 'Failed';
+      } else status = d.state === 'cancelled' ? 'Cancelled' : d.state === 'discarded' ? 'Discarded' : 'Failed';
       const bar = d.state === 'progressing' || d.state === 'paused' ? `<div class="bar"><span style="width:${pct}%"></span></div>` : '';
       return `<div class="dl${d.state === 'completed' && !d.exists ? ' gone' : ''}">
         <div class="name" title="${esc(d.path)}">${esc(d.filename)}</div>${bar}
@@ -216,6 +220,8 @@ function renderSettingsPane() {
   const mm = prefs.mochiMode || 'lively';
   document.querySelectorAll('#mochiSeg [data-mochi]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mochi === mm)));
   $('sumMochi').textContent = cap(mm);
+  const eye = Number(prefs.eyeBreaks) || 0;
+  document.querySelectorAll('#eyeSeg [data-eye]').forEach((b) => b.setAttribute('aria-checked', String(Number(b.dataset.eye) === eye)));
   $('mochiNote').textContent = {
     lively: 'Mochi reacts to bookmarks, new workspaces, split view and more, at most every 25 seconds.',
     quiet: 'Mochi only speaks up for important things: finished downloads, tabs put to sleep, and problems.',
@@ -340,6 +346,10 @@ $('mochiSeg').addEventListener('click', (e) => {
   if (!b) return;
   B.setPrefs({ mochiMode: b.dataset.mochi });
   if (b.dataset.mochi !== 'off') setTimeout(() => window.mochiSay?.(b.dataset.mochi === 'quiet' ? "I'll keep it short" : 'Yay, chatty me!', { pose: 'wave', essential: true, ms: 2500 }), 150);
+});
+$('eyeSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-eye]');
+  if (b) B.setPrefs({ eyeBreaks: Number(b.dataset.eye) });
 });
 $('sleepSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-sleep]');

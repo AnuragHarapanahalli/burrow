@@ -19,6 +19,15 @@ const MAX_CLOSED = 25;
 let nextTabId = 1;
 let nextWsId = 1;
 
+// A web page without HTTPS (your own computer's test servers don't count).
+function insecurePage(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'http:') return false;
+    return process.env.BURROW_SELFTEST ? true : !/^(localhost|127\.0\.0\.1|\[::1\])$/i.test(u.hostname);
+  } catch { return false; }
+}
+
 class Tabs {
   constructor({ win, store, session, persist = true, zoom, gate, onChange, onInput, onVisit, onTitle, onSave }) {
     this.gate = gate || (() => null); // focus tools: returns the gate page to show instead of a URL, or null
@@ -632,6 +641,7 @@ class Tabs {
           canBack: nav ? nav.canGoBack() : false,
           canForward: nav ? nav.canGoForward() : false,
           asleep: !!t.asleep,
+          insecure: insecurePage(t.url),
           volume: this.volumeOf(t),
           volumeRemembered: this.siteVolume(t) !== undefined,
           boostOk: t.boostOk !== false,
@@ -652,7 +662,7 @@ class Tabs {
       current: this.currentWs,
       workspaces: this.workspaces.map((w) => {
         const tabs = this.tabs.filter((t) => t.ws === w.id);
-        return { id: w.id, name: w.name, tabs: tabs.map((t) => ({ url: t.url, title: t.title, favicon: t.favicon })), active: Math.max(0, tabs.findIndex((t) => t.id === w.activeId)) };
+        return { id: w.id, name: w.name, tabs: tabs.map((t) => ({ url: t.url, title: t.title, favicon: t.favicon, seen: t.lastActive })), active: Math.max(0, tabs.findIndex((t) => t.id === w.activeId)) };
       }),
     };
   }
@@ -700,6 +710,8 @@ class Tabs {
         title: typeof t.title === 'string' ? t.title.slice(0, 300) : undefined,
         favicon: /^https?:/i.test(t.favicon || '') ? t.favicon : null,
       }));
+      // When you last looked at each tab survives restarts (tab tidy-up uses it).
+      made.forEach((t, j) => { const seen = Number(items[j].seen); if (seen > 0 && seen <= Date.now()) t.lastActive = seen; });
       const pick = made[Math.min(Number(w.active) || 0, made.length - 1)];
       if (pick) ws.activeId = pick.id;
     });

@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -67,7 +67,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     if (section('basics')) {
     // --- Search engine chooser on the new tab ---
@@ -1392,6 +1392,148 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await until(() => w11("document.querySelector('#impCards [data-import=\"chrome:Profile 1\"]').getAttribute('aria-checked') === 'true'")) && library.bookmarks.some((b) => b.url === 'https://jira.example.com/'), 'one click in the tour imports that browser');
     await shot('41-import-tour', true);
     tabs.close(wt11.id);
+    }
+    if (section('phase12')) {
+    // ================= Phase 12: Mochi, helpful =================
+    const care = getCare();
+    const stats12 = getStats();
+    care.idleSeconds = () => 0;
+    care.winActive = (w) => w === mainWin;
+    const http12 = require('http');
+    const srv12 = http12.createServer((req, res) => {
+      if (req.url.startsWith('/setup.exe')) {
+        res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-disposition': 'attachment; filename="setup.exe"' });
+        return res.end(Buffer.alloc(2048, 7));
+      }
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>Page ' + req.url + '</title><form><input id="user"><input id="pw" type="password"></form>');
+    });
+    await new Promise((r) => srv12.listen(0, '127.0.0.1', r));
+    const base12 = 'http://127.0.0.1:' + srv12.address().port;
+    const clearStrip = () => js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
+
+    // --- Eye breaks ---
+    setPrefs({ eyeBreaks: 20, mochiMode: 'lively' });
+    await clearStrip();
+    care.eyeSec = 20 * 60 - 2;
+    check(await until(() => js("UI.mochiLog.some((m) => m.text === 'Look at something far away for 20 seconds')"), 5000), 'after 20 minutes of screen time Mochi asks you to look far away');
+    check(await until(() => js("/Look far away\u2026 1[0-9]/.test(document.getElementById('stripBubble').textContent)"), 3000), 'with a 20-second countdown');
+    await shot('42-eye-break');
+    const eyesBefore = stats12.day().eyes || 0;
+    await js('UI.eyeBreak.left = 1');
+    check(await until(() => js('UI.eyeBreak.done'), 4000) && await until(() => (stats12.day().eyes || 0) === eyesBefore + 1), 'when it ends Mochi says thanks (and it counts)');
+    setPrefs({ eyeBreaks: 0 });
+    await clearStrip();
+    care.eyeSec = 99999;
+    care.longSec = 0;
+    await wait(1500);
+    check(!(await js("UI.mochiLog.some((m) => /far away/.test(m.text))")), 'eye breaks can be switched off');
+    care.longSec = 90 * 60 - 1;
+    check(await until(() => js("UI.mochiLog.some((m) => /90 minutes in/.test(m.text))"), 4000), 'after 90 minutes in one go, a stretch nudge');
+    await js("openPanel('settings')");
+    await wait(300);
+    await js("document.querySelectorAll('#panel details.sect')[6].open = true");
+    await js("document.querySelector('#eyeSeg [data-eye=\"30\"]').click()");
+    check(await until(() => store.get('eyeBreaks') === 30), 'Settings → Mochi sets how often (30 minutes)');
+    await js("closePanel()");
+    setPrefs({ eyeBreaks: 0 });
+    care.eyeSec = 0; care.longSec = 0;
+
+    // --- Tab tidy-up: duplicates ---
+    const keepT = tabs.create(base12 + '/dup');
+    await ready(keepT);
+    const d1 = tabs.create(base12 + '/dup', { activate: false });
+    const d2 = tabs.create(base12 + '/dup#section', { activate: false });
+    await wait(500);
+    await clearStrip();
+    const offer = care.offerTidy(mainWin, true);
+    check(offer && offer.kind === 'dupes' && offer.tabs.length === 2 && !offer.tabs.some((t) => t.id === keepT.id), 'duplicate tabs found (ignoring #parts); the one you are looking at is kept (' + JSON.stringify(offer && { kind: offer.kind, n: offer.tabs.length, text: offer.text }) + ')');
+    check(await until(() => js("UI.mochiLog.some((m) => /copies of 127\\.0\\.0\\.1/.test(m.text))")), 'Mochi offers: "3 copies of … open. Click me to tidy"');
+    await js("document.getElementById('stripMochi').click()");
+    check(await until(() => js("!document.getElementById('tidyPop').hidden && document.querySelectorAll('#tidyList [data-tab]').length === 2")), 'clicking Mochi shows the extras to review, all ticked');
+    await shot('43-tidy');
+    await js("document.getElementById('tidyClose').click()");
+    check(await until(() => !tabs.get(d1.id) && !tabs.get(d2.id) && !!tabs.get(keepT.id)), 'the extras close; your copy stays');
+    check(tabs.closed.some((c) => c.url.startsWith(base12 + '/dup')), 'closed tabs can come back with Ctrl+Shift+T');
+    check(care.offerTidy(mainWin, false) === null, 'Mochi offers each kind at most once a day');
+    // Forgotten tabs (and "when you last looked" survives a restart)
+    const o1 = tabs.create(base12 + '/old1', { activate: false });
+    const o2 = tabs.create(base12 + '/old2', { activate: false });
+    o1.lastActive = o2.lastActive = Date.now() - 4 * 864e5;
+    check(tabs.snapshot().workspaces.some((w) => w.tabs.some((t) => t.url.endsWith('/old1') && t.seen === o1.lastActive)), 'when you last looked at a tab is saved with the session');
+    await ui.webContents.executeJavaScript('crTidyNow()');
+    check(await until(() => js("!document.getElementById('tidyPop').hidden && document.getElementById('tidyTitle').textContent === 'FORGOTTEN TABS' && document.querySelectorAll('#tidyList [data-tab]').length >= 2")), 'Ctrl+K → Tidy up finds tabs you have not opened in 3 days');
+    await js("document.getElementById('tidyLater').click()");
+    tabs.close(o1.id); tabs.close(o2.id);
+
+    // --- Remind me about this tab ---
+    const rt = tabs.create(base12 + '/later');
+    await ready(rt);
+    store.set('reminders', []);
+    await js("(() => { const el = document.querySelector('#tabs [data-id=\"" + rt.id + "\"], #sideTabs [data-id=\"" + rt.id + "\"]'); const r = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 20, clientY: r.top + 10 })); })()");
+    await until(() => js("!document.getElementById('ctxMenu').hidden"));
+    await js("(() => { const b = [...document.querySelectorAll('#ctxMenu .cm-item')].find((x) => x.textContent.includes('Remind me')); b.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()");
+    check(await until(() => js("[...document.querySelectorAll('#ctxMenu .cm-sub')].some((s) => !s.hidden && s.textContent.includes('In 1 hour') && s.textContent.includes('Tomorrow morning'))")), 'the tab menu has Remind me ▸ in 1 hour / this evening / tomorrow morning / pick a time');
+    await shot('44-remind-menu');
+    await js("[...document.querySelectorAll('#ctxMenu .cm-sub:not([hidden]) .cm-item')].find((x) => x.textContent.includes('In 1 hour')).click()");
+    check(await until(() => !tabs.get(rt.id) && (store.get('reminders') || []).length === 1), 'the tab leaves and a reminder is saved');
+    const rem = store.get('reminders')[0];
+    check(Math.abs(rem.at - (Date.now() + 3600e3)) < 60e3 && rem.url === base12 + '/later', 'due in one hour, for that page');
+    check(await until(() => js('UI.reminders.length === 1')), 'the reminder is listed (Ctrl+K can bring it back early)');
+    await clearStrip();
+    store.set('reminders', [{ ...rem, at: Date.now() - 1000 }]);
+    care.checkReminders();
+    check(await until(() => tabs.visible.some((t) => t.url === base12 + '/later')) && (store.get('reminders') || []).length === 0, 'when it is due, Mochi brings the tab back');
+    check(await until(() => js("UI.mochiLog.some((m) => /^Back as promised/.test(m.text))")), 'and says "Back as promised"');
+    const back = tabs.visible.find((t) => t.url === base12 + '/later');
+    await ui.webContents.executeJavaScript('crRemind(' + back.id + ", 'pick', 300, 80)");
+    check(await until(() => js("!document.getElementById('remindPop').hidden")), 'Pick a time… opens a date and time picker');
+    await js("document.getElementById('remindAt').value = '2001-01-01T09:00'; document.getElementById('remindForm').requestSubmit()");
+    check(await until(() => js("!document.getElementById('remindErr').hidden")) && tabs.get(back.id), 'a time in the past is refused');
+    const later = new Date(Date.now() + 3 * 864e5); later.setHours(10, 0, 0, 0);
+    const pad = (n) => String(n).padStart(2, '0');
+    await js("document.getElementById('remindAt').value = '" + later.getFullYear() + '-' + pad(later.getMonth() + 1) + '-' + pad(later.getDate()) + "T10:00'; document.getElementById('remindForm').requestSubmit()");
+    check(await until(() => !tabs.get(back.id) && (store.get('reminders') || []).some((r) => r.at === later.getTime())), 'a time three days ahead is saved');
+    store.set('reminders', []);
+
+    // --- Safety: passwords on pages without HTTPS ---
+    const ip = tabs.create(base12 + '/login');
+    await ready(ip);
+    check(await until(() => js("!document.getElementById('secChip').hidden")), 'a page without HTTPS shows NOT SECURE in the address bar');
+    await clearStrip();
+    await ip.view.webContents.executeJavaScript("document.getElementById('user').focus()");
+    await wait(400);
+    check(!(await js("UI.mochiLog.some((m) => /isn't secure/.test(m.text))")), 'typing in a normal box says nothing');
+    await ip.view.webContents.executeJavaScript("document.getElementById('pw').focus()");
+    check(await until(() => js("UI.mochiLog.some((m) => /isn't secure\\. Don't type passwords/.test(m.text))")), 'starting to type a password there makes Mochi warn you');
+    await shot('45-insecure');
+    await ip.view.webContents.executeJavaScript("document.getElementById('user').focus(); document.getElementById('pw').focus()");
+    await wait(500);
+    check(await js("UI.mochiLog.filter((m) => /isn't secure/.test(m.text)).length") === 1, 'only once per page');
+    tabs.close(ip.id);
+
+    // --- Safety: risky downloads wait for Keep / Discard ---
+    await clearStrip();
+    keepT.view.webContents.downloadURL(base12 + '/setup.exe?1');
+    const held = () => downloads.state().find((d) => d.filename.startsWith('setup') && d.held);
+    check(await until(() => held() && held().state === 'completed', 8000), 'a program (.exe) downloads but is held');
+    const h1 = held();
+    check(fs.existsSync(h1.tmp) && !fs.existsSync(h1.path), 'it waits under a temporary name, not as setup.exe');
+    check(await until(() => js("UI.mochiLog.some((m) => /setup\\.exe is a program\\. Click me/.test(m.text))")), 'Mochi warns: "… is a program. Click me to keep or discard"');
+    await js("openPanel('downloads')");
+    check(await until(() => js("!!document.querySelector('#dlList [data-act=keep]') && !!document.querySelector('#dlList [data-act=discard]')")), 'Downloads shows Keep and Discard');
+    await shot('46-risky-download');
+    await js("document.querySelector('#dlList [data-act=keep]').click()");
+    check(await until(() => { const d = downloads.find(h1.id); return d && !d.held && fs.existsSync(d.path) && !fs.existsSync(h1.tmp); }), 'Keep gives it its real name');
+    keepT.view.webContents.downloadURL(base12 + '/setup.exe?2');
+    check(await until(() => held() && held().state === 'completed', 8000), 'another one is held');
+    const h2 = held();
+    await until(() => js("!!document.querySelector('#dlList [data-act=discard]')"));
+    await js("document.querySelector('#dlList [data-act=discard]').click()");
+    check(await until(() => downloads.find(h2.id)?.state === 'discarded' && !fs.existsSync(h2.tmp) && !fs.existsSync(h2.path)), 'Discard deletes it');
+    await js("closePanel()");
+    tabs.close(keepT.id);
+    srv12.close();
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

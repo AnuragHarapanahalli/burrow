@@ -31,3 +31,15 @@ if (location.protocol === 'burrow:') {
     }),
   });
 }
+
+// Every web page: if you start typing in a password box on a page without HTTPS, tell Burrow so Mochi
+// can warn you. The page learns nothing and gets no access to Burrow.
+if (location.protocol === 'http:') {
+  let told = false;
+  window.addEventListener('focusin', (e) => {
+    const el = e.target;
+    if (told || !el || el.tagName !== 'INPUT' || String(el.type).toLowerCase() !== 'password') return;
+    told = true;
+    ipcRenderer.send('page:insecure-password');
+  }, true);
+}

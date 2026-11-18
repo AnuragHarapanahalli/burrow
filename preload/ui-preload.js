@@ -18,6 +18,18 @@ contextBridge.exposeInMainWorld('burrow', {
   openWindow: send('window:new'),
   otherWindows: () => ipcRenderer.invoke('windows:others'),
   readClipboard: () => ipcRenderer.invoke('clip:read'),
+  care: {
+    onEye: listen('care-eye'),
+    eyeDone: send('care:eye-done'),
+    onTidy: listen('care-tidy'),
+    tidy: () => ipcRenderer.invoke('care:tidy'),
+    closeTabs: send('care:close-tabs'),
+    remind: (id, at) => ipcRenderer.invoke('tab:remind', id, at),
+    reminders: () => ipcRenderer.invoke('reminders:list'),
+    onReminders: listen('reminders'),
+    openReminder: send('reminders:open'),
+    cancelReminder: send('reminders:cancel'),
+  },
   importer: {
     sources: () => ipcRenderer.invoke('import:sources'),
     run: (id, want) => ipcRenderer.invoke('import:run', id, want),
@@ -128,6 +140,9 @@ contextBridge.exposeInMainWorld('burrow', {
     clear: send('dl:clear'),
     onChange: listen('downloads'),
     onDone: listen('download-done'),
+    onRisky: listen('download-risky'),
+    keep: send('dl:keep'),
+    discard: send('dl:discard'),
   },
   theme: {
     set: send('theme:set'),

@@ -132,6 +132,7 @@ async function cmTabMenu(id, x, y) {
     active
       ? { id: 'split', label: UI.state.split ? 'Close split view' : 'Split with…', key: 'CTRL \\' }
       : { id: 'split-with', label: 'Show beside the current tab' },
+    ...(priv || !/^https?:/.test(t.rawUrl || t.url || '') ? [] : [{ id: 'remind', label: 'Remind me about this tab', sub: window.crRemindItems ? window.crRemindItems() : [] }]),
     ...(priv ? [] : [{ id: 'ws', label: 'Move to workspace', sub: [
       ...spaces.map((w) => ({ id: `ws:${w.id}`, label: w.name })),
       ...(spaces.length ? [{ sep: true }] : []),
@@ -168,6 +169,7 @@ async function cmTabMenu(id, x, y) {
     else if (k === 'close-others') B.tabs.closeOthers(id);
     else if (k === 'close-right') B.tabs.closeRight(id);
     else if (k === 'reopen') B.tabs.reopen();
+    else if (k === 'remind') setTimeout(() => window.crRemind?.(id, v, x, y), 0);
   });
 }
 window.cmTabMenu = cmTabMenu;

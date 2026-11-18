@@ -13,6 +13,8 @@ const SETTINGS_DEFAULTS = {
   bookmarksBar: true,
   onboarded: false,
   sleep: { on: true, minutes: 30, never: [] }, // tab sleeping: unload tabs you haven't looked at for a while
+  eyeBreaks: 20,         // minutes between "look far away" nudges (0 = off)
+  reminders: [],         // tabs Mochi will bring back later
   reportOn: true,        // record time for the weekly report (Settings → Focus)
   mochiMode: 'lively',   // lively (all of Mochi's reactions) | quiet (only important ones) | off      // the welcome tour has been finished or skipped
   aiProvider: 'claude',  // Ask AI: claude | chatgpt | gemini

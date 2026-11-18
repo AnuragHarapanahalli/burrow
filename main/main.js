@@ -11,6 +11,7 @@ const { Notes } = require('./notes');
 const { Focus, pretty: sitePretty } = require('./focus');
 const { Stats } = require('./stats');
 const { Importer, topSites } = require('./importer');
+const { Care } = require('./care');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -60,7 +61,7 @@ if (SELFTEST) {
   app.commandLine.appendSwitch('disable-background-timer-throttling');
 }
 
-let store, library, downloads, notes, focus, stats;
+let store, library, downloads, notes, focus, stats, care;
 const windows = new Set();
 let mainWin = null;          // the first normal window (used by the self-test)
 const sessions = new Map();  // normal window -> its saved tabs, in the order windows were opened
@@ -128,6 +129,7 @@ function themePayload(isPrivate = false) {
     aiProviders: AI.list(),
     sleep: store.get('sleep'),
     mochiMode: store.get('mochiMode'),
+    eyeBreaks: Number(store.get('eyeBreaks')) || 0,
     reportOn: store.get('reportOn') !== false,
     engines: Object.entries(ENGINES).map(([id, e]) => ({ id, name: e.name, host: new URL(e.url).host.replace(/^www\./, '') })),
   };
@@ -157,6 +159,7 @@ function setPrefs(patch) {
   if (patch?.aiProvider) everyWindow((w) => w.onAIProviderChange?.());
   if (['lively', 'quiet', 'off'].includes(patch?.mochiMode)) store.set('mochiMode', patch.mochiMode);
   if (typeof patch?.reportOn === 'boolean') store.set('reportOn', patch.reportOn);
+  if ([0, 20, 30, 45].includes(patch?.eyeBreaks)) store.set('eyeBreaks', patch.eyeBreaks);
   if (patch?.sleep && typeof patch.sleep === 'object') {
     const cur = { ...store.get('sleep') };
     if (typeof patch.sleep.on === 'boolean') cur.on = patch.sleep.on;
@@ -247,6 +250,27 @@ function startFocus() {
       everyWindow((w) => { if (say) w.send('mochi-say', { text: say[0], pose: say[1], essential: true }); });
     },
   });
+}
+
+// ---------------- Mochi, helpful: breaks, tidy-up, reminders ----------------
+const remindersChanged = () => everyWindow((w) => w.send('reminders', care.list()));
+function startCare() {
+  care = new Care({
+    store,
+    getWindows: () => [...windows],
+    mochiOn: () => store.get('mochiMode') !== 'off',
+    onEye: (w) => w.send('care-eye', { seconds: 20 }),
+    onStretch: (w) => w.send('mochi-say', { text: "90 minutes in. Stand up and stretch for a minute?", pose: 'wave', essential: true, ms: 9000 }),
+    onTidy: (w, offer) => w.send('care-tidy', offer),
+    onReminder: (r) => {
+      const w = normalWindows().find((x) => x.win.isFocused()) || normalWindows()[0];
+      if (!w) return;
+      w.tabs.create(r.url, { title: r.title });
+      w.send('mochi-say', { text: `Back as promised: ${r.title.slice(0, 40)}`, pose: 'wave', essential: true, ms: 8000 });
+      remindersChanged();
+    },
+  });
+  setTimeout(() => care.checkReminders(), 4000); // reminders that came due while Burrow was closed
 }
 
 // ---------------- Import from other browsers ----------------
@@ -398,6 +422,22 @@ function registerIpc() {
   // Clipboard text for Burrow's own text boxes (Paste in the right-click menu). Websites can't read it.
   handle('clip:read', () => clipboard.readText());
   // Import from other browsers (Settings → Import, Ctrl+K)
+  // Mochi, helpful
+  on('care:eye-done', () => stats.event('eyes'));
+  handle('care:tidy', (w) => (w.isPrivate ? null : care.offerTidy(w, true)));
+  on('care:close-tabs', (w, ids) => { for (const id of (Array.isArray(ids) ? ids : []).slice(0, 200)) w.tabs.close(Number(id), { keepWindow: true }); });
+  handle('tab:remind', (w, id, at) => {
+    if (w.isPrivate) return null;
+    const t = w.tabs.get(Number(id));
+    const r = care.add(t, Number(at));
+    if (r) { w.tabs.close(t.id, { keepWindow: true }); remindersChanged(); }
+    return r;
+  });
+  handle('reminders:list', () => care.list());
+  on('reminders:open', (w, id) => { const r = care.remove(Number(id)); if (r) { w.tabs.create(r.url, { title: r.title }); remindersChanged(); } });
+  on('reminders:cancel', (_w, id) => { care.remove(Number(id)); remindersChanged(); });
+  on('dl:keep', (w, id) => w.downloads.keep(Number(id)));
+  on('dl:discard', (w, id) => w.downloads.discard(Number(id)));
   handle('import:sources', (w) => (w.isPrivate ? [] : importSources()));
   handle('import:run', (w, id, want) => (w.isPrivate ? null : runImport(id, want)));
   handle('import:quicklinks', (w, sites) => (w.isPrivate ? 0 : addQuickLinks(sites)));
@@ -665,6 +705,19 @@ function registerIpc() {
     else if (action === 'open' && /^https?:\/\//i.test(String(value || ''))) g.w.tabs.navigateFrom(wc, String(value));
     else if (action === 'continue' && g.original && !focus.gateFor(g.original)) g.w.tabs.navigateFrom(wc, g.original);
   });
+  // ---- A password box on a page without HTTPS (any web page may send this; it only shows a warning) ----
+  const warnedPages = new Set();
+  ipcMain.on('page:insecure-password', (e) => {
+    let u;
+    try { u = new URL(e.sender.getURL()); } catch { return; }
+    if (u.protocol !== 'http:') return;
+    if (!SELFTEST && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(u.hostname)) return;
+    const key = e.sender.id + ' ' + u.host;
+    if (warnedPages.has(key)) return;
+    warnedPages.add(key);
+    const w = winOfPage(e.sender);
+    w?.send('mochi-say', { text: `${u.host} isn't secure. Don't type passwords here`, pose: 'oops', essential: true, ms: 9000 });
+  });
   // ---- New tab: the stat line (and the weekly nudge) ----
   ipcMain.handle('page:statline', (e) => {
     const w = isBurrowPage(e.sender) && e.sender.getURL().startsWith('burrow://newtab') && winOfPage(e.sender);
@@ -721,11 +774,13 @@ app.whenReady().then(() => {
   });
   // Normal windows share one session, so they share one downloads list.
   startFocus();
+  startCare();
   notes = new Notes({ onChange: (host) => everyWindow((w) => w.send('notes-changed', host)) });
   downloads = new Downloads({
     session: session.defaultSession,
     onChange: (list) => normalWindows().forEach((w) => w.send('downloads', list)),
     onDone: (d) => normalWindows().forEach((w) => w.send('download-done', d)),
+    onRisky: (d) => normalWindows().forEach((w) => w.send('download-risky', d)),
   });
   protocol.handle('burrow', serveBurrow);
   setupSession(session.defaultSession);
@@ -744,7 +799,7 @@ app.whenReady().then(() => {
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care,
     });
   }
 });

@@ -156,6 +156,7 @@ function renderToolbar() {
   $('reload').title = t?.loading ? 'Stop' : 'Reload (Ctrl+R)';
   $('reload').setAttribute('aria-label', t?.loading ? 'Stop' : 'Reload');
   if (!UI.editing) address.value = t?.url || '';
+  $('secChip').hidden = !t?.insecure;
   address.placeholder = `Search ${engineName()} or type a URL`;
   // Zoom chip: only shows when the page isn't at 100%; click resets.
   const zoomBtn = $('zoomBtn');
@@ -255,6 +256,7 @@ function stripMochi(text, ms = 5000, pose = 'happy') {
 $('stripMochi').addEventListener('click', () => {
   $('stripMochi').hidden = true;
   if (UI.stripClickOpens === 'report') B.openReport();
+  else if (UI.stripClickOpens === 'tidy') window.openTidy?.();
   else if (UI.stripClickOpens) window.openPanel?.(UI.stripClickOpens);
 });
 // Messages from the main process (tabs put to sleep, "question copied", …).

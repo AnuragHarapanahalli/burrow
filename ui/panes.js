@@ -295,6 +295,14 @@ palActions = function () {
   list.push(sess
     ? A('End the focus session', () => B.focus.session('end'), '', 'focus pomodoro timer stop')
     : A('Start a focus session (25 min)', () => B.focus.session('start'), '', 'focus pomodoro timer work study'));
+  if (!UI.state.isPrivate) {
+    list.push(A('Tidy up tabs (duplicates, forgotten)', () => window.crTidyNow?.(), '', 'clean close duplicate old tabs mochi'));
+    for (const r of UI.reminders || []) {
+      const when = new Date(r.at).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+      list.push(A(`Bring back now: ${r.title.slice(0, 40)} (due ${when})`, () => B.care.openReminder(r.id), '', 'reminder remind later tab ' + r.url));
+      list.push(A(`Cancel reminder: ${r.title.slice(0, 40)}`, () => B.care.cancelReminder(r.id), '', 'reminder remind delete'));
+    }
+  }
   if (!UI.state.isPrivate) list.push(A('Weekly report', () => B.openReport(), '', 'stats week time screen report mochi'));
   if (!UI.state.isPrivate) list.push(A('Import bookmarks and history', () => { openPanel('settings'); setTimeout(() => { const d = $('importSect'); if (d) d.open = true; }, 50); }, '', 'import chrome edge firefox brave opera move switch browser'));
   list.push(A('Focus settings (time limits)', () => { openPanel('settings'); setTimeout(() => { const d = $('focusSect'); if (d) d.open = true; }, 50); }, '', 'limit time doomscroll'));
