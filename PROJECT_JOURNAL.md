@@ -497,6 +497,10 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Checked the packaged app itself (the files inside the installer) with three test parts. Found and fixed: before your first release, the installed app said "Couldn't check for updates" (GitHub has no releases yet); that now counts as "You have the latest version".
 - npm's audit flags some build tools (electron-builder's helpers); they only run on your PC to package Burrow and are not inside the app — the app's own packages have no known problems.
 
+**2026-11-18 — First release (v0.2.0) and a release fix**
+- Your first `npm run release` created **two** v0.2.0 releases: electron-builder uploads the installer and the portable copy at the same time, and when no release exists yet both uploads create one. `latest.yml` (needed for auto-update) didn't arrive.
+- Fix: `npm run release` now runs `scripts/release.js`, which creates the one release first (or stops if there are duplicates), then builds and uploads into it, and finally checks that all four files are there (installer, blockmap, portable, latest.yml).
+
 ## 10. Known issues / next up
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).
 - Picture-in-picture only finds videos on the page itself, not inside embedded frames (e.g. a YouTube video embedded on another site).
