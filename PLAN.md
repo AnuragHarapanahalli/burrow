@@ -112,7 +112,22 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
    - **Mochi grows + outfits**: carrots for focus sessions, days within limits, eye breaks taken and Mochi Hop scores; spend them on outfits (scarf, glasses, beanie, bow tie, cape…) in Settings → Mochi → Wardrobe. Purely for fun — never lost, never a penalty.
    - **Reading time + idle life**: a "7 MIN READ" chip for articles; Mochi naps when you're away and waves when you're back; on the new tab Mochi's eyes follow the cursor and it blinks, stretches and hops now and then.
    - **Bedtime wind-down** (off by default; you set the time): 30 minutes before, Mochi mentions it; at bedtime it offers night mode (a warm, dim Burrow theme and a gentle warm tint over pages, can be turned off) and every 30 minutes after, a soft "It's late" (a few times at most). Ends at 06:00.
-14. Polish, accessibility check (AA contrast for every seed colour), electron-builder Windows installer.
+14. **Polish, accessibility, Windows installer** (decided 2026-11-18):
+   - **Accessibility check**
+     - Every colour choice readable: the theme engine guarantees at least 4.5:1 for text on backgrounds and on the accent colour, for every preset and any custom colour, light and dark (fixes the known 4.4:1 cases). The self-test checks all presets plus 200 random colours.
+     - Keyboard: every control reachable with Tab, a visible focus ring everywhere, menus and pickers work with arrow keys / Enter / Esc.
+     - Screen readers: every icon-only button gets a name (the self-test lists any that don't); live areas for Mochi's messages.
+     - "Reduce animations" in Windows is respected everywhere.
+   - **Site permission prompts**: camera, microphone, location, notifications (today all silently blocked) → a bar under the toolbar: "example.com wants to use your camera — Allow / Block", remembered per site; **Settings → Site permissions** to change or forget them. Private windows ask every time and never remember. Fullscreen, copy and pointer lock stay allowed without asking.
+   - **Clear browsing data**: Settings section + Ctrl+Shift+Delete — history, cookies and site data, cached files, downloads list; last hour / day / week / all time. Weekly-report stats keep their own "Clear my stats".
+   - **Default browser**: the installer registers Burrow as a browser; Settings → "Make Burrow your default browser" opens Windows' default-apps page (Windows insists you confirm there). Links opened from other apps arrive as a new tab in the open Burrow window.
+   - **Crash page**: when a tab's page crashes, a Burrow page with Mochi fainted and a Reload button, instead of a blank tab. **Split view is remembered** after a restart.
+   - **Installer (electron-builder)**: a **one-click setup** (installs for your user in seconds, no admin; Start menu + desktop shortcuts; uninstaller in Windows Settings) **plus a portable .exe**. App name Burrow, the chosen icon (generated as a multi-size .ico from the pixel art).
+   - **Updates (electron-updater + GitHub Releases)**: Burrow checks on launch and every 6 hours, downloads quietly, then Mochi says "Update ready — restart to get vX.Y.Z". Settings → About: version, "Check for updates", "Restart to update". **Unsigned for now** (Windows shows "Windows protected your PC" on first install: More info → Run anyway); signing (SignPath or Microsoft Store) can be added later without changing anything else.
+   - **Releasing**: `npm version minor` then `npm run release` builds and uploads to GitHub Releases — this needs a GitHub token on your machine and is always run by you (Burrow never publishes on its own). First release: **v0.2.0**.
+   - **Tidying**: the self-test's download check uses a local test server (no internet needed); stale "known issues" are removed.
+   - **App icon**: **Mochi's pixel face on a Signal-red square** (chosen 2026-11-18 from five designs), drawn from Mochi's own sprite so it stays crisp from 16 px to 256 px.
+   - Self-test: contrast for all presets + random colours, unnamed buttons, the permission bar (a local page asks for notifications/geolocation → Allow / Block / remembered / private forgets), clearing each kind of data, crash page via a forced renderer crash, split restored from a saved session, update flow with simulated "update available / downloaded" events. The installer is checked by building it and confirming both files exist and launch.
 15. Later: **password manager** (encrypted with Windows' own protection, autofill on login forms, "save password?" prompt, revealing a password asks for your Windows PIN) **+ password import** from other browsers.
 16. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 

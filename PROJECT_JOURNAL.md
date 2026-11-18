@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-18 | **Release via GitHub Releases with auto-update, unsigned for now** (phase 14) | SignPath free signing (needs an open-source licence); Microsoft Store; installer only | Simplest that really updates itself; signing can be added later without changing anything. Cost: a one-time SmartScreen warning on first install |
+| 2026-11-18 | **One-click per-user installer + portable .exe** | One-click only; classic wizard | Installs in seconds without admin; the portable copy runs from a USB stick or a college PC |
+| 2026-11-18 | Phase 14 adds browser basics: **site permission prompts, clear browsing data, default browser, crash page + remembered split view** | Leave for later | Your picks; these are what people expect from a real browser |
+| 2026-11-18 | App icon: **Mochi's pixel face on a Signal-red square** | Full body, peeking, face on dark, "B." wordmark | Your pick; bold colour, readable even at 16 px in the taskbar |
+| 2026-11-18 | Releases are always **run by you** (`npm run release` with your GitHub token); Burrow never publishes anything by itself | Automatic publishing from the build | Publishing is public and permanent, so a person should press the button |
 | 2026-11-18 | Clicking Mochi on the new tab opens **a menu of things to do** (petting is one of them); private windows get only Pet and Mochi Hop | Keep clicking = a random line | You asked for Mochi to do stuff; a menu makes Mochi's features easy to find |
 | 2026-11-18 | Self-test speed-ups: Mochi's eat animation runs 4× faster *in tests only*; timer checks call Burrow's once-a-second timer directly; "pause then check" became "check until true" — except checks that something does **not** happen, which keep their pause | Shorter pauses everywhere | Faster without weakening what the tests prove |
 | 2026-11-18 | **Mochi Hop** is our own game: Mochi hops puddles and pebbles and collects carrots, drawn from Mochi's own sprite and your theme colours; five game carrots earn one real carrot (five a day) | A copy of a well-known offline game | Original, on-brand, and gives the carrots a playful source |
@@ -496,7 +501,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 11 | Import bookmarks + history from Chrome, Edge, Brave, Vivaldi, Opera, Firefox | ✅ done |
 | 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | ✅ done |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | ✅ done |
-| 14 | Polish, accessibility, Windows installer | next (planned) |
+| 14 | Polish, accessibility, site permissions, clear data, default browser, crash page, installer + auto-update (v0.2.0) | next (planned) |
 | 15 | Password manager + password import | later |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 
@@ -521,7 +526,7 @@ To bump it: `npm version patch` (or `minor` / `major`) — this edits package.js
 - Without a code-signing certificate (~$100–400/yr), Windows SmartScreen shows "Windows protected your PC" on first install (click *More info → Run anyway*). Updates still work. Fine for friends/college; buy a certificate later if Burrow goes public.
 - Private GitHub repos can't be used by the updater without putting a secret token inside the app, so the releases must be public.
 
-**Code signing — open decision (parked 2026-11-17, decide before the first public release):**
+**Code signing — decided 2026-11-18: unsigned for now (GitHub Releases + auto-update). Options for later:**
 - *Microsoft Store* (free for individuals; Store signs MSIX packages, no SmartScreen warning, Store handles updates; each version is reviewed). Recommended if Burrow stays closed-source.
 - *SignPath Foundation* (free, but Burrow must be open source with an OSI licence in a public repo; publisher shows as "SignPath Foundation"; builds run on GitHub Actions; works with GitHub Releases + auto-update).
 - Not suitable: Azure Artifact Signing (individuals only in USA/Canada, ~$9.99/mo); self-signed certificates (Windows doesn't trust them).
