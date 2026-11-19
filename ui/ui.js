@@ -287,7 +287,19 @@ window.addEventListener('DOMContentLoaded', () => { B.ready(); sendLayout(); });
 
 // ---------- Browser fullscreen (F11): the bars hide; at the top edge they slide back in ----------
 UI.full = null;
-B.fullscreen.onChange((mode) => { UI.full = mode; document.body.classList.toggle('is-full', !!mode); });
+UI.fs = null; // (the self-test reads this)
+// In fullscreen, Burrow's window shows only a small strip at the top centre: the exit note or the ✕.
+B.fullscreen.onChange((st) => {
+  UI.fs = st;
+  UI.full = st?.mode || null;
+  document.body.classList.toggle('is-full', !!st);
+  document.body.classList.toggle('fs-mini', !!st && !st.big && (!!st.hint || st.exit));
+  const hint = $('fsHint');
+  hint.hidden = !st?.hint;
+  if (st?.hint) hint.innerHTML = `Press <kbd>${st.hint === 'esc' ? 'Esc' : 'F11'}</kbd> to exit full screen`;
+  $('fsExit').hidden = !(st?.exit && st.mode === 'browser' && !st.hint);
+});
+$('fsExit').addEventListener('click', () => B.fullscreen.toggle());
 $('chrome').addEventListener('mouseenter', () => { if (UI.full === 'browser') B.fullscreen.peek(true); });
 $('chrome').addEventListener('mouseleave', () => {
   // Keep them while you're typing in the address bar or a menu is open.

@@ -235,3 +235,22 @@ body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--f
 #settingsBtn[aria-pressed="true"] svg .knob { fill: var(--fg); }
 #settingsBtn:hover:not([aria-pressed="true"]) svg .knob { fill: var(--hover); }
 .cc-settings:hover svg .knob { fill: var(--fg); }
+
+/* ---------- Fullscreen, like Chrome: the exit note and the ✕ at the top centre ---------- */
+/* (In fullscreen the interface is only a small strip at the top centre, so everything else hides.) */
+body.fs-mini > *:not(#fsHint):not(#fsExit) { visibility: hidden; }
+body.fs-mini { background: transparent; }
+.fs-hint, .fs-exit { position: fixed; left: 50%; transform: translateX(-50%); z-index: 50; }
+.fs-hint[hidden], .fs-exit[hidden] { display: none; }
+.fs-hint {
+  top: 14px; white-space: nowrap; padding: 9px 16px; border-radius: 999px;
+  background: rgba(20, 16, 17, .88); color: #fff; font-size: 14px; animation: fs-drop .2s var(--ease-out);
+}
+.fs-hint kbd { font-family: 'Silkscreen', monospace; font-size: 11px; border: 1px solid rgba(255, 255, 255, .7); padding: 1px 6px; margin: 0 3px; }
+.fs-exit {
+  top: 10px; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(20, 16, 17, .88); color: #fff; animation: fs-drop .18s var(--ease-out);
+}
+.fs-exit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.fs-exit:hover { background: var(--accent); color: var(--on-accent); }
+@keyframes fs-drop { from { transform: translate(-50%, -20px); opacity: 0; } }

@@ -1983,34 +1983,40 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     mainWin.win.focus();
     await wait(200);
     const size = () => mainWin.win.getContentSize();
-    // --- A page going fullscreen (like a video's ⛶ button) ---
+    // --- A page going fullscreen (like a video's ⛶ button), Chrome-style ---
+    const mini = () => { const u = mainWin.ui.getBounds(); return u.height > 0 && u.height <= 80 && u.width <= 470; };
     await vt.view.webContents.executeJavaScript("document.getElementById('box').requestFullscreen()", true);
     check(await until(() => mainWin.full === 'video' && mainWin.win.isFullScreen(), 5000), 'a video asking for fullscreen makes the window fullscreen');
     await wait(400);
     const vb = vt.view.getBounds(), [W, H] = size();
     check(vb.x === 0 && vb.y === 0 && vb.width === W && vb.height === H, 'and the page fills the whole window (' + vb.width + 'x' + vb.height + ' of ' + W + 'x' + H + ')');
-    check(mainWin.ui.getBounds().height === 0, "Burrow's tabs and address bar are hidden");
+    check(await until(() => js("!document.getElementById('fsHint').hidden && document.getElementById('fsHint').textContent === 'Press Esc to exit full screen'")) && mini(), 'like Chrome: "Press Esc to exit full screen" at the top for a moment (no toolbar)');
+    await capture(ui.webContents, path.join(dir, '55b-video-esc-hint-ui.png'));
     vt.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
     vt.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
     check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen(), 5000), 'Esc leaves fullscreen');
     await wait(300);
-    check(vt.view.getBounds().y === mainWin.layout.top && mainWin.ui.getBounds().height > 0, 'and the toolbar comes back');
-    // --- F11: browser fullscreen ---
+    check(vt.view.getBounds().y === mainWin.layout.top && mainWin.ui.getBounds().height > 100, 'and the toolbar comes back');
+    // --- F11: browser fullscreen, Chrome-style ---
     ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
     check(await until(() => mainWin.full === 'browser' && mainWin.win.isFullScreen(), 5000), 'F11 turns on full screen');
-    check(await until(() => js("UI.mochiLog.some((m) => /F11 to exit/.test(m.text))") || mainWin.peek), 'and says how to get the bars back (move to the top, F11 to exit)');
-    await until(() => !mainWin.peek, 5000);
-    mainWin.uiHovered = false; mainWin.setPeek(false); // (the real mouse pointer may be resting on the bars)
-    await wait(150);
-    await until(() => mainWin.ui.getBounds().height === 0 && vt.view.getBounds().y === 0, 3000); // (the window may still be animating into full screen)
-    check(mainWin.ui.getBounds().height === 0 && vt.view.getBounds().y === 0, 'the tabs and address bar hide; the page fills the screen' + ' (ui ' + JSON.stringify(mainWin.ui.getBounds()) + ', page ' + JSON.stringify(vt.view.getBounds()) + ', peek ' + mainWin.peek + ', overlay ' + mainWin.overlayOpen + ', shown ' + tabs.shownTabs.map((t) => t.id).join('+') + ' active ' + tabs.activeId + ' vt ' + vt.id + ')');
-    await shot('56-f11-hidden', true);
+    check(await until(() => js("!document.getElementById('fsHint').hidden && document.getElementById('fsHint').textContent === 'Press F11 to exit full screen'")) && mini(), 'with "Press F11 to exit full screen" at the top centre, like Chrome');
+    await capture(ui.webContents, path.join(dir, '56-f11-hint-ui.png'));
+    check(await until(() => mainWin.ui.getBounds().height === 0 && vt.view.getBounds().y === 0, 6000), 'then the note goes and the page fills the screen');
     vt.view.webContents.sendInputEvent({ type: 'mouseMove', x: 300, y: 1 });
-    check(await until(() => mainWin.peek && mainWin.ui.getBounds().height === mainWin.layout.top, 3000), 'moving the mouse to the top edge slides them back in');
-    await shot('57-f11-peek');
-    mainWin.setPeek(false);
+    check(await until(async () => (await js("!document.getElementById('fsExit').hidden")) && mini(), 3000), 'touching the top edge drops down a round \u2715 to exit');
+    await capture(ui.webContents, path.join(dir, '57-f11-exit-button-ui.png'));
+    vt.view.webContents.sendInputEvent({ type: 'mouseMove', x: 300, y: 400 });
+    check(await until(async () => mainWin.ui.getBounds().height === 0 && (await js("document.getElementById('fsExit').hidden")), 3000), 'moving away hides it again');
+    vt.view.webContents.sendInputEvent({ type: 'mouseMove', x: 300, y: 1 });
+    await until(() => js("!document.getElementById('fsExit').hidden"), 3000);
+    await js("document.getElementById('fsExit').click()");
+    check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen() && mainWin.ui.getBounds().height > 100, 5000), 'clicking \u2715 leaves full screen');
+    await wait(300);
     ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
-    check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen() && mainWin.ui.getBounds().height > 0, 5000), 'F11 again goes back to normal');
+    await until(() => mainWin.full === 'browser', 5000);
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
+    check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen() && mainWin.ui.getBounds().height > 100, 5000), 'and F11 again does too');
     await wait(400);
     // --- Back / forward: Alt+arrows (on the page and in the address bar), mouse side buttons, Alt+Home ---
     vt.view.webContents.loadURL(base22 + '/second');

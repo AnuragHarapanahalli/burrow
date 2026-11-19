@@ -7,7 +7,7 @@
       version: '0.2.2',
       title: 'Full screen, fixed',
       new: [
-        'F11 full screen: the page fills the screen; move the mouse to the top for tabs and the address bar.',
+        'F11 full screen, like Chrome: the page fills the screen; touch the top edge for a ✕ to exit.',
         'Settings has its own button in the toolbar, next to the menu (and Ctrl+,).',
         "Your mouse's side buttons go back and forward; Alt+Home opens a new tab page.",
         "This “What's new” note after every update.",

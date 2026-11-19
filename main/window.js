@@ -9,6 +9,8 @@ const AI = require('../shared/ai');
 
 const ROOT = path.join(__dirname, '..');
 const TITLEBAR_HEIGHT = 40;
+// In fullscreen, Burrow's interface shrinks to this strip at the top centre (the exit note and ✕).
+const FS_STRIP_W = 460, FS_STRIP_H = 76;
 const AI_HEAD = 36;          // the AI panel's header (drawn by Burrow's interface)
 const AI_MIN = 320, AI_MAX = 760;
 
@@ -106,7 +108,7 @@ class BurrowWindow {
     this.tabs.onFind = (r) => this.send('find-result', { active: r.activeMatchOrdinal, matches: r.matches });
     this.tabs.onContextMenu = (tab, params) => this.showPageMenu(tab, params);
     this.tabs.onHtmlFullscreen = (tab, on) => this.setHtmlFullscreen(tab, on);
-    this.tabs.onTopEdge = () => this.setPeek(true);
+    this.tabs.onTopEdge = (atTop) => this.setFsExit(atTop);
     this.tabs.nightOn = () => !isPrivate && !!ctx.store.get('nightMode') && ctx.store.get('nightTint') !== false;
     // The last tab closed (or dragged away): close this window.
     this.tabs.onEmpty = () => {
@@ -126,7 +128,7 @@ class BurrowWindow {
     // Fullscreen ended some other way (e.g. a Windows shortcut): put everything back.
     this.win.on('leave-full-screen', () => {
       if (this.full === 'video') this.exitFullscreen();
-      else if (this.full === 'browser') { this.full = null; this.peek = false; this.relayout(); this.tabs.raiseActive(); this.send('fullscreen', null); }
+      else if (this.full === 'browser') { this.full = null; this.peek = false; this.fsExit = false; this.fsHint = null; this.relayout(); this.tabs.raiseActive(); this.sendFullscreen(); }
     });
     // The back / forward buttons on the side of many mice.
     this.win.on('app-command', (_e, cmd) => {
@@ -180,13 +182,17 @@ class BurrowWindow {
     const [w, h] = this.win.getContentSize();
     const l = this.layout;
     if (this.full) {
-      // Fullscreen: the page fills the whole window. In browser fullscreen (F11) the tabs and address
-      // bar slide in while the mouse is at the top edge (or a menu is open).
-      const showUi = this.full === 'browser' && (this.peek || this.overlayOpen);
-      this.ui.setBounds({ x: 0, y: 0, width: w, height: showUi ? (this.overlayOpen ? h : l.top) : 0 });
+      // Fullscreen: the page fills the whole window, like Chrome. Burrow's interface only appears as
+      // a small strip at the top centre for the "Press F11 / Esc to exit" note and the ✕ exit button;
+      // whole, if a menu is open or you pressed Ctrl+L.
+      const big = this.overlayOpen || (this.full === 'browser' && this.peek);
+      const mini = !big && !!(this.fsHint || this.fsExit);
+      if (big) this.ui.setBounds({ x: 0, y: 0, width: w, height: this.overlayOpen ? h : l.top });
+      else if (mini) this.ui.setBounds({ x: Math.max(0, Math.round((w - FS_STRIP_W) / 2)), y: 0, width: Math.min(w, FS_STRIP_W), height: FS_STRIP_H });
+      else this.ui.setBounds({ x: 0, y: 0, width: w, height: 0 });
       this.tabs.setBounds({ x: 0, y: 0, width: w, height: h });
       if (this.aiView) this.aiView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-      if (showUi) this.win.contentView.addChildView(this.ui);
+      if (big || mini) this.win.contentView.addChildView(this.ui);
       return;
     }
     this.ui.setBounds({ x: 0, y: 0, width: w, height: h });
@@ -208,7 +214,7 @@ class BurrowWindow {
   // While a menu or suggestion list is open, the UI sits on top of the website.
   setOverlay(open) {
     this.overlayOpen = !!open;
-    if (this.full) { this.relayout(); if (!open) this.tabs.raiseActive(); return; }
+    if (this.full) { this.sendFullscreen(); this.relayout(); if (!open) this.tabs.raiseActive(); return; }
     if (open) this.win.contentView.addChildView(this.ui);
     else {
       this.tabs.raiseActive();
@@ -229,38 +235,65 @@ class BurrowWindow {
       if (!this.win.isFullScreen()) this.win.setFullScreen(true);
       this.relayout();
       this.tabs.raiseActive();
+      this.showFsHint('esc');
+      return;
     } else {
       if (this.full !== 'video') return;
       this.full = this.fullBefore || null;
       this.fullTab = null;
       this.peek = false;
+      this.fsHint = null;
+      this.fsExit = false;
+      clearTimeout(this.fsHintTimer);
       if (!this.windowWasFull && this.win.isFullScreen()) this.win.setFullScreen(false);
       if (this.tabs.activeId) this.tabs.activate(this.tabs.activeId); // brings split view back
       this.relayout();
       this.tabs.raiseActive();
     }
-    this.send('fullscreen', this.full);
+    this.sendFullscreen();
   }
-  // F11: browser fullscreen. Move the mouse to the top edge to see the tabs and address bar.
+  // F11: browser fullscreen, like Chrome — a "Press F11 to exit full screen" note for a few seconds,
+  // and a round ✕ that drops down when the mouse touches the top edge.
   toggleBrowserFull() {
     if (this.full === 'video') return;
     const on = this.full !== 'browser';
     this.full = on ? 'browser' : null;
     this.peek = false;
+    this.fsExit = false;
+    this.fsHint = null;
     this.win.setFullScreen(on);
     this.relayout();
     this.tabs.raiseActive();
-    this.send('fullscreen', this.full);
-    if (on) {
-      this.setPeek(true); // show the bars for a moment, with a hint
-      this.send('mochi-say', { text: 'Full screen: move to the top for tabs. F11 to exit', pose: 'wave', essential: true, ms: 3000 });
-      clearTimeout(this.peekTimer);
-      this.peekTimer = setTimeout(() => { if (!this.uiHovered) this.setPeek(false); }, 3200);
-    }
+    this.sendFullscreen();
+    if (on) this.showFsHint('f11');
+  }
+  // The interface draws the note / ✕ from this.
+  sendFullscreen() { this.send('fullscreen', this.full ? { mode: this.full, hint: this.fsHint || null, exit: !!this.fsExit, big: !!(this.overlayOpen || this.peek) } : null); }
+  // "Press F11 / Esc to exit full screen", for a few seconds.
+  showFsHint(kind) {
+    this.fsHint = kind;
+    this.sendFullscreen();
+    this.relayout();
+    clearTimeout(this.fsHintTimer);
+    this.fsHintTimer = setTimeout(() => {
+      this.fsHint = null;
+      this.sendFullscreen();
+      this.relayout();
+      if (this.full) this.tabs.raiseActive();
+    }, 3500);
+  }
+  // The mouse at the very top in F11 full screen: the ✕ drops down; moving away hides it.
+  setFsExit(on) {
+    if (this.full !== 'browser' || this.fsExit === !!on) return;
+    this.fsExit = !!on;
+    this.sendFullscreen();
+    this.relayout();
+    if (!on) this.tabs.raiseActive();
   }
   setPeek(on) {
     if (this.full !== 'browser' || this.peek === !!on) return;
     this.peek = !!on;
+    this.sendFullscreen();
     this.relayout();
     if (!on) this.tabs.raiseActive();
   }

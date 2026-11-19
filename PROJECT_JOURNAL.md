@@ -505,7 +505,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 
 **2026-11-19 — v0.2.2 fixes**
 - **Video fullscreen fixed.** Burrow's tabs are separate views inside its window, so a page going fullscreen only filled its own box. Now the window goes fullscreen, that page fills it, and Burrow's bars hide; Esc (or the video's button) brings everything back. In split view, just that side goes fullscreen.
-- **F11 full screen:** the page fills the screen; the tabs and address bar slide in when the mouse touches the top edge (or with Ctrl+L), and hide again when it leaves.
+- **F11 full screen, like Chrome:** the page fills the screen with a "Press F11 to exit full screen" note for a few seconds; touching the top edge drops down a round ✕ to exit (Ctrl+L still brings the address bar). Videos going fullscreen show "Press Esc to exit full screen". In fullscreen, Burrow's interface shrinks to a small see-through strip at the top centre, so nothing else covers the page.
 - **Back / forward everywhere:** Alt+Left / Alt+Right were already handled (now tested from the page and the toolbar); added the mouse's side buttons and Alt+Home.
 - **Settings is easier to find:** a ⚙ button in the toolbar, a full row in the ☰ menu, and Ctrl+,.
 - **What's new after an update:** the first time Burrow opens on a new version, a popup lists what's new and fixed in every version since yours, and thanks testers. The notes live in `shared/changelog.js` — add an entry before each release.
