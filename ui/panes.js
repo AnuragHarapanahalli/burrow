@@ -295,6 +295,8 @@ palActions = function () {
   list.push(sess
     ? A('End the focus session', () => B.focus.session('end'), '', 'focus pomodoro timer stop')
     : A('Start a focus session (25 min)', () => B.focus.session('start'), '', 'focus pomodoro timer work study'));
+  list.push(A("What's new in Burrow", () => B.whatsNew.show(), '', 'changelog update release notes version new'));
+  list.push(A(UI.full === 'browser' ? 'Exit full screen' : 'Full screen', () => B.fullscreen.toggle(), 'F11', 'fullscreen f11 hide bars kiosk'));
   list.push(A('Play Mochi Hop', () => B.fun.hop(), '', 'game play offline dino hop mochi fun'));
   if (!UI.state.isPrivate) list.push(A(UI.theme?.prefs.nightMode ? 'Night mode off' : 'Night mode on', () => B.fun.night(!UI.theme?.prefs.nightMode), '', 'bedtime warm dim dark sleep'));
   if (!UI.state.isPrivate) {

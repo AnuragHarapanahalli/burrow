@@ -284,3 +284,12 @@ B.theme.onChange((payload) => {
 window.addEventListener('DOMContentLoaded', () => { B.ready(); sendLayout(); });
 
 (window.__loaded = window.__loaded || []).push('ui');
+
+// ---------- Browser fullscreen (F11): the bars hide; at the top edge they slide back in ----------
+UI.full = null;
+B.fullscreen.onChange((mode) => { UI.full = mode; document.body.classList.toggle('is-full', !!mode); });
+$('chrome').addEventListener('mouseenter', () => { if (UI.full === 'browser') B.fullscreen.peek(true); });
+$('chrome').addEventListener('mouseleave', () => {
+  // Keep them while you're typing in the address bar or a menu is open.
+  if (UI.full === 'browser' && !UI.editing && $('overlay').hidden) B.fullscreen.peek(false);
+});

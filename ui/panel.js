@@ -4,6 +4,7 @@ let lastLibrary = 'bookmarks';
 let downloadsList = [];
 
 function openPanel(name = section) {
+  setTimeout(() => window.syncSettingsBtn?.(), 0);
   hideOverlay();
   section = name;
   if (name !== 'settings') lastLibrary = name;
@@ -387,3 +388,10 @@ $('winAccent').addEventListener('change', (e) => B.theme.set({ useWindowsAccent:
 $('gridToggle').addEventListener('change', (e) => B.theme.set({ grid: e.target.checked }));
 
 (window.__loaded = window.__loaded || []).push('panel');
+
+// The ⚙ button in the toolbar: opens Settings (or closes it if it's already showing).
+$('settingsBtn').addEventListener('click', () => {
+  if (!panel.hidden && section === 'settings') closePanel(); else openPanel('settings');
+});
+window.syncSettingsBtn = () => $('settingsBtn').setAttribute('aria-pressed', String(!panel.hidden && section === 'settings'));
+new MutationObserver(() => window.syncSettingsBtn()).observe(panel, { attributes: true, attributeFilter: ['hidden'] });

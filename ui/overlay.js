@@ -129,8 +129,8 @@ function openMainMenu() {
       <button data-cmd="downloads" title="Downloads (Ctrl+J)">${ccIcon('downloads')}<span>Downloads</span></button>
       ${priv ? '' : `<button data-cmd="report" title="Your week in Burrow">${ccIcon('report')}<span>Report</span></button>`}
     </div>
+    <button class="cc-settings" data-cmd="settings"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.7 1.5h2.6l.4 1.7 1.2.5 1.5-.9 1.8 1.8-.9 1.5.5 1.2 1.7.4v2.6l-1.7.4-.5 1.2.9 1.5-1.8 1.8-1.5-.9-1.2.5-.4 1.7H6.7l-.4-1.7-1.2-.5-1.5.9-1.8-1.8.9-1.5-.5-1.2-1.7-.4V6.7l1.7-.4.5-1.2-.9-1.5 1.8-1.8 1.5.9 1.2-.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg><span>Settings</span><span class="pixel">CTRL ,</span></button>
     <div class="cc-foot">
-      <button data-cmd="settings">Settings</button><span>&middot;</span>
       <button data-cmd="welcome">Tour</button><span>&middot;</span>
       <button data-cmd="bug">Report a bug</button>
     </div>`;

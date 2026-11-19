@@ -134,6 +134,10 @@ class Tabs {
     });
     wc.on('before-input-event', (e, input) => T().onInput(e, input));
     wc.on('context-menu', (_e, params) => T().onContextMenu?.(tab, params));
+    // A video (or any page) going fullscreen, and the mouse reaching the top edge in F11 fullscreen.
+    wc.on('enter-html-full-screen', () => T().onHtmlFullscreen?.(tab, true));
+    wc.on('leave-html-full-screen', () => T().onHtmlFullscreen?.(tab, false));
+    wc.on('input-event', (_e, input) => { if (input.type === 'mouseMove' && input.y <= 2) T().onTopEdge?.(tab); });
     wc.on('focus', () => T().focusPane(tab));
     // Focus tools: links, redirects and Back/Forward to a closed site show the gate instead.
     const toGate = (e, url) => {

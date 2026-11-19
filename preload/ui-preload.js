@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('burrow', {
   // Right-click menus on pages: Burrow shows them, and sends back only the chosen item.
   ctx: { onMenu: listen('ctx-menu'), run: send('ctx:run'), closed: send('ctx:closed') },
   onDropMarker: listen('drop-marker'),
+  whatsNew: { onShow: listen('whats-new'), show: send('whatsnew:show') },
+  fullscreen: { peek: send('fullscreen:peek'), toggle: send('fullscreen:toggle'), onChange: listen('fullscreen') },
   ask: send('ai:ask'),
   searchNewTab: send('tab:search'),
   allTabs: () => ipcRenderer.invoke('palette:tabs'),

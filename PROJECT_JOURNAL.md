@@ -39,6 +39,7 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-19 | "What's new" notes are written by hand in  and shown once after an update; testers are credited there | Generated from commit messages | Commit messages are written for developers; the popup is for the people using Burrow |
 | 2026-11-18 | **Releases are made by pushing a version tag** (GitHub Actions builds on Windows and publishes with GitHub's built-in token) | Release on every push to main; keep releasing from your PC | Every commit would otherwise reach everyone's Burrow at once; tags make releasing a deliberate step, and no personal token is needed on your PC |
 | 2026-11-18 | **Google sign-in:** on accounts.google.com only, Burrow presents itself as Firefox (request headers, the page's navigator.userAgent, no Chromium client hints); everywhere else it stays Chrome | Leave it (Google blocks sign-in); pretend to be Google Chrome everywhere | Google refuses sign-in from browsers it sees as embedded Chromium. Presenting as Firefox only there is the usual approach of independent browsers and changes nothing for other sites. Google could change its checks later |
 | 2026-11-18 | **MIT licence**; README with screenshots, issue templates (blank issues stay on for the in-app Report a bug) | GPL-3.0; no licence | Your pick: simple and common, and keeps the free SignPath signing option open |
@@ -501,6 +502,13 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 **2026-11-18 — First release (v0.2.0) and a release fix**
 - Your first `npm run release` created **two** v0.2.0 releases: electron-builder uploads the installer and the portable copy at the same time, and when no release exists yet both uploads create one. `latest.yml` (needed for auto-update) didn't arrive.
 - Fix: `npm run release` now runs `scripts/release.js`, which creates the one release first (or stops if there are duplicates), then builds and uploads into it, and finally checks that all four files are there (installer, blockmap, portable, latest.yml).
+
+**2026-11-19 — v0.2.2 fixes**
+- **Video fullscreen fixed.** Burrow's tabs are separate views inside its window, so a page going fullscreen only filled its own box. Now the window goes fullscreen, that page fills it, and Burrow's bars hide; Esc (or the video's button) brings everything back. In split view, just that side goes fullscreen.
+- **F11 full screen:** the page fills the screen; the tabs and address bar slide in when the mouse touches the top edge (or with Ctrl+L), and hide again when it leaves.
+- **Back / forward everywhere:** Alt+Left / Alt+Right were already handled (now tested from the page and the toolbar); added the mouse's side buttons and Alt+Home.
+- **Settings is easier to find:** a ⚙ button in the toolbar, a full row in the ☰ menu, and Ctrl+,.
+- **What's new after an update:** the first time Burrow opens on a new version, a popup lists what's new and fixed in every version since yours, and thanks testers. The notes live in  — add an entry before each release.
 
 ## 10. Known issues / next up
 - Quick links can only be reordered with the mouse (no keyboard reordering yet).

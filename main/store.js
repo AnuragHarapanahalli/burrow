@@ -13,6 +13,7 @@ const SETTINGS_DEFAULTS = {
   bookmarksBar: true,
   onboarded: false,
   sleep: { on: true, minutes: 30, never: [] }, // tab sleeping: unload tabs you haven't looked at for a while
+  lastVersion: null,     // the version that last ran (to show "What's new" once after an update)
   sitePerms: {},         // per site: camera / microphone / location / notifications → allow | block
   carrots: 0,            // earned by focus sessions, eye breaks, days within limits, Mochi Hop
   outfitsOwned: [],

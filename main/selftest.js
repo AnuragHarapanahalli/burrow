@@ -12,7 +12,7 @@ async function until(fn, ms = 4000) {
   return !!(await fn());
 }
 
-async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare, getFun, getPerms, getUpdates, linkFromArgs, clearData }) {
+async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, store, dir, mainWin, openWindow, windows, session, getNotes, sweepSleep, getFocus, getStats, statLine, getCare, getFun, getPerms, getUpdates, linkFromArgs, clearData, showWhatsNew, checkWhatsNew }) {
   fs.mkdirSync(dir, { recursive: true });
   const log = [];
   let failures = 0;
@@ -77,7 +77,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await wait(300);
     setTheme({ mode: 'light', seed: '#E63027' });
     const loaded = await js('window.__loaded || []');
-    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui', 'fun-ui', 'site-ui'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
+    check(['ui', 'overlay', 'panel', 'bmbar', 'find', 'drag', 'palette', 'panes', 'mochi-react', 'focus-ui', 'volume', 'ctxmenu', 'care-ui', 'fun-ui', 'site-ui', 'whatsnew'].every((n) => loaded.includes(n)), `all interface scripts loaded (${loaded.join(', ')})`);
 
     if (section('basics')) {
     // --- Search engine chooser on the new tab ---
@@ -1970,6 +1970,97 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     store.set('nightMode', false);
     setTheme({ mode: 'light', seed: '#E63027' });
     tabs.close(r1.id);
+    }
+    if (section('v022')) {
+    // ================= v0.2.2: fullscreen, F11, back/forward controls, Settings button, What's new =================
+    const http22 = require('http');
+    const page22 = (n) => '<!doctype html><title>Page ' + n + '</title><div id="box" style="width:200px;height:120px;background:#333"></div><p>Page ' + n + '</p>';
+    const srv22 = http22.createServer((req, res) => { res.writeHead(200, { 'content-type': 'text/html' }); res.end(page22(req.url)); });
+    await new Promise((r) => srv22.listen(0, '127.0.0.1', r));
+    const base22 = 'http://127.0.0.1:' + srv22.address().port;
+    const vt = tabs.create(base22 + '/video');
+    await ready(vt);
+    mainWin.win.focus();
+    await wait(200);
+    const size = () => mainWin.win.getContentSize();
+    // --- A page going fullscreen (like a video's ⛶ button) ---
+    await vt.view.webContents.executeJavaScript("document.getElementById('box').requestFullscreen()", true);
+    check(await until(() => mainWin.full === 'video' && mainWin.win.isFullScreen(), 5000), 'a video asking for fullscreen makes the window fullscreen');
+    await wait(400);
+    const vb = vt.view.getBounds(), [W, H] = size();
+    check(vb.x === 0 && vb.y === 0 && vb.width === W && vb.height === H, 'and the page fills the whole window (' + vb.width + 'x' + vb.height + ' of ' + W + 'x' + H + ')');
+    check(mainWin.ui.getBounds().height === 0, "Burrow's tabs and address bar are hidden");
+    vt.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+    vt.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
+    check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen(), 5000), 'Esc leaves fullscreen');
+    await wait(300);
+    check(vt.view.getBounds().y === mainWin.layout.top && mainWin.ui.getBounds().height > 0, 'and the toolbar comes back');
+    // --- F11: browser fullscreen ---
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
+    check(await until(() => mainWin.full === 'browser' && mainWin.win.isFullScreen(), 5000), 'F11 turns on full screen');
+    check(await until(() => js("UI.mochiLog.some((m) => /F11 to exit/.test(m.text))") || mainWin.peek), 'and says how to get the bars back (move to the top, F11 to exit)');
+    await until(() => !mainWin.peek, 5000);
+    mainWin.uiHovered = false; mainWin.setPeek(false); // (the real mouse pointer may be resting on the bars)
+    await wait(150);
+    await until(() => mainWin.ui.getBounds().height === 0 && vt.view.getBounds().y === 0, 3000); // (the window may still be animating into full screen)
+    check(mainWin.ui.getBounds().height === 0 && vt.view.getBounds().y === 0, 'the tabs and address bar hide; the page fills the screen' + ' (ui ' + JSON.stringify(mainWin.ui.getBounds()) + ', page ' + JSON.stringify(vt.view.getBounds()) + ', peek ' + mainWin.peek + ', overlay ' + mainWin.overlayOpen + ', shown ' + tabs.shownTabs.map((t) => t.id).join('+') + ' active ' + tabs.activeId + ' vt ' + vt.id + ')');
+    await shot('56-f11-hidden', true);
+    vt.view.webContents.sendInputEvent({ type: 'mouseMove', x: 300, y: 1 });
+    check(await until(() => mainWin.peek && mainWin.ui.getBounds().height === mainWin.layout.top, 3000), 'moving the mouse to the top edge slides them back in');
+    await shot('57-f11-peek');
+    mainWin.setPeek(false);
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'F11' });
+    check(await until(() => mainWin.full === null && !mainWin.win.isFullScreen() && mainWin.ui.getBounds().height > 0, 5000), 'F11 again goes back to normal');
+    await wait(400);
+    // --- Back / forward: Alt+arrows (on the page and in the address bar), mouse side buttons, Alt+Home ---
+    vt.view.webContents.loadURL(base22 + '/second');
+    await ready(vt);
+    vt.view.webContents.focus();
+    vt.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Left', modifiers: ['alt'] });
+    check(await until(() => vt.url === base22 + '/video' && !vt.loading), 'Alt+Left goes back (with the page focused)');
+    ui.webContents.focus();
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Right', modifiers: ['alt'] });
+    check(await until(() => vt.url === base22 + '/second' && !vt.loading), 'Alt+Right goes forward (from Burrow\'s toolbar too)');
+    mainWin.win.emit('app-command', {}, 'browser-backward');
+    check(await until(() => vt.url === base22 + '/video' && !vt.loading), "the mouse's back button goes back");
+    mainWin.win.emit('app-command', {}, 'browser-forward');
+    check(await until(() => vt.url === base22 + '/second' && !vt.loading), 'and its forward button goes forward');
+    vt.view.webContents.focus();
+    vt.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Home', modifiers: ['alt'] });
+    check(await until(() => vt.url.startsWith('burrow://newtab')), 'Alt+Home opens the new tab page');
+    tabs.close(vt.id);
+    // --- Settings is easy to find ---
+    check(await js("!!document.getElementById('settingsBtn') && document.getElementById('settingsBtn').getBoundingClientRect().width > 0"), 'there is a \u2699 Settings button in the toolbar');
+    await js("document.getElementById('settingsBtn').click()");
+    check(await until(() => js("!document.getElementById('panel').hidden && document.getElementById('settingsBtn').getAttribute('aria-pressed') === 'true'")), 'it opens Settings (and shows as pressed)');
+    await shot('58-settings-button');
+    await js("document.getElementById('settingsBtn').click()");
+    check(await until(() => js("document.getElementById('panel').hidden")), 'clicking it again closes Settings');
+    ui.webContents.focus();
+    ui.webContents.sendInputEvent({ type: 'keyDown', keyCode: ',', modifiers: ['control'] });
+    check(await until(() => js("!document.getElementById('panel').hidden")), 'Ctrl+, opens Settings');
+    await js("closePanel()");
+    await js("document.getElementById('menuBtn').click()");
+    check(await until(() => js("!!document.querySelector('#mainMenu .cc-settings')")), 'the \u2630 menu has a full Settings row');
+    await js('hideOverlay()');
+    // --- What's new after an update ---
+    const Changelog = require('../shared/changelog');
+    check(Changelog.between('0.2.0', '0.2.2').map((e) => e.version).join() === '0.2.2,0.2.1' && Changelog.newer('0.10.0', '0.9.9'), 'the changelog lists the versions since yours (newest first)');
+    store.set('lastVersion', '0.0.1');
+    checkWhatsNew();
+    check(store.get('lastVersion') === app.getVersion(), 'Burrow remembers which version last ran');
+    showWhatsNew('0.2.0', '0.2.2', mainWin);
+    check(await until(() => js("!document.getElementById('whatsNew').hidden && document.querySelectorAll('#wnBody .wn-ver').length === 2")), "after updating from 0.2.0, \u201cWhat's new\u201d shows 0.2.1 and 0.2.2");
+    check((await js("document.getElementById('wnKicker').textContent")).includes('V0.2.0 \u2192 V0.2.2') && (await js("document.getElementById('wnBody').textContent")).includes('full screen'), 'with what changed and what was fixed');
+    await shot('59-whats-new');
+    await js("document.getElementById('wnClose').click()");
+    check(await until(() => js("document.getElementById('whatsNew').hidden")), '"Got it" closes it');
+    await js("openPanel('settings')");
+    await wait(200);
+    await js("document.getElementById('aboutSect').open = true; document.getElementById('whatsNewBtn').click()");
+    check(await until(() => js("!document.getElementById('whatsNew').hidden")), "Settings \u2192 About can show it again any time");
+    await js('hideOverlay(); closePanel()');
+    srv22.close();
     }
     if (section('windows')) {
     // ================= Windows + dragging tabs =================

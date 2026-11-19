@@ -105,6 +105,8 @@ class BurrowWindow {
     });
     this.tabs.onFind = (r) => this.send('find-result', { active: r.activeMatchOrdinal, matches: r.matches });
     this.tabs.onContextMenu = (tab, params) => this.showPageMenu(tab, params);
+    this.tabs.onHtmlFullscreen = (tab, on) => this.setHtmlFullscreen(tab, on);
+    this.tabs.onTopEdge = () => this.setPeek(true);
     this.tabs.nightOn = () => !isPrivate && !!ctx.store.get('nightMode') && ctx.store.get('nightTint') !== false;
     // The last tab closed (or dragged away): close this window.
     this.tabs.onEmpty = () => {
@@ -121,6 +123,16 @@ class BurrowWindow {
     ['resize', 'maximize', 'unmaximize', 'restore', 'enter-full-screen', 'leave-full-screen']
       .forEach((ev) => this.win.on(ev, () => this.relayout()));
     this.win.on('closed', () => this.onClosed());
+    // Fullscreen ended some other way (e.g. a Windows shortcut): put everything back.
+    this.win.on('leave-full-screen', () => {
+      if (this.full === 'video') this.exitFullscreen();
+      else if (this.full === 'browser') { this.full = null; this.peek = false; this.relayout(); this.tabs.raiseActive(); this.send('fullscreen', null); }
+    });
+    // The back / forward buttons on the side of many mice.
+    this.win.on('app-command', (_e, cmd) => {
+      if (cmd === 'browser-backward') this.tabs.back();
+      else if (cmd === 'browser-forward') this.tabs.forward();
+    });
   }
 
   // ---------- Messages to this window's interface ----------
@@ -167,6 +179,16 @@ class BurrowWindow {
     if (this.win.isDestroyed()) return;
     const [w, h] = this.win.getContentSize();
     const l = this.layout;
+    if (this.full) {
+      // Fullscreen: the page fills the whole window. In browser fullscreen (F11) the tabs and address
+      // bar slide in while the mouse is at the top edge (or a menu is open).
+      const showUi = this.full === 'browser' && (this.peek || this.overlayOpen);
+      this.ui.setBounds({ x: 0, y: 0, width: w, height: showUi ? (this.overlayOpen ? h : l.top) : 0 });
+      this.tabs.setBounds({ x: 0, y: 0, width: w, height: h });
+      if (this.aiView) this.aiView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      if (showUi) this.win.contentView.addChildView(this.ui);
+      return;
+    }
     this.ui.setBounds({ x: 0, y: 0, width: w, height: h });
     // The AI panel takes the right edge; Burrow's interface draws its header and border.
     const aiW = this.aiOpen ? this.aiWidth() : 0;
@@ -185,11 +207,69 @@ class BurrowWindow {
 
   // While a menu or suggestion list is open, the UI sits on top of the website.
   setOverlay(open) {
+    this.overlayOpen = !!open;
+    if (this.full) { this.relayout(); if (!open) this.tabs.raiseActive(); return; }
     if (open) this.win.contentView.addChildView(this.ui);
     else {
       this.tabs.raiseActive();
       if (this.aiOpen && this.aiView) this.win.contentView.addChildView(this.aiView);
     }
+  }
+
+  // ---------- Fullscreen ----------
+  // A page asking for fullscreen (a video's ⛶ button): the window goes fullscreen and that page fills it.
+  setHtmlFullscreen(tab, on) {
+    if (on) {
+      if (this.full === 'video') return;
+      this.fullBefore = this.full;              // null, or 'browser' if F11 was already on
+      this.windowWasFull = this.win.isFullScreen();
+      this.full = 'video';
+      this.fullTab = tab;
+      if (this.tabs.shownTabs.length > 1) this.tabs.show([tab]); // split view: just this side
+      if (!this.win.isFullScreen()) this.win.setFullScreen(true);
+      this.relayout();
+      this.tabs.raiseActive();
+    } else {
+      if (this.full !== 'video') return;
+      this.full = this.fullBefore || null;
+      this.fullTab = null;
+      this.peek = false;
+      if (!this.windowWasFull && this.win.isFullScreen()) this.win.setFullScreen(false);
+      if (this.tabs.activeId) this.tabs.activate(this.tabs.activeId); // brings split view back
+      this.relayout();
+      this.tabs.raiseActive();
+    }
+    this.send('fullscreen', this.full);
+  }
+  // F11: browser fullscreen. Move the mouse to the top edge to see the tabs and address bar.
+  toggleBrowserFull() {
+    if (this.full === 'video') return;
+    const on = this.full !== 'browser';
+    this.full = on ? 'browser' : null;
+    this.peek = false;
+    this.win.setFullScreen(on);
+    this.relayout();
+    this.tabs.raiseActive();
+    this.send('fullscreen', this.full);
+    if (on) {
+      this.setPeek(true); // show the bars for a moment, with a hint
+      this.send('mochi-say', { text: 'Full screen: move to the top for tabs. F11 to exit', pose: 'wave', essential: true, ms: 3000 });
+      clearTimeout(this.peekTimer);
+      this.peekTimer = setTimeout(() => { if (!this.uiHovered) this.setPeek(false); }, 3200);
+    }
+  }
+  setPeek(on) {
+    if (this.full !== 'browser' || this.peek === !!on) return;
+    this.peek = !!on;
+    this.relayout();
+    if (!on) this.tabs.raiseActive();
+  }
+  exitFullscreen() {
+    if (this.full === 'video') {
+      const wc = this.fullTab?.view?.webContents;
+      if (wc && !wc.isDestroyed()) wc.executeJavaScript('document.fullscreenElement && document.exitFullscreen()', true).catch(() => {});
+      this.setHtmlFullscreen(this.fullTab, false);
+    } else if (this.full === 'browser') this.toggleBrowserFull();
   }
 
   openPanel(section) { this.ui.webContents.focus(); this.send('open-panel', section); }
@@ -322,6 +402,7 @@ class BurrowWindow {
     else if (ctrl && input.shift && digit && !this.isPrivate) tabs.switchWorkspaceIndex(Number(digit[1]) - 1);
     else if (ctrl && !input.shift && k === 'd') this.toggleBookmark();
     else if (ctrl && !input.shift && k === 'h') this.openPanel('history');
+    else if (ctrl && !input.shift && (k === ',' || input.code === 'Comma')) this.openPanel('settings');
     else if (ctrl && !input.shift && k === 'j') this.openPanel('downloads');
     else if (ctrl && input.shift && k === 'o') this.openPanel('bookmarks');
     else if (ctrl && input.shift && k === 'b') ctx.setPrefs({ bookmarksBar: !ctx.store.get('bookmarksBar') });
@@ -336,13 +417,16 @@ class BurrowWindow {
     else if (ctrl && (k === '-' || k === '_')) tabs.stepZoom(-1);
     else if (ctrl && k === '0') tabs.stepZoom(0);
     else if (ctrl && k === 'w') tabs.close(tabs.activeId);
-    else if (ctrl && k === 'l') this.focusAddress();
+    else if (ctrl && k === 'l') { if (this.full === 'browser') this.setPeek(true); this.focusAddress(); }
     else if (ctrl && k === 'tab') tabs.cycle(input.shift ? -1 : 1);
     else if (ctrl && !input.shift && /^[1-8]$/.test(k)) tabs.activateIndex(Number(k) - 1);
     else if (ctrl && !input.shift && k === '9') tabs.activateIndex(-1);
     else if ((ctrl && k === 'r') || input.key === 'F5') tabs.reload();
     else if (input.alt && input.key === 'ArrowLeft') tabs.back();
     else if (input.alt && input.key === 'ArrowRight') tabs.forward();
+    else if (input.alt && input.key === 'Home') tabs.navigate(NEWTAB);
+    else if (input.key === 'F11') this.toggleBrowserFull();
+    else if (input.key === 'Escape' && this.full === 'video') this.exitFullscreen();
     else if (input.key === 'F12') tabs.active?.view.webContents.toggleDevTools();
     else if (ctrl && input.shift && (input.key === 'Delete' || input.code === 'Delete') && !this.isPrivate) this.openPanel('settings:clear');
     else handled = false;

@@ -16,6 +16,7 @@ const { Fun, NIGHT_SEED } = require('./fun');
 const { Permissions } = require('./permissions');
 const { Updates } = require('./updates');
 const SignIn = require('./signin');
+const Changelog = require('../shared/changelog');
 const Reader = require('./reader');
 const { BurrowWindow } = require('./window');
 const { Tabs } = require('./tabs');
@@ -485,6 +486,10 @@ function registerIpc() {
   on('theme:set', (_w, patch) => setTheme(patch));
   on('window:private', () => ctx.openPrivate());
   on('window:new', () => openWindow());
+  on('fullscreen:peek', (w, on) => { w.uiHovered = !!on; w.setPeek(!!on); });
+  on('fullscreen:toggle', (w) => w.toggleBrowserFull());
+  // "What's new" any time (Settings → About, Ctrl+K): this version and the one before
+  on('whatsnew:show', (w) => { const prev = Changelog.CHANGES[1]?.version || '0.0.0'; showWhatsNew(prev, app.getVersion(), w) || showWhatsNew('0.0.0', app.getVersion(), w); });
   // Clipboard text for Burrow's own text boxes (Paste in the right-click menu). Websites can't read it.
   handle('clip:read', () => clipboard.readText());
   // Site permissions: the bar's answer, and Settings → Site permissions
@@ -953,15 +958,34 @@ app.whenReady().then(() => {
   else openWindow();
   const startLink = linkFromArgs(process.argv);
   if (startLink && mainWin) mainWin.tabs.create(startLink);
+  // Just updated? Show what's new once (a fresh install gets the welcome tour instead).
+  checkWhatsNew();
   // First time: Mochi's welcome tour (the self-test opens it itself).
   if (!store.get('onboarded') && !SELFTEST) mainWin.tabs.create('burrow://welcome/');
   if (SELFTEST) {
     require('./selftest').run({
       app, ui: mainWin.ui, tabs: mainWin.tabs, library, downloads, setTheme, setPrefs, store, dir: SELFTEST,
-      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care, getFun: () => fun, setNight, getPerms: () => perms, getUpdates: () => updates, linkFromArgs, clearData,
+      mainWin, openWindow, windows, session, getNotes: () => notes, sweepSleep, getFocus: () => focus, getStats: () => stats, statLine, getCare: () => care, getFun: () => fun, setNight, getPerms: () => perms, showWhatsNew, checkWhatsNew, getUpdates: () => updates, linkFromArgs, clearData,
     });
   }
 });
+
+// ---------------- "What's new" after an update ----------------
+function checkWhatsNew() {
+  const now = app.getVersion();
+  const last = store.get('lastVersion');
+  store.set('lastVersion', now);
+  if (!last || !Changelog.newer(now, last) || SELFTEST) return; // first install, same version, or the self-test
+  showWhatsNew(last, now);
+}
+function showWhatsNew(from, to, w = mainWin) {
+  const entries = Changelog.between(from, to);
+  if (!entries.length || !w) return false;
+  // The window's interface may still be loading: send once it's ready.
+  const send = () => w.send('whats-new', { from, to, entries });
+  if (w.ui.webContents.isLoading()) w.ui.webContents.once('did-finish-load', () => setTimeout(send, 600)); else setTimeout(send, 300);
+  return true;
+}
 
 function flushAll() { store?.flush(); library?.flush(); downloads?.flush(); notes?.flush(); focus?.flush(); stats?.flush(); }
 app.on('before-quit', flushAll);

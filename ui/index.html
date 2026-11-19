@@ -65,6 +65,9 @@
       <button class="tool label ai-btn" id="aiBtn" title="AI panel (Ctrl+Shift+A)" aria-label="AI panel" aria-pressed="false">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.6 4.9L14.5 8l-4.9 1.6L8 14.5l-1.6-4.9L1.5 8l4.9-1.6z"/></svg><span class="pixel">AI</span>
       </button>
+      <button class="tool icon" id="settingsBtn" title="Settings (Ctrl+,)" aria-label="Settings" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.7 1.5h2.6l.4 1.7 1.2.5 1.5-.9 1.8 1.8-.9 1.5.5 1.2 1.7.4v2.6l-1.7.4-.5 1.2.9 1.5-1.8 1.8-1.5-.9-1.2.5-.4 1.7H6.7l-.4-1.7-1.2-.5-1.5.9-1.8-1.8.9-1.5-.5-1.2-1.7-.4V6.7l1.7-.4.5-1.2-.9-1.5 1.8-1.8 1.5.9 1.2-.5zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+      </button>
       <button class="tool icon" id="menuBtn" title="Menu" aria-label="Menu" aria-haspopup="menu" aria-expanded="false">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
       </button>
@@ -313,6 +316,7 @@
             <button class="text-btn" id="updateCheck">Check for updates</button>
             <button class="text-btn" id="updateRestart" hidden>Restart to update</button>
           </div>
+          <button class="text-btn" id="whatsNewBtn">What's new in this version</button>
           <div class="sect-sub pixel">DEFAULT BROWSER</div>
           <p class="sect-note" id="defaultState"></p>
           <button class="text-btn" id="makeDefault">Make Burrow your default browser</button>
@@ -359,6 +363,17 @@
     <div class="menu main-menu" id="mainMenu" hidden role="menu" aria-label="Menu"></div>
     <div class="menu bm-menu" id="bmMenu" hidden role="menu" aria-label="More bookmarks"></div>
     <div class="suggest" id="suggest" hidden role="listbox" aria-label="Suggestions"></div>
+    <div class="menu whats-new" id="whatsNew" hidden role="dialog" aria-modal="true" aria-labelledby="wnTitle">
+      <div class="wn-head">
+        <div class="wn-mochi" id="wnMochi" aria-hidden="true"></div>
+        <div>
+          <p class="pixel wn-kicker" id="wnKicker">UPDATED</p>
+          <h2 id="wnTitle">What's new<span class="dot">.</span></h2>
+        </div>
+      </div>
+      <div class="wn-body" id="wnBody"></div>
+      <div class="pop-btns"><button type="button" class="primary" id="wnClose">Got it</button></div>
+    </div>
     <div class="menu tidy-pop" id="tidyPop" hidden role="dialog" aria-label="Tidy up tabs">
       <div class="menu-label pixel" id="tidyTitle">TIDY UP</div>
       <div class="tidy-list" id="tidyList"></div>
@@ -423,5 +438,7 @@
   <script src="burrow://app/ui/care-ui.js"></script>
   <script src="burrow://app/ui/fun-ui.js"></script>
   <script src="burrow://app/ui/site-ui.js"></script>
+  <script src="burrow://app/shared/changelog.js"></script>
+  <script src="burrow://app/ui/whatsnew.js"></script>
 </body>
 </html>
