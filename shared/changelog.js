@@ -8,14 +8,14 @@
       title: 'Full screen, fixed',
       new: [
         'F11 full screen: the page fills the screen; move the mouse to the top for tabs and the address bar.',
-        'Settings has its own ⚙ button in the toolbar (and Ctrl+,).',
+        'Settings has its own button in the toolbar, next to the menu (and Ctrl+,).',
         "Your mouse's side buttons go back and forward; Alt+Home opens a new tab page.",
         "This “What's new” note after every update.",
       ],
       fixed: [
         'Videos (YouTube, Netflix…) now really go full screen.',
       ],
-      thanks: [],
+      thanks: [{ name: 'Harshad' }, { name: 'Aaryan' }],
     },
     {
       version: '0.2.1',
