@@ -230,3 +230,8 @@ body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--f
 .strip-mochi.walking .strip-bubble { visibility: hidden; }
 @keyframes mochi-walk-in { from { transform: translateX(140px); } }
 #settingsBtn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+/* Sliders icon (Settings): solid knobs that punch through the lines, in the button's own colours */
+#settingsBtn svg .knob, .cc-settings svg .knob { fill: var(--bg); stroke: currentColor; stroke-width: 1.5; }
+#settingsBtn[aria-pressed="true"] svg .knob { fill: var(--fg); }
+#settingsBtn:hover:not([aria-pressed="true"]) svg .knob { fill: var(--hover); }
+.cc-settings:hover svg .knob { fill: var(--fg); }
