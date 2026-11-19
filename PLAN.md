@@ -128,8 +128,53 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
    - **Tidying**: the self-test's download check uses a local test server (no internet needed); stale "known issues" are removed.
    - **App icon**: **Mochi's pixel face on a Signal-red square** (chosen 2026-11-18 from five designs), drawn from Mochi's own sprite so it stays crisp from 16 px to 256 px.
    - Self-test: contrast for all presets + random colours, unnamed buttons, the permission bar (a local page asks for notifications/geolocation → Allow / Block / remembered / private forgets), clearing each kind of data, crash page via a forced renderer crash, split restored from a saved session, update flow with simulated "update available / downloaded" events. The installer is checked by building it and confirming both files exist and launch.
-15. Later: **password manager** (encrypted with Windows' own protection, autofill on login forms, "save password?" prompt, revealing a password asks for your Windows PIN) **+ password import** from other browsers.
-16. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
+15. **v0.3.0 — "Soft paper" design system + UX fundamentals** (decided 2026-11-19; mockups compared five looks, then v2, then the UX additions). The layout, features and Mochi stay; how everything looks and behaves gets calmer and more consistent.
+   - **a. Design tokens first** (written down once; every screen uses them):
+     - Type scale: Display 30 · Title 20 · Body-long 15 (1.6 line height, ~65 characters a line) · UI 13 · Label 11 (small-caps sans). Headings weight 650 (was 800), letter spacing −0.02em.
+     - Spacing on a 4/8 rhythm (4 · 8 · 12 · 16 · 24 · 32). Radius: 4 small (chips, keys) · 8 medium (buttons, inputs, rows) · 12 large (menus, cards).
+     - Elevation: page → surface (inputs, cards: hairline) → floating (menus, toasts: one soft shadow, no hard border).
+     - Motion: 120 ms (hover, press) · 180 ms (menus, panels) · 260 ms (Mochi, toasts), ease-out, all off with "reduce animations".
+     - **Status colours separate from the brand accent**: danger red, warning amber, success green, info blue (coral then always means "Burrow / act here").
+   - **b. Soft paper restyle** (fixes 1–8):
+     1. Lighter headings (650).
+     2. Tints instead of inverted black blocks: active tab = light tile + thin accent underline; selected menu row = soft accent tint with accent text; Search | Ask = soft toggle.
+     3. Pixel font only for numbers, keys and tiny badges; words in small-caps sans.
+     4. Accent reserved for the primary action, the current selection and focus (secondary buttons are quiet outlines).
+     5. Clear elevation: address bar flush in the toolbar; menus float on a soft shadow.
+     6. 8 px rhythm: tabs 34 px, toolbar 44 px, menu rows 32 px; more breathing room on the new tab.
+     7. Distinct states: hover = faint ink tint · selected = soft accent tint · keyboard focus = 3 px soft accent halo.
+     8. Bigger targets: toolbar buttons 34 px.
+     - Warm grey ink (not near-black), hairline rules (not 2 px black), soft coral accent; **dark mode** gets the same softening (warm dark greys). The Colour setting still works: any colour is softened the same way. The theme engine gains the new tokens (tint, hover, status colours) and checks every text colour for 4.5:1.
+   - **c. UX additions** (9–15):
+     9. Honest address bar: lock or "Not secure" at the start; domain in full ink, the rest muted; page chips (reading time, star, reader, zoom) inside the bar only when they apply.
+     10. Informative tabs: favicon or a loading spinner; × on hover and on the active tab only; hover tooltip with the full title, site and state (playing, asleep).
+     11. A thin loading bar under the toolbar.
+     12. Undo instead of "are you sure?": closing a tab, closing others / to the right, tidy-up → "3 tabs closed · Undo" toast.
+     13. Status colours used for status (not secure, warnings, saved, updates), never the brand accent.
+     14. Two voices: Mochi stays the friendly voice in the tab strip; system messages (downloads, undo, errors, updates) become plain toasts at the bottom left, so nothing important depends on Mochi's Lively / Quiet / Off setting.
+     15. Density setting: Comfortable (default) or Compact (tabs 28, rows 26, text 12) for small screens.
+   - Self-test: 4.5:1 for every token pair (all presets + random colours, light and dark), states distinguishable, address-bar parts, tab tooltip, loading bar, undo restores tabs, toasts vs Mochi, density sizes; screenshots of every screen in light and dark reviewed before release.
+16. **v0.3.x — features agreed earlier** (2026-11-19):
+   - **Search suggestions** in the address bar as you type, from your search engine (Google, Bing, DuckDuckGo, Brave, Ecosia, Startpage — each has a public suggestion address), mixed with history and bookmarks; arrow keys + Enter; on by default, a switch in Settings → Search engine; **off in private windows**; only what you type is sent, only to your chosen engine.
+   - **Gestures**: touchpad two-finger swipe = Back / Forward (with an arrow that follows your fingers and commits past a threshold), pinch = zoom the page; **mouse gestures** (hold the right button and draw: ← back, → forward, ↓ new tab, ↓→ close tab) with a visible trail and a Settings switch. (Alt+arrows, mouse side buttons and Alt+Home are done in 0.2.2.)
+   - **Tester badge**: testers enter a code you give them (Settings → About) → a "Tester" badge in About and a special Mochi outfit; the "What's new" popup keeps crediting testers by name (done in 0.2.2).
+17. **v0.4.0 — the Burrow adventure** (Mochi's game, our own design): a small top-down adventure in a Game Boy-style 4-shade palette — Mochi explores a burrow and a meadow, talks to critters, solves little puzzles, collects carrots (which count as real carrots); progress is saved. A short design document (map, critters, puzzles, controls) comes first for your approval. Mochi Hop stays as the offline mini-game.
+18. **v0.5.x — more features** (chosen 2026-11-19; each one ships as its own small release, in this order):
+   - a) **Tab groups + pinned tabs**: right-click a tab → "Add to group" → name + colour; a group collapses to one coloured chip and expands again; drag tabs in and out; groups are saved with the session. Pinned tabs shrink to an icon at the left, survive restarts and can't be closed by "close others". Self-test: create / rename / collapse / drag between groups, restore after restart, pinned order.
+   - b) **Ad & tracker blocker**: a well-tested filter engine (Ghostery's open-source adblocker for Electron) with EasyList + EasyPrivacy, refreshed weekly in the background; a shield in the address bar shows how many were blocked on this page; a per-site off switch; a total in the weekly report. On by default; Settings switch. Self-test: a local test page with fake ad/tracker requests is blocked, an allowed site is not.
+   - c) **Screenshot tool** (Ctrl+Shift+S and the ☰ menu): visible area, a selected area (drag a box), or the whole long page; then copy, save as PNG, or open in a new tab. Self-test: each mode returns an image of the right size.
+   - d) **Send to phone (QR)**: a QR icon in the address bar shows a QR code of the page address; scan it with your phone's camera. Made on your computer — nothing is sent anywhere. Self-test: the QR code decodes back to the page address.
+   - e) **File converter + shrinker** for downloads (from the downloads list: "Convert…" / "Make smaller…"), all done on your computer, nothing uploaded. The original is always kept; the result is saved next to it with a new name:
+     - Images: PNG ↔ JPG ↔ WebP; smaller = lower quality and/or smaller dimensions, with a before → after size preview.
+     - PDF: PDF → images (one per page); images → one PDF; smaller = re-compress the pictures inside (text stays text).
+     - Word (.docx): DOCX → PDF, DOCX → plain text / web page. (PDF → Word isn't offered: it can't be done well offline, and a bad result is worse than none.)
+     - Self-test: every conversion on sample files from `tests/files/` opens correctly, "smaller" really is smaller, the original is untouched.
+   - f) **"What are you here for?"**: opening a site on your limits list first asks your intention in one line ("reply to Sam", "10 minutes of videos"); Mochi shows it in the tab strip and checks in gently when your time is up or you drift to other pages. Skippable; a Settings switch.
+   - g) **Endless-scroll nudge**: on any site, when Mochi notices a long unbroken stretch of endless scrolling (the page keeps growing as you scroll, for 10+ minutes), Mochi suggests a pause — once per stretch, never on reading pages. Respects Mochi's Lively / Quiet / Off.
+   - h) **Focus schedule**: focus sessions that start by themselves at times you set (e.g. weekdays 9–12), with the days, times and blocked sites chosen in Settings → Focus; a 1-minute heads-up before it starts; you can still end one early.
+   - Self-test for f–h uses the test clock (no real waiting).
+19. Later: **password manager** (encrypted with Windows' own protection, autofill on login forms, "save password?" prompt, revealing a password asks for your Windows PIN) **+ password import** from other browsers.
+20. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 
 ## Verification
 - `npm install` and `npm start` after every phase, then check that phase's features by hand.

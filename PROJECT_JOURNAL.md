@@ -39,6 +39,14 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-19 | **New look: "Soft paper" v2** for v0.3.0 — warm grey ink, hairline rules, soft coral, tints instead of black blocks, lighter headings, 8 px rhythm, clear hover / selected / focus states, bigger targets; dark mode softened the same way | Keep the current high-contrast look; Muted Swiss; Cozy sand; Calm cool | You found the current look harsh. Soft paper keeps Burrow's Swiss character and red but stops everything shouting at once (compared as HTML mockups) |
+| 2026-11-19 | **Design tokens written down** (type scale, spacing, radius, elevation, motion) before the restyle | Restyle screen by screen | One set of building blocks keeps every screen consistent as Burrow grows |
+| 2026-11-19 | **Status colours separate from the brand accent** (danger, warning, success, info) | Coral for everything | When coral meant both "Burrow" and "error", neither was clear |
+| 2026-11-19 | **Two voices**: Mochi in the tab strip; system messages as plain toasts at the bottom left | Everything through Mochi | Important messages (downloads, undo, errors, updates) shouldn't depend on Mochi's Lively / Quiet / Off setting |
+| 2026-11-19 | **Undo instead of "are you sure?"** for closing tabs and tidy-up | Confirmation dialogs | Prevents mistakes without nagging |
+| 2026-11-19 | **v0.5.x features chosen**: tab groups + pinned tabs, ad & tracker blocker, screenshot tool, send to phone (QR), file converter + shrinker for downloads, "What are you here for?", endless-scroll nudge, focus schedule | Reading list, session manager, translate, dark mode for sites, greyscale for distracting sites | Your picks; one small release each so every feature is tested on its own |
+| 2026-11-19 | **File converter works offline only**; PDF → Word not offered | An online conversion service | Your files never leave your computer; offline PDF → Word gives poor results |
+| 2026-11-19 | Order: v0.3.0 = design system + UX; v0.3.x = search suggestions, gestures, tester badges; v0.4.0 = the Burrow adventure; more features to be chosen | Everything in one release | Each release stays shippable and testable on its own |
 | 2026-11-19 | "What's new" notes are written by hand in `shared/changelog.js` and shown once after an update; testers are credited there | Generated from commit messages | Commit messages are written for developers; the popup is for the people using Burrow |
 | 2026-11-18 | **Releases are made by pushing a version tag** (GitHub Actions builds on Windows and publishes with GitHub's built-in token) | Release on every push to main; keep releasing from your PC | Every commit would otherwise reach everyone's Burrow at once; tags make releasing a deliberate step, and no personal token is needed on your PC |
 | 2026-11-18 | **Google sign-in:** on accounts.google.com only, Burrow presents itself as Firefox (request headers, the page's navigator.userAgent, no Chromium client hints); everywhere else it stays Chrome | Leave it (Google blocks sign-in); pretend to be Google Chrome everywhere | Google refuses sign-in from browsers it sees as embedded Chromium. Presenting as Firefox only there is the usual approach of independent browsers and changes nothing for other sites. Google could change its checks later |
@@ -541,7 +549,11 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | ✅ done |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | ✅ done |
 | 14 | Polish, accessibility, site permissions, clear data, default browser, crash page, installer + auto-update | ✅ done |
-| 15 | Password manager + password import | later |
+| 15 | v0.3.0: "Soft paper" design system + UX fundamentals (tokens, restyle, honest address bar, informative tabs, loading bar, undo toasts, status colours, two voices, density) | next (planned) |
+| 16 | v0.3.x: search suggestions, touchpad + mouse gestures, tester badges | planned |
+| 17 | v0.4.0: the Burrow adventure (Game Boy-style, our own game) | planned |
+| 18 | v0.5.x: tab groups + pinned, ad & tracker blocker, screenshots, send to phone (QR), file converter + shrinker, "What are you here for?", endless-scroll nudge, focus schedule | planned |
+| 19 | Password manager + password import | later |
 | later | Mochi answers with your own AI key; code signing; auto-updates | parked |
 
 ---
