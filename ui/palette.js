@@ -39,7 +39,7 @@ function palActions() {
     A('New private window', () => B.openPrivate(), 'CTRL SHIFT N', 'incognito'),
     A('Reopen closed tab', () => B.tabs.reopen(), 'CTRL SHIFT T', 'undo restore'),
     // If Google says "Couldn't sign you in", try another way of signing in (see main/signin.js).
-    ...[['both', 'Chrome pieces + Electron identity (default)'], ['chrome', 'Chrome pieces'], ['electron', 'Electron identity']].map(([m, name]) =>
+    ...[['chrome', 'Chrome pieces (default)'], ['both', 'Chrome pieces + Electron identity'], ['electron', 'Electron identity']].map(([m, name]) =>
       A(`Google sign-in method: ${name}`, async () => { await B.signInMethod(m); toast(`Google sign-in method: ${name}. Try signing in again.`); }, '', 'google login account sign in signin gmail youtube method')),
     A('Find in page', () => openFind(), 'CTRL F', 'search text'),
     A('Zoom in', () => B.zoom(1), 'CTRL +', 'bigger larger'),

@@ -2242,9 +2242,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     const t31 = tabs.create(base31 + '/plain');
     await ready(t31);
 
-    check(SignIn.method() === 'both', 'the default method is "Chrome pieces + Electron identity"');
+    check(SignIn.method() === 'chrome', 'the default method is "Chrome pieces" (the one that signed you in)');
     let l = await look31();
     check(l.app && l.csi === 'object' && l.lt === 'number' && !l.ua.includes('Electron'), 'every web page has the window.chrome pieces real Chrome has (app, csi, loadTimes), and still looks like Chrome (' + l.ua.slice(-40) + ')');
+    SignIn.setMethod('both'); // (the Electron identity, checked on both paths)
     for (const [how, p] of [['opened directly', '/__burrow_signin_test/start'], ['reached by a redirect (like Gmail → sign in)', '/go-signin']]) {
       l = await go31(p, '/__burrow_signin_test');
       // (Client hints aren't sent to this plain-HTTP stand-in at all; on Google's HTTPS pages Burrow leaves Chromium's own.)
@@ -2273,8 +2274,8 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     const offer = () => mainWin.toasts.list().find((t) => /Google refused the sign-in/.test(t.text));
     check(await until(() => offer() && offer().action === 'Try it'), 'when Google refuses, a message offers the next method (' + (offer()?.text || '') + ')');
     mainWin.toasts.act(offer().id);
-    check(await until(() => SignIn.method() === 'both' && tabs.active.url.includes('/__burrow_signin_test/start')), '"Try it" switches method and goes back to the sign-in page');
-    SignIn.setMethod('both');
+    check(await until(() => SignIn.method() === 'chrome' && tabs.active.url.includes('/__burrow_signin_test/start')), '"Try it" switches method and goes back to the sign-in page');
+    SignIn.setMethod('chrome');
     tabs.close(t31.id);
     srv31.close();
     }

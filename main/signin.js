@@ -6,11 +6,11 @@
 //     window.chrome empty. Filling them in got a real account past the block (Nuphos).
 //   • "electron" identity: on Google's sign-in pages only, say honestly what Burrow is: Electron's
 //     own user agent with Chromium's normal client hints, everything consistent (Orca).
-// Google changes its checks often, so the method is a setting: 'both' (default), 'chrome' or
-// 'electron' (Ctrl+K → "Google sign-in method"). If Google still refuses, Burrow notices its
+// Google changes its checks often, so the method is a setting: 'chrome' (default: it signed you in on
+// 2026-11-20, where 'both' was refused), 'both' or 'electron' (Ctrl+K → "Google sign-in method"). If Google still refuses, Burrow notices its
 // "Couldn't sign you in" page and offers the next method.
 const SIGNIN_HOSTS = ['accounts.google.com', 'accounts.youtube.com'];
-const METHODS = ['both', 'chrome', 'electron'];
+const METHODS = ['chrome', 'both', 'electron']; // the first is the default; "Try it" goes down the list
 const METHOD_NAMES = { both: 'Chrome pieces + Electron identity', chrome: 'Chrome pieces', electron: 'Electron identity' };
 
 let store = null;
@@ -25,7 +25,7 @@ function init(opts) {
 
 function method() {
   const m = store?.get('signInMethod');
-  return METHODS.includes(m) ? m : 'both';
+  return METHODS.includes(m) ? m : METHODS[0];
 }
 function setMethod(m) { if (METHODS.includes(m)) store.set('signInMethod', m); return method(); }
 function nextMethod() { return METHODS[(METHODS.indexOf(method()) + 1) % METHODS.length]; }
