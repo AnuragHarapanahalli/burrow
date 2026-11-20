@@ -1,0 +1,186 @@
+/* "Soft paper" (PLAN.md phase 15), the default look since 0.3.0. Imported by base.css, so it reaches the
+   browser chrome and every Burrow page. Every rule is scoped to [data-look="soft"], so switching to
+   Classic (Settings → Look) simply turns this file off. Most of the softening comes from the design
+   tokens below; the rules after them fix the places where Classic draws hard edges. */
+
+/* ================= Tokens ================= */
+:root[data-look="soft"] {
+  --rule: 1px solid var(--line);
+  --w-head: 600;
+  --r-s: 4px; --r-m: 8px; --r-l: 12px;
+  --float-shadow: 0 12px 32px rgb(60 40 20 / .14), 0 2px 6px rgb(60 40 20 / .08);
+  --sel-bg: var(--tint); --sel-fg: var(--accent-ink);
+  --btn-bg: var(--accent); --btn-fg: var(--on-accent);
+  --bar-h: 44px; --tool-h: 34px; --row-h: 32px;
+  --ink-hover: color-mix(in srgb, var(--fg) 8%, transparent);
+  --halo: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+:root[data-look="soft"][data-mode="dark"] {
+  --float-shadow: 0 12px 32px rgb(0 0 0 / .45), 0 2px 6px rgb(0 0 0 / .3);
+}
+/* Compact density (both looks): smaller bars, rows and text for small screens. */
+:root[data-density="compact"] { --strip-h: 34px; --bar-h: 36px; --tool-h: 28px; --row-h: 26px; --fs-ui: 12px; }
+:root[data-density="compact"] body { font-size: 12px; }
+:root[data-density="compact"] .tab { min-width: 96px; }
+
+/* ================= Everywhere ================= */
+/* Keyboard focus: a soft 3 px halo in the accent colour. */
+:root[data-look="soft"] :focus-visible { outline: 3px solid var(--halo); outline-offset: 1px; }
+/* The pixel font only for numbers, keys and tiny badges; words become small-caps sans. */
+:root[data-look="soft"] .pixel {
+  font-family: var(--sans); font-variant-caps: all-small-caps; font-size: 12.5px; letter-spacing: .05em; font-weight: 600;
+}
+:root[data-look="soft"] :is(.num, .kbd, kbd, .dl-badge, .zoom-chip, .sect-n, .bm-dot, .mm-key, .pal-key, .cm-key, .digits, .score, .wn-ver h3 .pixel).pixel,
+:root[data-look="soft"] :is(.num, .kbd, kbd, .dl-badge, .zoom-chip, .sect-n, .bm-dot, .mm-key, .pal-key, .cm-key, .digits, .score) {
+  font-family: var(--pixel); font-variant-caps: normal; font-size: 11px; letter-spacing: 0; font-weight: 400;
+}
+:root[data-look="soft"] h1, :root[data-look="soft"] h2 { letter-spacing: -0.02em; }
+/* Primary buttons are the accent; secondary ones are quiet outlines. */
+:root[data-look="soft"] :is(.primary, .imp-go, .clr-go, .limit-add button, .eat-snooze, .bug-go, .lf-save, .go, .nav .next) {
+  border-radius: var(--r-m); border-color: transparent; box-shadow: none;
+}
+:root[data-look="soft"] :is(.primary, .imp-go, .clr-go, .limit-add button, .eat-snooze, .bug-go, .lf-save, .go, .nav .next):hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--fg)); transform: none;
+}
+:root[data-look="soft"] :is(.bm-edit-btns button, .pop-btns button, .btns button):not(.primary) { border-color: var(--line); border-radius: var(--r-m); }
+:root[data-look="soft"] :is(.bm-edit-btns button, .pop-btns button, .btns button):not(.primary):hover { background: var(--ink-hover); }
+/* Inputs: rounded, hairline; focus = accent edge + halo. */
+:root[data-look="soft"] :is(.address, .pane-search, #findInput, .bm-edit input, .note-text, .search, input[type="text"], input[type="url"], input[type="search"], textarea) {
+  border-radius: var(--r-m);
+}
+:root[data-look="soft"] :is(.pane-search, #findInput, .bm-edit input, .note-text):focus {
+  border: 1px solid var(--accent-ink); box-shadow: 0 0 0 3px var(--halo); outline: 0;
+}
+:root[data-look="soft"] .row input[type="color"] { border-color: var(--line); border-radius: var(--r-s); }
+
+/* Floating things: menus, suggestions, palette, dialogs. One soft shadow, no hard border. */
+:root[data-look="soft"] :is(.menu, .suggest, .palette, .ctx-menu, .cm-sub) {
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: var(--r-l);
+  background: var(--surface); padding: 4px; overflow: hidden;
+}
+:root[data-look="soft"] .menu .menu-label { border-bottom: 0; }
+:root[data-look="soft"] :is(.mm-row, .cm-item, .pal-row, .ws-row, .sg, .mm-item) { border-radius: var(--r-m); border-bottom: 0; }
+:root[data-look="soft"] :is(.mm-row, .cm-item, .pal-row, .sg, .mm-item) { min-height: var(--row-h); }
+:root[data-look="soft"] .ws-row:hover, :root[data-look="soft"] .item:hover, :root[data-look="soft"] .engine:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .mm-row:hover .mm-key { color: var(--accent-ink); }
+:root[data-look="soft"] .pal-head { border-bottom: var(--hair); }
+:root[data-look="soft"] .pal-row.sel :is(.kind, .u, .pal-key) { color: var(--accent-ink); }
+:root[data-look="soft"] .ws-row.current .num, :root[data-look="soft"] .tab.active .num, :root[data-look="soft"] .side-tab.active .num { color: var(--accent-ink); }
+:root[data-look="soft"] .cm-item:hover:not([disabled]) .cm-key, :root[data-look="soft"] .cm-item:focus:not([disabled]) .cm-key { opacity: .8; }
+
+/* ================= Browser chrome ================= */
+/* Tab strip: no column rules; tabs are soft tiles; the current tab is a light tile with a thin accent line. */
+:root[data-look="soft"] .brand { border-right: 0; border-radius: var(--r-m); margin: 3px 2px 3px 4px; padding-top: 3px; }
+:root[data-look="soft"] .tab {
+  border-right: 0; margin: 4px 1px 0; border-radius: var(--r-m) var(--r-m) 0 0; position: relative;
+}
+:root[data-look="soft"] .tab:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .tab.active { background: var(--surface); color: var(--fg); box-shadow: inset 0 -2px 0 var(--accent); }
+:root[data-look="soft"] .tab.active .title { font-weight: 600; }
+:root[data-look="soft"] .tab .num { opacity: .8; }
+:root[data-look="soft"] .close, :root[data-look="soft"] .snd { border-radius: var(--r-s); }
+:root[data-look="soft"] .close:hover, :root[data-look="soft"] .snd:hover { background: var(--ink-hover); color: var(--fg); }
+:root[data-look="soft"] .new-tab { border-right: 0; width: 32px; margin: 4px 2px; border-radius: var(--r-m); }
+:root[data-look="soft"] .new-tab:hover, :root[data-look="soft"] .brand:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .strip-bubble { border: var(--hair); border-radius: var(--r-l); box-shadow: 0 2px 8px rgb(60 40 20 / .1); padding: 3px 10px; }
+:root[data-look="soft"] body.tab-dragging .tab.active:not(.dragging) { background: var(--surface); }
+:root[data-look="soft"] :is(.tab, .side-tab).dragging { outline: 0; border-radius: var(--r-m); }
+:root[data-look="soft"] body.tab-tearing .dragging { background: var(--surface); color: var(--fg); }
+:root[data-look="soft"] .tear-hint { border-radius: var(--r-m); }
+:root[data-look="soft"] .tab.paired { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Toolbar: bigger, rounded buttons; the address bar sits in the toolbar as a soft field. */
+:root[data-look="soft"] .toolbar { gap: 4px; padding: 0 8px; }
+:root[data-look="soft"] .tool { border-radius: var(--r-m); padding: 0 8px; }
+:root[data-look="soft"] .tool:hover:not(:disabled) { background: var(--ink-hover); }
+:root[data-look="soft"] :is(.tool[aria-expanded="true"], #settingsBtn[aria-pressed="true"], .ai-btn[aria-pressed="true"], #splitBtn[aria-pressed="true"]) { background: var(--sel-bg); color: var(--sel-fg); }
+:root[data-look="soft"] .address { height: var(--tool-h); border-color: transparent; background: var(--ink-hover); margin: 0 8px; }
+:root[data-look="soft"] .address:hover { border-color: transparent; background: color-mix(in srgb, var(--fg) 11%, transparent); }
+:root[data-look="soft"] .address:focus-within { background: var(--surface); border-color: var(--accent-ink); box-shadow: 0 0 0 3px var(--halo); }
+:root[data-look="soft"] .address .hint { border-color: var(--line); border-radius: var(--r-s); }
+:root[data-look="soft"] .addr-chip { border-radius: var(--r-s); }
+:root[data-look="soft"] .addr-chip:hover { background: var(--ink-hover); color: var(--fg); }
+:root[data-look="soft"] .zoom-chip { border-color: var(--line); }
+:root[data-look="soft"] .dl-btn.fresh .dl-badge { border-radius: 999px; padding: 0 5px; }
+
+/* Bookmarks bar, find bar */
+:root[data-look="soft"] .bm, :root[data-look="soft"] .bm-more { border-radius: var(--r-m); }
+:root[data-look="soft"] .bm:hover, :root[data-look="soft"] .bm-more:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .bm-dot { border-radius: var(--r-s); background: var(--tint); color: var(--accent-ink); }
+:root[data-look="soft"] .find-case[aria-pressed="true"] { border-radius: var(--r-s); }
+:root[data-look="soft"] .findbar.no-match #findInput { border-color: var(--danger); }
+:root[data-look="soft"] .findbar.no-match .find-count { color: var(--danger); }
+
+/* ================= Panels: tab sidebar, side panel, settings ================= */
+:root[data-look="soft"] .side-tab { border-bottom: 0; margin: 1px 6px; border-radius: var(--r-m); }
+:root[data-look="soft"] .side-tab:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .side-tab.active { background: var(--sel-bg); color: var(--fg); box-shadow: inset 3px 0 0 var(--accent); }
+:root[data-look="soft"] .side-new { border-radius: var(--r-m); margin: 4px 6px; }
+:root[data-look="soft"] .panel-nav { gap: 2px; padding: 4px; }
+:root[data-look="soft"] .panel-nav button { border: 0; border-radius: var(--r-m); }
+:root[data-look="soft"] .panel-nav button:hover { background: var(--ink-hover); }
+:root[data-look="soft"] .panel-nav button[aria-selected="true"] .pixel { color: var(--accent-ink); }
+:root[data-look="soft"] .pane h2 { font-size: 22px; }
+:root[data-look="soft"] .list, :root[data-look="soft"] .engines, :root[data-look="soft"] .sects,
+:root[data-look="soft"] .limits, :root[data-look="soft"] .imp-list, :root[data-look="soft"] .perm-list { border-top: var(--hair); }
+:root[data-look="soft"] .item { border-radius: var(--r-s); padding-left: 4px; padding-right: 4px; }
+:root[data-look="soft"] .item .x { border-radius: var(--r-s); }
+:root[data-look="soft"] .item .x:hover { background: var(--ink-hover); color: var(--danger); }
+:root[data-look="soft"] .engine .radio { border: 1.5px solid var(--muted); border-radius: 50%; }
+:root[data-look="soft"] .engine[aria-checked="true"] .radio { border-color: var(--accent-ink); }
+:root[data-look="soft"] .engine[aria-checked="true"] .radio::after { border-radius: 50%; }
+/* Segmented controls become a soft toggle: a light track, the chosen option a raised pill. */
+:root[data-look="soft"] :is(.seg, .ai-seg, .mode-seg, .lf-seg) {
+  border: 0; background: var(--ink-hover); border-radius: var(--r-m); padding: 3px; gap: 2px;
+}
+:root[data-look="soft"] :is(.seg, .ai-seg, .mode-seg, .lf-seg) button { border: 0 !important; border-radius: 6px; }
+:root[data-look="soft"] :is(.seg, .ai-seg, .mode-seg, .lf-seg) button:hover { background: var(--ink-hover); }
+:root[data-look="soft"] :is(.seg, .ai-seg, .mode-seg, .lf-seg) button[aria-checked="true"] {
+  background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgb(60 40 20 / .16); font-weight: 600;
+}
+:root[data-look="soft"] .swatches .chip { border-radius: var(--r-m); }
+:root[data-look="soft"] .swatches button[aria-checked="true"] .chip { border: 2px solid var(--fg); }
+:root[data-look="soft"] .bubble { border: var(--hair); border-radius: var(--r-l); }
+:root[data-look="soft"] .dl .bar { border: 0; background: var(--ink-hover); border-radius: 999px; overflow: hidden; height: 5px; }
+:root[data-look="soft"] .text-btn.danger.confirm, :root[data-look="soft"] .ws-row .act.confirm { background: var(--danger); color: #fff; border-radius: var(--r-s); }
+:root[data-look="soft"] .permbar { border-bottom: var(--hair); }
+:root[data-look="soft"] .wn-thanks { border-radius: var(--r-m); background: var(--tint); }
+:root[data-look="soft"] .wn-ver h4 { font-family: var(--sans); font-variant-caps: all-small-caps; font-weight: 600; font-size: 13px; letter-spacing: .05em; }
+:root[data-look="soft"] .whats-new .pop-btns { border-top: var(--hair); }
+:root[data-look="soft"] .focus-chip, :root[data-look="soft"] .eat-bubble { border-radius: var(--r-m); }
+
+/* ================= Burrow pages (new tab, welcome, gate, reader, report, offline) ================= */
+:root[data-look="soft"] .card, :root[data-look="soft"] button.card { border-radius: var(--r-l); }
+:root[data-look="soft"] .card:hover { background: var(--ink-hover); color: inherit; }
+:root[data-look="soft"] .go { box-shadow: none; }
+:root[data-look="soft"] .go:hover, :root[data-look="soft"] .go:active { box-shadow: none; transform: none; }
+:root[data-look="soft"] .chooser-grid button, :root[data-look="soft"] .bug-btn,
+:root[data-look="soft"] .breathe-btn, :root[data-look="soft"] .open-btn, :root[data-look="soft"] .rtools button { border-radius: var(--r-m); }
+:root[data-look="soft"] :is(.chooser-grid button, .bug-btn, .breathe-btn:not(:disabled), .open-btn):hover { background: var(--ink-hover); color: var(--fg); border-color: var(--line); }
+:root[data-look="soft"] body.ask-mode .search:focus-within { box-shadow: 0 0 0 3px var(--halo); }
+:root[data-look="soft"] .steps li.current button { border-radius: var(--r-m); }
+
+/* Loading tabs show a small spinner where the icon goes (Classic keeps its blinking pixel). */
+:root[data-look="soft"] .loading .num::after { display: none; }
+:root[data-look="soft"] :is(.tab, .side-tab).loading .fav { display: grid !important; place-items: center; width: 14px; height: 14px; flex: none; }
+:root[data-look="soft"] :is(.tab, .side-tab).loading .fav img { display: none; }
+:root[data-look="soft"] :is(.tab, .side-tab).loading .fav::after {
+  content: ''; width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite;
+}
+/* "Not secure": a soft danger pill. */
+:root[data-look="soft"] .sec-chip { border: 0; border-radius: var(--r-s); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+:root[data-look="soft"] .read-chip { border-radius: var(--r-s); }
+:root[data-look="soft"] .load-bar { border-radius: 0 2px 2px 0; }
+
+/* Settings section titles and the ☰ menu's zoom control */
+:root[data-look="soft"] .sect-t { font-weight: 600; }
+:root[data-look="soft"] .mm-zbtn, :root[data-look="soft"] .mm-zval { border-color: var(--line); }
+:root[data-look="soft"] .mm-zbtn:first-of-type { border-radius: var(--r-m) 0 0 var(--r-m); }
+:root[data-look="soft"] .mm-zbtn:last-of-type { border-radius: 0 var(--r-m) var(--r-m) 0; }
+:root[data-look="soft"] :is(.mm-zbtn, .mm-zval):hover { background: var(--ink-hover); color: var(--fg); }
+
+/* Compact: the wordmark and workspace name fit the shorter strip. */
+:root[data-density="compact"] .brand { padding-top: 2px; margin-top: 1px; margin-bottom: 1px; line-height: 1; gap: 1px; }
+:root[data-density="compact"] .wordmark { font-size: 13.5px; }
+:root[data-density="compact"] .workspace { font-size: 10px; }

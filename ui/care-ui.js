@@ -45,8 +45,7 @@ $('tidyClose').onclick = () => {
   const ids = [...crTidy.querySelectorAll('[data-tab]:checked')].map((c) => Number(c.dataset.tab));
   hideOverlay();
   if (!ids.length) return;
-  B.care.closeTabs(ids);
-  mochiSay(`Tidied ${ids.length} tab${ids.length === 1 ? '' : 's'}. Ctrl+Shift+T brings one back`, { pose: 'happy', essential: true });
+  B.care.closeTabs(ids); // (a toast says how many closed, with Undo)
 };
 $('tidyLater').onclick = () => hideOverlay();
 async function crTidyNow() {
@@ -108,11 +107,7 @@ $('remindCancel').onclick = () => hideOverlay();
 
 // =============== Risky downloads ===============
 B.downloads.onRisky((d) => {
-  UI.stripClickOpens = 'downloads';
-  let site = '';
-  try { site = new URL(d.url).host.replace(/^www\./, ''); } catch { site = 'a website'; }
-  void site;
-  mochiSay(`${d.filename} is a program. Click me to keep or discard`, { pose: 'oops', essential: true, ms: 10000, opens: 'downloads' });
+  toast(`${d.filename} is a program. Keep it only if you trust where it came from`, { kind: 'warning', action: 'Review', ms: 12000, onAction: () => openPanel('downloads') });
 });
 
 (window.__loaded = window.__loaded || []).push('care-ui');

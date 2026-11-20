@@ -152,7 +152,10 @@ function themePayload(isPrivate = false) {
   // Private windows are always dark, so you can tell them apart at a glance.
   // Night mode (bedtime): a warm, dim Burrow until morning. Your own theme is untouched.
   const night = !isPrivate && !!store.get('nightMode');
-  const tokens = night ? Theme.build(NIGHT_SEED, true) : Theme.build(seed, isPrivate || nativeTheme.shouldUseDarkColors);
+  // Look: Soft paper (default) or Classic. Saved settings from before 0.3.0 have no look → Soft paper.
+  const look = settings.look === 'classic' ? 'classic' : 'soft';
+  const tokens = night ? Theme.build(NIGHT_SEED, true, look) : Theme.build(seed, isPrivate || nativeTheme.shouldUseDarkColors, look);
+  tokens.density = settings.density === 'compact' ? 'compact' : 'comfortable';
   const prefs = {
     searchEngine: store.get('searchEngine'),
     searchChosen: store.get('searchChosen'),
@@ -185,6 +188,8 @@ function setTheme(patch) {
   if (['light', 'dark', 'system'].includes(patch?.mode)) next.mode = patch.mode;
   if (typeof patch?.useWindowsAccent === 'boolean') next.useWindowsAccent = patch.useWindowsAccent;
   if (typeof patch?.grid === 'boolean') next.grid = patch.grid;
+  if (['soft', 'classic'].includes(patch?.look)) next.look = patch.look;
+  if (['comfortable', 'compact'].includes(patch?.density)) next.density = patch.density;
   store.set('theme', next);
   broadcastTheme();
 }
@@ -470,6 +475,7 @@ function overChrome(w, x, y) {
 }
 
 const winOfUi = (wc) => [...windows].find((w) => w.ui.webContents === wc);
+const winOfToast = (wc) => [...windows].find((w) => w.toasts?.view?.webContents === wc);
 const winOfPage = (wc) => [...windows].find((w) => w.ownsPage(wc));
 const isBurrowPage = (wc) => wc.getURL().startsWith('burrow://');
 
@@ -481,6 +487,13 @@ function registerIpc() {
 
   on('ui:ready', (w) => { w.sendTabs(); w.applyTheme(); w.sendBookmarks(); w.send('downloads', w.downloads.state()); w.send('ai-panel', w.aiState()); });
   on('ui:layout', (w, l) => w.setLayout(l));
+  // System toasts: shown by the interface (e.g. "Saved report.pdf · Show"); the button's press goes back to it.
+  handle('toast:show', (w, t) => w.toasts.show({ text: t?.text, kind: t?.kind, action: t?.action, ms: t?.ms, onAction: (id) => w.send('toast-action', id) }));
+  const onToast = (ch, fn) => ipcMain.on(ch, (e, ...a) => { const w = winOfToast(e.sender); if (w) fn(w, ...a); });
+  onToast('toast:size', (w, width, height) => w.toasts.setSize(width, height));
+  onToast('toast:act', (w, id) => w.toasts.act(Number(id)));
+  onToast('toast:dismiss', (w, id) => w.toasts.dismiss(Number(id)));
+  onToast('toast:hover', (w, on) => w.toasts.hover(on));
   on('ui:overlay', (w, open) => w.setOverlay(open));
   on('prefs:set', (_w, patch) => setPrefs(patch));
   on('theme:set', (_w, patch) => setTheme(patch));
@@ -521,7 +534,7 @@ function registerIpc() {
   on('night:set', (w, on) => { if (!w.isPrivate) setNight(!!on); });
   on('hop:open', (w) => w.tabs.create('burrow://offline/?play=1'));
   handle('care:tidy', (w) => (w.isPrivate ? null : care.offerTidy(w, true)));
-  on('care:close-tabs', (w, ids) => { for (const id of (Array.isArray(ids) ? ids : []).slice(0, 200)) w.tabs.close(Number(id), { keepWindow: true }); });
+  on('care:close-tabs', (w, ids) => w.tabs.closeMany((Array.isArray(ids) ? ids : []).slice(0, 200), { keepWindow: true }));
   handle('tab:remind', (w, id, at) => {
     if (w.isPrivate) return null;
     const t = w.tabs.get(Number(id));
@@ -844,7 +857,7 @@ function registerIpc() {
     if (warnedPages.has(key)) return;
     warnedPages.add(key);
     const w = winOfPage(e.sender);
-    w?.send('mochi-say', { text: `${u.host} isn't secure. Don't type passwords here`, pose: 'oops', essential: true, ms: 9000 });
+    w?.toasts.show({ text: `${u.host} isn't secure. Don't type passwords here`, kind: 'warning', ms: 9000 });
   });
   // ---- New tab: the stat line (and the weekly nudge) ----
   // ---- Mochi's menu on the new tab (burrow://newtab only) ----
@@ -942,7 +955,7 @@ app.whenReady().then(() => {
       everyWindow((w) => w.send('update-state', st));
       if (st.status === 'ready') {
         const w = normalWindows().find((x) => x.win.isFocused()) || normalWindows()[0];
-        w?.send('mochi-say', { text: `Update ready. Click me to restart into v${st.version}`, pose: 'celebrate', essential: true, ms: 15000, opens: 'update' });
+        w?.toasts.show({ text: `Burrow v${st.version} is ready`, kind: 'success', action: 'Restart', ms: 15000, onAction: () => updates.install() });
       }
     },
   });

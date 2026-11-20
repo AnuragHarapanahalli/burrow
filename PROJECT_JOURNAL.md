@@ -39,6 +39,11 @@ Burrow is built with **Electron**: a toolkit that bundles the Chromium engine (t
 
 | Date | Decision | Options considered | Why |
 |---|---|---|---|
+| 2026-11-20 | **Both looks stay: Soft paper (default) and Classic**, switchable in Settings → Look, in the 0.3.0 "What's new" popup, and from Ctrl+K | Soft paper only | You asked to keep the choice. Classic is the original rules untouched; Soft paper is one extra stylesheet (`ui/soft.css`) that only applies when chosen |
+| 2026-11-20 | Soft paper is built from **design tokens** (CSS variables in `ui/base.css`): the look switch swaps the token values, so most screens needed no per-screen rules | Restyle every screen twice | One switch, consistent everywhere, and new screens get both looks for free |
+| 2026-11-20 | **Toasts live in their own small window layer** at the bottom left, sized to fit them exactly | Drawing them in the interface layer | The interface layer sits under the web page except when a menu is open, so a toast drawn there would be hidden; a full-size layer on top would block clicks on the page |
+| 2026-11-20 | **Undo puts tabs back in their old places**, one Undo per action (a whole "close others" comes back together) | Only Ctrl+Shift+T | Undo is what makes "no confirmation" safe |
+| 2026-11-20 | Safety warnings (password on a non-HTTPS page, risky download) and "update ready" became **toasts**; Mochi keeps breaks, bedtime, reminders and fun | Keep them with Mochi | With Mochi set to Off they would have disappeared |
 | 2026-11-19 | **New look: "Soft paper" v2** for v0.3.0 — warm grey ink, hairline rules, soft coral, tints instead of black blocks, lighter headings, 8 px rhythm, clear hover / selected / focus states, bigger targets; dark mode softened the same way | Keep the current high-contrast look; Muted Swiss; Cozy sand; Calm cool | You found the current look harsh. Soft paper keeps Burrow's Swiss character and red but stops everything shouting at once (compared as HTML mockups) |
 | 2026-11-19 | **Design tokens written down** (type scale, spacing, radius, elevation, motion) before the restyle | Restyle screen by screen | One set of building blocks keeps every screen consistent as Burrow grows |
 | 2026-11-19 | **Status colours separate from the brand accent** (danger, warning, success, info) | Coral for everything | When coral meant both "Burrow" and "error", neither was clear |
@@ -271,7 +276,14 @@ Presets: Signal red (default), Tomato, Klein, Matcha, Plum, Teal, Amber, Graphit
 | Crash page ("Mochi fainted") + split view remembered after a restart | ✅ done (tested with a forced crash) |
 | PDF links open in the tab (Chromium's built-in viewer) | ✅ done |
 | App icon (Mochi's face on red), one-click installer + portable .exe, auto-update from GitHub Releases, Settings → About | ✅ done (built locally; update flow tested with simulated events) |
-| Windows installer | planned |
+| Look: Soft paper (default) or Classic — Settings → Look, the 0.3.0 "What's new" popup, Ctrl+K | ✅ done (tested) |
+| Density: Comfortable or Compact | ✅ done (tested) |
+| Design tokens (type, spacing, radius, elevation, motion, status colours) | ✅ done |
+| Honest address bar: lock / "Not secure", domain in full ink, the rest muted | ✅ done (tested) |
+| Tab tooltip (title, site, state), loading spinner in tabs (Soft paper), loading bar under the toolbar | ✅ done (tested) |
+| Undo toasts for closing tabs, "close others / to the right" and tidy-up | ✅ done (tested) |
+| System messages as toasts (downloads, warnings, updates, errors), whatever Mochi's setting | ✅ done (tested) |
+| Windows installer | ✅ done (v0.2.0) |
 
 ---
 
@@ -286,6 +298,7 @@ WOAHDAMN/
 │  ├─ window.js           one Burrow window (normal or private): frame, interface, tabs, shortcuts, find, PiP, AI panel
 │  ├─ permissions.js      site permissions: ask (bar), remember per site, private windows never remember
 │  ├─ updates.js          auto-update from GitHub Releases (installed app only)
+│  ├─ toasts.js           system messages at the bottom left ("3 tabs closed · Undo"): one small layer per window
 │  ├─ fun.js              carrots + outfits, Mochi Hop scores, bedtime arithmetic
 │  ├─ care.js             Mochi's helpful side: eye/stretch breaks, tab tidy-up, tab reminders
 │  ├─ importer.js         finds other browsers' profiles and reads their bookmarks + history (read-only copies)
@@ -309,7 +322,9 @@ WOAHDAMN/
 │  ├─ ai.js               Ask AI: the AI sites, how to open each one, and "does this look like a question?"
 │  └─ mochi.js            Mochi's pixel sprites (idle, blink, happy, wave) drawn as SVG
 └─ ui/                    ── what you see ──
-   ├─ base.css            fonts + colour variables shared by every Burrow page
+   ├─ base.css            fonts + colour variables + design tokens shared by every Burrow page (Classic values)
+   ├─ soft.css            the Soft paper look: token values + the few rules where Classic draws hard edges
+   ├─ toast.html / .js    the toast layer's page (draws the messages, reports its size)
    ├─ index.html          the browser's interface (one page)
    ├─ ui.css / ui.js      tab strip, sidebar tabs, toolbar, Mochi popping into the strip
    ├─ overlay.js          things that float over websites: workspace menu, address suggestions
@@ -511,6 +526,15 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 - Your first `npm run release` created **two** v0.2.0 releases: electron-builder uploads the installer and the portable copy at the same time, and when no release exists yet both uploads create one. `latest.yml` (needed for auto-update) didn't arrive.
 - Fix: `npm run release` now runs `scripts/release.js`, which creates the one release first (or stops if there are duplicates), then builds and uploads into it, and finally checks that all four files are there (installer, blockmap, portable, latest.yml).
 
+**2026-11-20 — v0.3.0: Soft paper + UX fundamentals (phase 15)**
+- **Two looks, one switch.** Every hard-coded "Classic" style (2 px black rules, inverted black blocks, block shadows, 800-weight headings) became a design token in `ui/base.css`. Soft paper (`ui/soft.css`) changes the tokens and fixes the remaining hard edges: tiles for tabs with a thin accent line, rounded menus on a soft shadow, a soft toggle for segmented controls, small caps instead of the pixel font for words, a 3 px focus halo.
+- **Theme engine:** Soft paper colours (warm grey paper and ink, softer accent, a selection tint) and status colours (danger, warning, success, info), all checked for 4.5:1 on every background they can sit on, in both looks, light and dark.
+- **Density** (Comfortable / Compact) also resizes Windows' own title-bar buttons.
+- **Toasts** in their own layer (see decision log); **Undo** for closing tabs, by batch, back in their old places.
+- **Honest address bar**, tab tooltips, tab spinner (Soft paper), loading bar.
+- Self-test: new `v030` part (32 checks) with screenshots of both looks in light and dark; the three checks that used to read Mochi's words now read the toasts.
+- Bugs found while testing: a 0×0 layer never paints a frame, so the toast layer measured itself with requestAnimationFrame and never grew (now measured straight away); closing several tabs remembered each one's neighbour *after* the earlier ones had gone, so Undo put them back in the wrong order (now the order from before the close is kept).
+
 **2026-11-19 — v0.2.2 fixes**
 - **Video fullscreen fixed.** Burrow's tabs are separate views inside its window, so a page going fullscreen only filled its own box. Now the window goes fullscreen, that page fills it, and Burrow's bars hide; Esc (or the video's button) brings everything back. In split view, just that side goes fullscreen.
 - **F11 full screen, like Chrome:** the page fills the screen with a "Press F11 to exit full screen" note for a few seconds; touching the top edge drops down a round ✕ to exit (Ctrl+L still brings the address bar). Videos going fullscreen show "Press Esc to exit full screen". In fullscreen, Burrow's interface shrinks to a small see-through strip at the top centre, so nothing else covers the page.
@@ -549,7 +573,7 @@ Your settings and open tabs are saved in `%APPDATA%\burrow\burrow-state.json`. D
 | 12 | Mochi, helpful: eye & break nudges, tab tidy-up, tab reminders, safety warnings | ✅ done |
 | 13 | Mochi, fun: offline game, carrots + outfits, reading time + idle life, bedtime wind-down | ✅ done |
 | 14 | Polish, accessibility, site permissions, clear data, default browser, crash page, installer + auto-update | ✅ done |
-| 15 | v0.3.0: "Soft paper" design system + UX fundamentals (tokens, restyle, honest address bar, informative tabs, loading bar, undo toasts, status colours, two voices, density) | next (planned) |
+| 15 | v0.3.0: "Soft paper" design system + UX fundamentals (tokens, restyle, Classic kept as a choice, honest address bar, informative tabs, loading bar, undo toasts, status colours, two voices, density) | ✅ done (release: `npm version minor`) |
 | 16 | v0.3.x: search suggestions, touchpad + mouse gestures, tester badges | planned |
 | 17 | v0.4.0: the Burrow adventure (Game Boy-style, our own game) | planned |
 | 18 | v0.5.x: tab groups + pinned, ad & tracker blocker, screenshots, send to phone (QR), file converter + shrinker, "What are you here for?", endless-scroll nudge, focus schedule | planned |

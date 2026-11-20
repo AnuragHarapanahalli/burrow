@@ -136,7 +136,7 @@ function renderReaderBtn() {
 }
 async function svToggleReader() {
   const ok = await B.reader();
-  if (!ok) { UI.stripClickOpens = null; stripMochi("Couldn't find an article on this page", 3500, 'oops'); }
+  if (!ok) toast("Couldn't find an article on this page");
 }
 window.toggleReader = svToggleReader;
 $('readerBtn').onclick = svToggleReader;
@@ -256,7 +256,7 @@ $('noteExport').onclick = async () => {
   ntSaveNow();
   const r = await B.notes.exportAll();
   UI.stripClickOpens = null;
-  if (r?.ok) stripMochi('Notes exported', 3500, 'celebrate');
+  if (r?.ok) toast('Notes exported', { kind: 'success' });
 };
 B.notes.onChange(() => { if (!panel.hidden && section === 'notes') ntRenderList(); });
 

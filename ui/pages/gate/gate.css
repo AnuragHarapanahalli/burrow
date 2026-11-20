@@ -19,7 +19,7 @@ body { min-height: 100vh; }
 @keyframes float { 0%, 100% { transform: translateY(0); opacity: .4; } 50% { transform: translateY(-6px); opacity: 1; } }
 
 .kicker { color: var(--accent-ink); margin: 0 0 8px; }
-h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; letter-spacing: -.04em; line-height: 1.02; margin: 0 0 14px; }
+h1 { font-size: clamp(32px, 5vw, 54px); font-weight: var(--w-head); letter-spacing: -.04em; line-height: 1.02; margin: 0 0 14px; }
 .lead { font-size: 18px; line-height: 1.55; color: var(--fg); margin: 0 0 14px; max-width: 600px; }
 .pills { display: flex; gap: 8px; flex-wrap: wrap; }
 .pill { border: 1px solid var(--fg); padding: 3px 8px; }
@@ -32,13 +32,13 @@ h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; letter-spacing: -.04em
 }
 .card b { font-size: 16px; }
 .card span { color: var(--muted); font-size: 13px; }
-.card:hover { background: var(--fg); color: var(--bg); }
+.card:hover { background: var(--sel-bg); color: var(--sel-fg); }
 .card:hover span { color: var(--accent); }
 
 .stretch { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .stretch[hidden] { display: none; }
 .stretch .pixel { color: var(--accent-ink); margin: 0; }
-.ring { width: 140px; height: 140px; border: var(--rule); border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: 800; animation: ring 4s ease-in-out infinite; }
+.ring { width: 140px; height: 140px; border: var(--rule); border-radius: 50%; display: grid; place-items: center; font-size: 34px; font-weight: var(--w-head); animation: ring 4s ease-in-out infinite; }
 @keyframes ring { 50% { transform: scale(1.06); } }
 #stretchTip { font-size: 18px; margin: 0; }
 
@@ -55,7 +55,7 @@ h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; letter-spacing: -.04em
 #phraseInput.ok { border-color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-ink); }
 .breathe-btn, .open-btn { align-self: flex-start; padding: 10px 16px; font-weight: 700; border: 2px solid var(--fg); transition: background-color .12s, opacity .12s; }
 .breathe-btn:disabled { opacity: .35; cursor: default; }
-.breathe-btn:not(:disabled):hover, .open-btn:hover { background: var(--fg); color: var(--bg); }
+.breathe-btn:not(:disabled):hover, .open-btn:hover { background: var(--sel-bg); color: var(--sel-fg); }
 .open-btn[hidden], .breathe-btn[hidden], .breathe[hidden] { display: none; }
 .breathe { display: flex; align-items: center; gap: 14px; }
 .breath-dot { width: 26px; height: 26px; background: var(--accent); border-radius: 50%; animation: breath 8s ease-in-out infinite; }

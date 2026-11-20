@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' burrow:; style-src 'self' burrow: 'unsafe-inline'">
+  <title>Burrow messages</title>
+  <link rel="stylesheet" href="burrow://app/ui/base.css">
+  <style>
+    html, body { background: transparent; overflow: hidden; user-select: none; }
+    /* The view is exactly as big as the stack plus room for the shadow. */
+    #stack { position: absolute; left: 0; bottom: 0; width: max-content; max-width: 430px; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+    .toast {
+      display: flex; align-items: center; gap: 12px; max-width: 400px; min-height: 40px; padding: 8px 8px 8px 14px;
+      background: var(--fg); color: var(--bg); box-shadow: var(--float-shadow); font-weight: 500;
+      animation: toast-in var(--t-slow) var(--ease, cubic-bezier(.2, .8, .2, 1));
+    }
+    .toast .dot { width: 8px; height: 8px; flex: none; background: var(--info); }
+    .toast.success .dot { background: var(--success); }
+    .toast.warning .dot { background: var(--warning); }
+    .toast.danger .dot { background: var(--danger); }
+    .toast .text { flex: 1; min-width: 0; line-height: 1.35; }
+    .toast .act { flex: none; padding: 5px 10px; font-weight: 700; color: var(--bg); border: 1px solid currentColor; }
+    .toast .act:hover { background: var(--bg); color: var(--fg); }
+    .toast .x { flex: none; width: 26px; height: 26px; display: grid; place-items: center; opacity: .7; }
+    .toast .x:hover { opacity: 1; }
+    .toast .x svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+    /* Soft paper: a light card on a soft shadow; the action is an accent text button. */
+    :root[data-look="soft"] .toast { background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: var(--r-l); }
+    :root[data-look="soft"] .toast .dot { border-radius: 50%; }
+    :root[data-look="soft"] .toast .act { color: var(--accent-ink); border: 0; border-radius: var(--r-m); }
+    :root[data-look="soft"] .toast .act:hover { background: var(--tint); color: var(--accent-ink); }
+    :root[data-look="soft"] .toast .x { border-radius: var(--r-s); }
+    :root[data-look="soft"] .toast .x:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+  </style>
+</head>
+<body>
+  <div id="stack" role="status" aria-live="polite"></div>
+  <script src="burrow://app/shared/theme.js"></script>
+  <script src="burrow://app/ui/toast.js"></script>
+</body>
+</html>

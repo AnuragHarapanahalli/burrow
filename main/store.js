@@ -5,7 +5,7 @@ const path = require('path');
 const { app } = require('electron');
 
 const SETTINGS_DEFAULTS = {
-  theme: { seed: '#E63027', mode: 'system', useWindowsAccent: false, grid: false },
+  theme: { seed: '#E63027', mode: 'system', useWindowsAccent: false, grid: false, look: 'soft', density: 'comfortable' },
   tabsMode: 'auto', // 'auto' (top, sidebar beyond 8 tabs) | 'top' | 'side'
   session: null,
   searchEngine: 'google',

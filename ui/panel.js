@@ -175,8 +175,7 @@ B.downloads.onDone((d) => {
   if (panel.hidden || section !== 'downloads') $('dlBtn').classList.add('fresh');
   renderDlBadge();
   bump($('dlBtn'), 'pop');
-  UI.stripClickOpens = 'downloads';
-  stripMochi(`Saved ${d.filename}`, 5000, 'celebrate');
+  toast(`Saved ${d.filename}`, { kind: 'success', action: 'Show', onAction: () => openPanel('downloads') });
 });
 
 // ---------- Settings ----------
@@ -190,6 +189,10 @@ function renderSettingsPane() {
       <span class="radio" aria-hidden="true"></span><span class="en-name">${esc(e.name)}</span><span class="en-host">${esc(e.host)}</span>
     </button>`).join('');
   document.querySelectorAll('#modeSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === settings.mode)));
+  const look = settings.look === 'classic' ? 'classic' : 'soft';
+  const density = settings.density === 'compact' ? 'compact' : 'comfortable';
+  document.querySelectorAll('#lookSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.look === look)));
+  document.querySelectorAll('#densitySeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.density === density)));
   document.querySelectorAll('#tabsSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.tabs === prefs.tabsMode)));
   $('bmbarToggle').checked = prefs.bookmarksBar;
   $('swatches').innerHTML = presets.map((p) => `
@@ -213,7 +216,7 @@ function renderSettingsPane() {
   document.querySelectorAll('#askSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.ask === prefs.askMode)));
   const aiName = prefs.aiProviders.find((p) => p.id === prefs.aiProvider)?.name || '';
   $('sumAI').textContent = `${aiName} \u00b7 ${{ smart: 'Smart', search: 'Search first', ai: 'AI first' }[prefs.askMode]}`;
-  $('sumTheme').textContent = cap(settings.mode);
+  $('sumTheme').textContent = `${look === 'classic' ? 'Classic' : 'Soft paper'} · ${cap(settings.mode)}`;
   $('sumColour').innerHTML = `<span class="chip-s" style="background:${tokens.accent}"></span>${settings.useWindowsAccent ? 'Windows accent' : esc(preset ? preset.name : 'Custom')}`;
   const sl = prefs.sleep || { on: true, minutes: 30, never: [] };
   const sleepVal = sl.on ? String(sl.minutes) : 'off';
@@ -341,8 +344,8 @@ $('impList').addEventListener('click', async (e) => {
   out.innerHTML = `<p><b>From ${esc(r.label)}:</b> ${impPl(r.bookmarks.added, 'bookmark')}${skipped} and ${impPl(r.history.added, 'page')} of history.</p>`
     + (impTop.length ? `<button class="text-btn" id="impLinks">Add ${esc(impTop.map((t) => t.name).join(', '))} to your new-tab quick links</button>` : '');
   $('sumImport').textContent = `From ${r.label}`;
-  if (r.bookmarks.added || r.history.added) mochiSay(`Moved in! ${impPl(r.bookmarks.added, 'bookmark')} unpacked`, { pose: 'celebrate', essential: true });
-  else mochiSay('All of that was already here', { pose: 'idle', essential: true });
+  if (r.bookmarks.added || r.history.added) toast(`Moved in! ${impPl(r.bookmarks.added, 'bookmark')} unpacked`, { kind: 'success' });
+  else toast('All of that was already here');
 });
 $('impResult').addEventListener('click', async (e) => {
   if (!e.target.closest('#impLinks')) return;
@@ -376,6 +379,8 @@ $('aiList').addEventListener('click', (e) => {
 $('askSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-ask]'); if (b) B.setPrefs({ askMode: b.dataset.ask }); });
 
 $('modeSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-mode]'); if (b) B.theme.set({ mode: b.dataset.mode }); });
+$('lookSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-look]'); if (b) B.theme.set({ look: b.dataset.look }); });
+$('densitySeg').addEventListener('click', (e) => { const b = e.target.closest('[data-density]'); if (b) B.theme.set({ density: b.dataset.density }); });
 $('tabsSeg').addEventListener('click', (e) => { const b = e.target.closest('[data-tabs]'); if (b) B.setPrefs({ tabsMode: b.dataset.tabs }); });
 $('swatches').addEventListener('click', (e) => {
   const b = e.target.closest('[data-seed]');

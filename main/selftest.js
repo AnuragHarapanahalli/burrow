@@ -1486,13 +1486,15 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await clearStrip();
     await ip.view.webContents.executeJavaScript("document.getElementById('user').focus()");
     await wait(400);
-    check(!(await js("UI.mochiLog.some((m) => /isn't secure/.test(m.text))")), 'typing in a normal box says nothing');
+    const insecureToasts = () => mainWin.toasts.log.filter((x) => /isn't secure/.test(x)).length;
+    const insecureBefore = insecureToasts();
+    check(insecureToasts() === insecureBefore, 'typing in a normal box says nothing');
     await ip.view.webContents.executeJavaScript("document.getElementById('pw').focus()");
-    check(await until(() => js("UI.mochiLog.some((m) => /isn't secure\\. Don't type passwords/.test(m.text))")), 'starting to type a password there makes Mochi warn you');
+    check(await until(() => mainWin.toasts.log.some((x) => /isn't secure\. Don't type passwords/.test(x))), 'starting to type a password there shows a warning');
     await shot('45-insecure');
     await ip.view.webContents.executeJavaScript("document.getElementById('user').focus(); document.getElementById('pw').focus()");
     await wait(500);
-    check(await js("UI.mochiLog.filter((m) => /isn't secure/.test(m.text)).length") === 1, 'only once per page');
+    check(insecureToasts() === insecureBefore + 1, 'only once per page');
     tabs.close(ip.id);
 
     // --- Safety: risky downloads wait for Keep / Discard ---
@@ -1502,7 +1504,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     check(await until(() => held() && held().state === 'completed', 8000), 'a program (.exe) downloads but is held');
     const h1 = held();
     check(fs.existsSync(h1.tmp) && !fs.existsSync(h1.path), 'it waits under a temporary name, not as setup.exe');
-    check(await until(() => js("UI.mochiLog.some((m) => /setup\\.exe is a program\\. Click me/.test(m.text))")), 'Mochi warns: "… is a program. Click me to keep or discard"');
+    check(await until(() => mainWin.toasts.log.some((x) => /setup\.exe is a program/.test(x))), 'a warning says "setup.exe is a program", with a Review button');
     await js("openPanel('downloads')");
     check(await until(() => js("!!document.querySelector('#dlList [data-act=keep]') && !!document.querySelector('#dlList [data-act=discard]')")), 'Downloads shows Keep and Discard');
     await shot('46-risky-download');
@@ -1837,7 +1839,7 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     else check(upd.state.status !== 'error', 'the installed app checks for updates without an error (' + upd.state.status + ')');
     await js("mochiLastChat = 0, UI.mochiLog.length = 0, UI.stripEssential = false, document.getElementById('stripMochi').hidden = true");
     upd.set({ status: 'ready', version: '9.9.9' });
-    check(await until(() => js("UI.mochiLog.some((m) => /^Update ready\\. Click me to restart into v9\\.9\\.9/.test(m.text))")), 'when an update has downloaded, Mochi says "Update ready"');
+    check(await until(() => mainWin.toasts.log.some((x) => /v9\.9\.9 is ready/.test(x))), 'when an update has downloaded, a message says "Burrow v9.9.9 is ready" with a Restart button');
     check(await until(() => js("!document.getElementById('updateRestart').hidden && /9\\.9\\.9 is ready/.test(document.getElementById('updateStatus').textContent)")), 'and Settings → About offers "Restart to update"');
     await shot('54-about-update');
     upd.set({ status: 'dev', version: null });
@@ -2068,6 +2070,162 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     await js('hideOverlay(); closePanel()');
     srv22.close();
     }
+    if (section('v030')) {
+    // ================= v0.3.0: Soft paper / Classic, density, honest address bar, undo toasts =================
+    const Theme = require('../shared/theme');
+    // --- Contrast: every text colour reads at 4.5:1 on every background, in both looks, light and dark ---
+    const seeds = [...Theme.PRESETS.map((p) => p.hex), '#FFFF00', '#00FFFF', '#000000', '#FFFFFF', '#7F7F7F', '#FF00FF'];
+    for (let i = 0; i < 12; i++) seeds.push('#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'));
+    const lows = [];
+    for (const look of ['soft', 'classic']) for (const dark of [false, true]) for (const seed of seeds) {
+      const t = Theme.build(seed, dark, look);
+      const backs = look === 'soft' ? ['bg', 'surface', 'hover', 'tint'] : ['bg', 'surface'];
+      for (const k of ['fg', 'muted', 'accentInk']) for (const b of backs) if (Theme.contrast(t[k], t[b]) < 4.5) lows.push(`${look}/${dark ? 'dark' : 'light'}/${seed} ${k} on ${b}`);
+      for (const k of ['danger', 'warning', 'success', 'info']) for (const b of ['bg', 'surface']) if (Theme.contrast(t[k], t[b]) < 4.5) lows.push(`${look}/${dark ? 'dark' : 'light'}/${seed} ${k} on ${b}`);
+      if (Theme.contrast(t.onAccent, t.accent) < 4.5) lows.push(`${look}/${seed} text on accent`);
+    }
+    check(!lows.length, `every text colour reads at 4.5:1 or more: Soft paper and Classic, light and dark, ${seeds.length} colours${lows.length ? ' (' + lows.slice(0, 4).join('; ') + ')' : ''}`);
+    const sl = Theme.build('#E63027', false, 'soft'), cl = Theme.build('#E63027', false, 'classic');
+    check(Theme.contrast(sl.fg, sl.bg) < Theme.contrast(cl.fg, cl.bg) && sl.danger !== sl.accent, 'Soft paper is softer than Classic (warm grey ink), and status colours are not the brand colour');
+
+    // --- The look: Soft paper by default; Classic one click away (Settings → Look) ---
+    const look = () => js("document.documentElement.dataset.look");
+    const ruleW = async () => parseFloat(await js("getComputedStyle(document.querySelector('.strip')).borderBottomWidth"));
+    setTheme({ mode: 'light', seed: '#E63027' });
+    check(await until(async () => (await look()) === 'soft') && (await ruleW()) <= 1, 'Soft paper is the default look: hairline rules (' + (await ruleW()) + 'px)');
+    await wait(300);
+    await shot('70-soft-light');
+    await js("openPanel('settings')");
+    await wait(200);
+    await js("document.getElementById('lookSeg').closest('details').open = true");
+    check(await js("document.querySelector('#lookSeg [data-look=soft]').getAttribute('aria-checked') === 'true'"), 'Settings → Look shows Soft paper chosen');
+    await shot('71-soft-settings');
+    await js("document.querySelector('#lookSeg [data-look=classic]').click()");
+    check(await until(async () => (await look()) === 'classic' && store.get('theme').look === 'classic' && (await ruleW()) > 1), 'choosing Classic brings back the original look: 2 px rules (and it is remembered)');
+    await wait(250);
+    await shot('72-classic-settings');
+    await js("document.querySelector('#lookSeg [data-look=soft]').click()");
+    check(await until(async () => (await look()) === 'soft' && store.get('theme').look === 'soft'), 'and back to Soft paper');
+    // Pages follow the look too.
+    const nt = tabs.create();
+    await ready(nt);
+    check(await until(async () => (await nt.view.webContents.executeJavaScript('document.documentElement.dataset.look')) === 'soft'), "Burrow's own pages (new tab) use the same look");
+    await js('closePanel()');
+
+    // --- Density ---
+    const heights = () => js("({ strip: document.querySelector('.strip').offsetHeight, bar: document.querySelector('.toolbar').offsetHeight, chrome: document.getElementById('chrome').offsetHeight })");
+    const comfy = await heights();
+    setTheme({ density: 'compact' });
+    check(await until(async () => (await heights()).strip === 34), 'Compact density: a shorter tab strip');
+    const compact = await heights();
+    check(compact.bar === 36 && compact.chrome < comfy.chrome, `and a shorter toolbar (${comfy.bar} → ${compact.bar} px)`);
+    check(await until(() => nt.view.getBounds().y === compact.chrome), 'the page moves up to fill the space');
+    await shot('73-soft-compact');
+    setTheme({ density: 'comfortable' });
+    check(await until(async () => (await heights()).bar === comfy.bar && comfy.bar === 44), 'Comfortable is back to 44 px bars');
+
+    // --- Honest address bar ---
+    const http30 = require('http');
+    const srv30 = http30.createServer((req, res) => {
+      const send = () => { res.writeHead(200, { 'content-type': 'text/html' }); res.end('<!doctype html><title>Slow page</title><p>' + req.url + '</p>'); };
+      if (req.url.startsWith('/slow')) setTimeout(send, 1500); else send();
+    });
+    await new Promise((r) => srv30.listen(0, '127.0.0.1', r));
+    const base30 = 'http://127.0.0.1:' + srv30.address().port;
+    tabs.navigate(base30 + '/path/page?q=1');
+    await ready(nt, '/path/page');
+    const view = () => js("({ hidden: document.getElementById('addrView').hidden, text: document.getElementById('addrView').textContent, host: document.querySelector('#addrView .av-host')?.textContent, lock: !document.getElementById('siteIcon').hidden, insecure: !document.getElementById('secChip').hidden })");
+    let v = await view();
+    check(!v.hidden && v.host === '127.0.0.1' && v.text === 'http://127.0.0.1:' + srv30.address().port + '/path/page?q=1' && v.insecure && !v.lock, 'plain HTTP: "Not secure" at the start, the domain in full ink, the rest muted');
+    await js("renderAddrView({ url: 'https://www.example.com/a/b?c=1' })");
+    v = await view();
+    check(v.host === 'example.com' && v.text === 'www.example.com/a/b?c=1' && v.lock, 'HTTPS: a lock, https:// hidden, "www." and the path muted');
+    ui.webContents.focus();
+    await js("address.focus()");
+    check(await until(() => js("document.getElementById('addrView').hidden && !document.getElementById('addressForm').classList.contains('has-view')")), 'clicking into the address bar shows the full address to edit');
+    await js("address.blur()");
+
+    // --- Tabs: tooltip; loading bar ---
+    const tip = await js("tabTooltip({ title: 'Song', url: 'https://www.music.example/x', audible: true }, 0)");
+    check(tip === 'Song\nmusic.example\nPlaying sound\nCtrl+1', 'hovering a tab shows its full title, site and state (' + JSON.stringify(tip) + ')');
+    tabs.navigate(base30 + '/slow');
+    check(await until(() => js("document.getElementById('loadBar').classList.contains('on')"), 2000), 'a thin loading bar runs under the toolbar while a page loads');
+    await shot('74-loading');
+    await ready(nt, '/slow');
+    check(await until(() => js("!document.getElementById('loadBar').classList.contains('on')"), 4000), 'and finishes when it has loaded');
+
+    // --- Undo instead of "are you sure?" ---
+    const toastsNow = () => mainWin.toasts.list();
+    const ut = tabs.create(base30 + '/undo-me', { activate: false });
+    await ready(ut);
+    const posBefore = tabs.visible.indexOf(ut);
+    await js(`B.tabs.close(${ut.id})`);
+    check(await until(() => !tabs.get(ut.id) && toastsNow().some((t) => t.text === 'Tab closed' && t.action === 'Undo')), 'closing a tab shows "Tab closed · Undo" (no question asked)');
+    const vb = mainWin.toasts.view.getBounds(), [cw, ch] = mainWin.win.getContentSize();
+    check(await until(() => { const b = mainWin.toasts.view.getBounds(); return b.width > 100 && b.y + b.height === ch && b.x === mainWin.layout.left; }), `the message sits at the bottom left, over the page (${vb.width}x${vb.height} of ${cw}x${ch})`);
+    await capture(mainWin.toasts.view.webContents, path.join(dir, '75-toast-undo.png'));
+    mainWin.toasts.act(toastsNow().find((t) => t.text === 'Tab closed').id);
+    check(await until(() => tabs.visible.some((t) => t.url.includes('/undo-me'))), 'Undo brings it back');
+    check(tabs.visible.findIndex((t) => t.url.includes('/undo-me')) === posBefore, 'in the same place');
+    // A group: close others → one Undo for all, in their old order.
+    const order = () => tabs.visible.map((t) => t.url);
+    while (tabs.visible.length < 4) tabs.create(base30 + '/g' + tabs.visible.length, { activate: false });
+    await wait(400);
+    const before = order();
+    tabs.activate(tabs.visible[1].id);
+    const n = tabs.visible.filter((t, i) => i !== 1 && !t.url.startsWith('burrow://newtab')).length;
+    await js(`B.tabs.closeOthers(${tabs.visible[1].id})`);
+    check(await until(() => tabs.visible.length === 1 && toastsNow().some((t) => t.text === `${n} tabs closed`)), `"close other tabs" says "${n} tabs closed · Undo"`);
+    mainWin.toasts.act(toastsNow().find((t) => t.text === `${n} tabs closed`).id);
+    const real = (list) => list.filter((u) => !u.startsWith('burrow://newtab')).join();
+    check(await until(() => real(order()) === real(before)), 'one Undo puts them all back, in order (' + real(before).replaceAll(base30, '') + ' → ' + real(order()).replaceAll(base30, '') + ')');
+    // Messages from the interface, with a button that does something.
+    await ui.webContents.executeJavaScript("toast('Hello from the interface', { action: 'Do it', onAction: () => { window.__toastDone = true; } }).then(() => 1)");
+    check(await until(() => toastsNow().some((t) => t.text === 'Hello from the interface')), 'the interface can show a message too');
+    mainWin.toasts.act(toastsNow().find((t) => t.text === 'Hello from the interface').id);
+    check(await until(() => js('window.__toastDone === true')), 'and its button runs the action');
+    // Two voices: messages that matter show even when Mochi is set to Off.
+    setPrefs({ mochiMode: 'off' });
+    await wait(150);
+    getUpdates().set({ status: 'ready', version: '9.9.8' });
+    check(await until(() => mainWin.toasts.log.some((x) => /v9\.9\.8 is ready/.test(x))), 'with Mochi set to Off, "update ready" still shows (as a message, not Mochi)');
+    getUpdates().set({ status: 'idle' });
+    setPrefs({ mochiMode: 'lively' });
+    toastsNow().forEach((t) => mainWin.toasts.dismiss(t.id));
+    check(await until(() => mainWin.toasts.view.getBounds().width === 0), 'dismissed messages leave nothing behind (the page is clickable again)');
+
+    // --- What's new 0.3.0: pick the look right there ---
+    showWhatsNew('0.2.5', '0.3.0', mainWin);
+    check(await until(() => js("!document.getElementById('whatsNew').hidden && !!document.getElementById('wnLookSeg')")), "the 0.3.0 “What's new” offers Soft paper or Classic");
+    check(await js("document.querySelector('#wnLookSeg [data-look=soft]').getAttribute('aria-checked') === 'true'"), 'with your current look chosen');
+    await shot('76-whats-new-look');
+    await js("document.querySelector('#wnLookSeg [data-look=classic]').click()");
+    check(await until(async () => (await look()) === 'classic' && (await js("document.querySelector('#wnLookSeg [data-look=classic]').getAttribute('aria-checked') === 'true'"))), 'choosing Classic there switches immediately');
+    await shot('77-whats-new-classic');
+    await js("document.querySelector('#wnLookSeg [data-look=soft]').click()");
+    check(await until(async () => (await look()) === 'soft'), 'and Soft paper again');
+    await js("document.getElementById('wnClose').click()");
+
+    // --- Screens in dark mode, both looks (reviewed before release) ---
+    await js("void openMainMenu()");
+    await wait(250);
+    await shot('78-soft-light-menu');
+    await js('hideOverlay()');
+    setTheme({ mode: 'dark' });
+    await wait(500);
+    await shot('79-soft-dark', true);
+    await js("void openPalette()");
+    await wait(300);
+    await shot('80-soft-dark-palette');
+    await js('hideOverlay()');
+    setTheme({ look: 'classic' });
+    await wait(400);
+    await shot('81-classic-dark', true);
+    setTheme({ look: 'soft', mode: 'light' });
+    await wait(300);
+    srv30.close();
+    }
+
     if (section('windows')) {
     // ================= Windows + dragging tabs =================
     const tabCenters = () => js("[...document.querySelectorAll('#tabs .tab:not(.closing)')].map((t) => [t, t.getBoundingClientRect()]).map(([t, r]) => ({ id: +t.dataset.id, x: r.left + r.width / 2, y: r.top + r.height / 2 }))");

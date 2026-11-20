@@ -16,6 +16,7 @@ function readerOriginal(url) {
 }
 
 const MAX_CLOSED = 25;
+let nextBatch = 1; // closes that "Undo" puts back together
 // Chromium's network error codes that mean "no internet" or "can't reach the site".
 const NET_ERRORS = new Set([-7, -15, -21, -100, -101, -102, -104, -105, -106, -109, -118, -137, -324]);
 // Night mode: a gentle warm tint over web pages (it never blocks clicks).
@@ -384,9 +385,16 @@ class Tabs {
     }
     const vis = this.visible;
     const vi = vis.indexOf(tab);
+    let batch = 0;
     if (!tab.url.startsWith('burrow://newtab')) {
-      this.closed.push({ url: tab.url, ws: tab.ws });
+      // Remembered with its neighbour and a batch number, so "Undo" can put a group back where it was.
+      batch = this.batch ? this.batch.id : nextBatch++;
+      // prevs: the tabs that were before it (nearest first), from the order before a group close began.
+      const order = this.batch?.order || vis.map((t) => t.id);
+      const prevs = order.slice(0, Math.max(0, order.indexOf(tab.id))).reverse().slice(0, 60);
+      this.closed.push({ url: tab.url, ws: tab.ws, id: tab.id, prevs, batch });
       if (this.closed.length > MAX_CLOSED) this.closed.shift();
+      if (this.batch) this.batch.n++;
     }
     const wasShown = this.shownTabs.includes(tab);
     this.dropFromSplit(id);
@@ -400,6 +408,40 @@ class Tabs {
     tab.view?.webContents.close();
     if (!this.visible.length) this.create(NEWTAB);
     else this.emit();
+    if (batch && !this.batch) this.onClosed?.(1, batch);
+  }
+
+  // Close several tabs as one action (close others, close to the right, tidy-up): one "Undo" for all.
+  closeMany(ids, opts) {
+    const batch = { id: nextBatch++, n: 0, order: this.visible.map((t) => t.id) };
+    this.batch = batch;
+    try { for (const i of ids) this.close(Number(i), opts); } finally { this.batch = null; }
+    if (batch.n) this.onClosed?.(batch.n, batch.id);
+  }
+
+  // "Undo" on the toast: reopen that close (one tab or a whole group) in its old places.
+  undoClose(batch) {
+    const items = this.closed.filter((c) => c.batch === batch);
+    if (!items.length) return 0;
+    this.closed = this.closed.filter((c) => c.batch !== batch);
+    const newIds = new Map();
+    let last = null;
+    for (const c of items) {
+      const ws = this.ws(c.ws) ? c.ws : this.currentWs;
+      // Back after the nearest tab that was before it and is here now (reopened or never closed).
+      let prev;
+      for (const p of c.prevs || []) { prev = newIds.get(p) || (this.get(p) ? p : undefined); if (prev) break; }
+      last = this.create(c.url, { ws, after: prev, activate: false });
+      if (!last) continue;
+      newIds.set(c.id, last.id);
+      // It was the first tab: put it back at the front (create() adds tabs at the end).
+      if (!prev && ws === this.currentWs) this.move(last.id, 0);
+    }
+    if (items.length === 1 && last) {
+      if (last.ws !== this.currentWs) this.switchWorkspace(last.ws);
+      this.activate(last.id);
+    }
+    return items.length;
   }
 
   reopenClosed() {
@@ -466,14 +508,14 @@ class Tabs {
     if (t && this.sleep(t)) this.emit();
   }
   closeOthers(id) {
-    for (const t of this.visible.filter((x) => x.id !== id)) this.close(t.id);
+    this.closeMany(this.visible.filter((x) => x.id !== id).map((t) => t.id));
     if (this.get(id)) this.activate(id);
   }
   closeRight(id) {
     const vis = this.visible;
     const i = vis.findIndex((t) => t.id === id);
     if (i < 0) return;
-    for (const t of vis.slice(i + 1)) this.close(t.id);
+    this.closeMany(vis.slice(i + 1).map((t) => t.id));
   }
   // Move a tab to another workspace in this window (or a new one).
   moveToWorkspace(id, wsId) {

@@ -74,11 +74,40 @@
   }
 
   // Build all tokens. Every text-like token is checked for readable contrast.
-  function build(seedHex, dark) {
+  // look: 'soft' (Soft paper, the default since 0.3.0) or 'classic' (the original high-contrast look).
+  function build(seedHex, dark, look) {
     const seed = normaliseHex(seedHex);
     const [h, s, l] = hexToHsl(seed);
-    const t = { seed, dark: !!dark };
-    if (!dark) {
+    const soft = look !== 'classic';
+    const t = { seed, dark: !!dark, look: soft ? 'soft' : 'classic' };
+    // Soft paper: warm grey paper and ink (hue 30, barely tinted by your colour), hairlines, a softer accent.
+    const PH = 30;
+    if (soft && !dark) {
+      t.bg = hslToHex(PH, 18, 96);
+      t.fg = hslToHex(PH, 8, 22);
+      t.surface = hslToHex(PH, 30, 99);
+      t.line = hslToHex(PH, 12, 87);
+      t.muted = ensureContrast(PH, 6, 44, t.bg, 4.6, false);
+      t.accent = hslToHex(h, s * 0.85, clamp(l, 40, 62));
+      t.accentInk = ensureContrast(h, s * 0.85, clamp(l, 40, 62), t.bg, 4.6, false);
+      t.hover = hslToHex(PH, 14, 92);
+      t.tint = hslToHex(h, Math.min(s, 70), 94);
+      t.accentInk = ensureContrast(...hexToHsl(t.accentInk), t.tint, 4.6, false); // readable on the tint too
+      t.mochiBody = '#FFFFFF';
+      t.mochiInner = hslToHex(h, 70, 84);
+    } else if (soft) {
+      t.bg = hslToHex(PH, 6, 13);
+      t.fg = hslToHex(PH, 10, 88);
+      t.surface = hslToHex(PH, 6, 17);
+      t.line = hslToHex(PH, 6, 25);
+      t.muted = ensureContrast(PH, 6, 62, t.surface, 4.6, true);
+      t.accent = hslToHex(h, Math.min(Math.max(s, 50), 75), Math.max(l, 64));
+      t.hover = hslToHex(PH, 6, 19);
+      t.tint = hslToHex(h, Math.min(s, 28), 20);
+      t.accentInk = ensureContrast(h, Math.min(Math.max(s, 50), 75), Math.max(l, 64), t.tint, 4.6, true);
+      t.mochiBody = t.fg;
+      t.mochiInner = hslToHex(h, 60, 78);
+    } else if (!dark) {
       t.bg = hslToHex(h, Math.min(s, 30), 95);
       t.fg = hslToHex(h, Math.min(s, 25), 9);
       t.surface = hslToHex(h, Math.min(s, 30), 99);
@@ -102,6 +131,23 @@
       t.mochiBody = t.fg;
       t.mochiInner = hslToHex(h, 60, 78);
     }
+    if (!t.tint) t.tint = t.hover; // (Classic shows selection as an inverted block instead)
+    else {
+      // Soft paper: muted and accent text must also read on a hovered or selected (tinted) row.
+      const backs = [t.bg, t.surface, t.hover, t.tint].sort((a, b) => luminance(a) - luminance(b));
+      const worst = dark ? backs[backs.length - 1] : backs[0];
+      t.muted = ensureContrast(...hexToHsl(t.muted), worst, 4.6, !!dark);
+      t.accentInk = ensureContrast(...hexToHsl(t.accentInk), worst, 4.6, !!dark);
+    }
+    // Status colours, separate from the brand accent: readable as text on the page, cards and hover.
+    // Checked against the closest background (the darkest one in light mode, the lightest in dark mode).
+    const near = dark ? [t.surface, t.hover, t.tint].sort((a, b) => luminance(b) - luminance(a))[0]
+      : [t.bg, t.hover].sort((a, b) => luminance(a) - luminance(b))[0];
+    const STATUS = { danger: [4, 70], warning: [32, 85], success: [142, 55], info: [212, 70] };
+    for (const k in STATUS) {
+      const [sh, ss] = STATUS[k];
+      t[k] = ensureContrast(sh, ss, dark ? 66 : 42, near, 4.6, dark);
+    }
     // Mochi's eyes + outline are always dark ink, so the face reads in both modes.
     t.mochiInk = hslToHex(h, Math.min(s, 25), 9);
     // Text on the accent colour (buttons, chips): white or near-black, whichever reads better — and if
@@ -123,12 +169,16 @@
   const CSS_NAMES = {
     bg: '--bg', fg: '--fg', surface: '--surface', line: '--line', muted: '--muted',
     accent: '--accent', accentInk: '--accent-ink', onAccent: '--on-accent', hover: '--hover',
-    mochiBody: '--mochi-body', mochiInner: '--mochi-inner',
+    mochiBody: '--mochi-body', mochiInner: '--mochi-inner', tint: '--tint',
+    danger: '--danger', warning: '--warning', success: '--success', info: '--info',
   };
 
   function apply(tokens, el) {
     el = el || document.documentElement;
     for (const k in CSS_NAMES) if (tokens[k]) el.style.setProperty(CSS_NAMES[k], tokens[k]);
+    // The look (Soft paper / Classic) and density switch whole sets of CSS variables in base.css.
+    el.dataset.look = tokens.look === 'classic' ? 'classic' : 'soft';
+    el.dataset.density = tokens.density === 'compact' ? 'compact' : 'comfortable';
     el.dataset.mode = tokens.dark ? 'dark' : 'light';
     el.style.colorScheme = tokens.dark ? 'dark' : 'light';
   }

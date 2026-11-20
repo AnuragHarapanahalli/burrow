@@ -3,7 +3,7 @@
 //   npm test -- phase8          just one part
 //   npm test -- phase7 phase8   several parts
 //   npm test -- --slow          also list the slowest checks (to find what to speed up)
-// Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, phase14, v022, windows
+// Parts: basics, phase3, phase4, phase5, welcome, phase6, phase7, phase8, phase9, phase10, phase11, phase12, phase13, phase14, v022, v030, windows
 // Screenshots and the full log go to .selftest/ in the project (ignored by Git).
 const { spawn } = require('child_process');
 const fs = require('fs');

@@ -1,8 +1,11 @@
 /* Shared base for every Burrow page: fonts + colour tokens (filled in by shared/theme.js). */
 @import url('burrow://app/node_modules/@fontsource/inter-tight/400.css');
 @import url('burrow://app/node_modules/@fontsource/inter-tight/500.css');
+@import url('burrow://app/node_modules/@fontsource/inter-tight/600.css');
 @import url('burrow://app/node_modules/@fontsource/inter-tight/800.css');
 @import url('burrow://app/node_modules/@fontsource/silkscreen/400.css');
+/* Soft paper (the default look) layers on top of the Classic rules; Settings → Look switches. */
+@import url('burrow://app/ui/soft.css');
 
 :root {
   /* Fallbacks (Signal red, light) until the theme arrives. */
@@ -11,8 +14,27 @@
   --mochi-body: #FFFFFF; --mochi-inner: #F7B3AE;
   --sans: 'Inter Tight', 'Segoe UI', system-ui, sans-serif;
   --pixel: 'Silkscreen', ui-monospace, monospace;
+  --tint: #E8E2E2; --danger: #B3261E; --warning: #8A5300; --success: #1E7A3C; --info: #1F5FB0;
   --rule: 2px solid var(--fg);
   --hair: 1px solid var(--line);
+
+  /* ---- Design tokens (PLAN.md phase 15a). Classic values here; Soft paper's in soft.css. ---- */
+  /* Type scale */
+  --fs-display: 30px; --fs-title: 20px; --fs-long: 15px; --fs-ui: 13px; --fs-label: 11px;
+  --w-head: 800;
+  /* Spacing (4/8 rhythm) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+  /* Radius: small (chips, keys) · medium (buttons, inputs, rows) · large (menus, cards) */
+  --r-s: 0px; --r-m: 0px; --r-l: 0px;
+  /* Elevation: floating things (menus, toasts, dialogs) */
+  --float-shadow: 6px 6px 0 var(--fg);
+  /* Motion */
+  --t-fast: 120ms; --t-mid: 180ms; --t-slow: 260ms;
+  /* Selection (current tab, chosen option, menu row) and the primary action button */
+  --sel-bg: var(--fg); --sel-fg: var(--bg);
+  --btn-bg: var(--fg); --btn-fg: var(--bg);
+  /* Sizes that density changes */
+  --strip-h: 40px; --bar-h: 40px; --row-h: 32px; --tool-h: 30px;
 }
 
 * { box-sizing: border-box; }

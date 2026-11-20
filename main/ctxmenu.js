@@ -174,7 +174,7 @@ async function run(c) {
       if (!host || !sel) break;
       const prev = h.notes.get(host);
       h.notes.set(host, `${prev ? prev.replace(/\s+$/, '') + '\n\n' : ''}> ${sel.replace(/\n/g, '\n> ')}`);
-      w.send('mochi-say', { text: 'Added to your notes for this site', pose: 'happy', essential: true });
+      w.toasts.show({ text: 'Added to your notes for this site', kind: 'success' });
       break;
     }
     case 'back': if (wc.navigationHistory.canGoBack()) wc.navigationHistory.goBack(); break;

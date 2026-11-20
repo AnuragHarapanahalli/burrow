@@ -10,6 +10,7 @@
 </head>
 <body>
   <div id="chrome">
+    <div class="load-bar" id="loadBar" aria-hidden="true"></div>
     <header class="strip">
       <button class="brand" id="wsBtn" aria-haspopup="menu" aria-expanded="false" title="Workspaces (Ctrl+Shift+1-9)">
         <span class="wordmark">Burrow<span class="dot">.</span></span>
@@ -38,13 +39,17 @@
         <svg class="i-stop" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
       </button>
       <form class="address" id="addressForm" autocomplete="off">
-        <input id="address" spellcheck="false" placeholder="Search or type a URL" aria-label="Address and search bar"
-          role="combobox" aria-controls="suggest" aria-expanded="false" aria-autocomplete="list">
+        <span class="site-icon" id="siteIcon" hidden title="Connection is secure (HTTPS)"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg></span>
+        <span class="sec-chip pixel" id="secChip" hidden title="This page doesn't use HTTPS. Don't type passwords or card numbers here.">NOT SECURE</span>
+        <span class="addr-field">
+          <input id="address" spellcheck="false" placeholder="Search or type a URL" aria-label="Address and search bar"
+            role="combobox" aria-controls="suggest" aria-expanded="false" aria-autocomplete="list">
+          <span class="addr-view" id="addrView" aria-hidden="true" hidden></span>
+        </span>
         <button type="button" class="addr-chip" id="pipBtn" hidden title="Picture in picture: pop the video out" aria-label="Picture in picture">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h12v10H2z"/><path class="pip-inner" d="M8 8h5v4H8z"/></svg>
         </button>
         <span class="read-chip pixel" id="readChip" hidden title="About how long this article takes to read"></span>
-        <span class="sec-chip pixel" id="secChip" hidden title="This page doesn't use HTTPS. Don't type passwords or card numbers here.">NOT SECURE</span>
         <span class="focus-chip pixel" id="focusChip" hidden title="Time left today"></span>
         <button type="button" class="addr-chip zoom-chip pixel" id="zoomBtn" hidden title="Reset zoom (Ctrl+0)"></button>
         <button type="button" class="addr-chip" id="readerBtn" hidden title="Reader view (F9)" aria-label="Reader view" aria-pressed="false">
@@ -174,13 +179,25 @@
         </div>
       </details>
       <details class="sect" name="settings">
-        <summary><span class="pixel sect-n">03</span><span class="sect-t">Theme</span><span class="sect-v" id="sumTheme"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+        <summary><span class="pixel sect-n">03</span><span class="sect-t">Look</span><span class="sect-v" id="sumTheme"></span><svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
         <div class="sect-body">
+          <div class="seg seg-2 look-seg" id="lookSeg" role="radiogroup" aria-label="Look">
+            <button data-look="soft" role="radio"><span class="look-swatch soft" aria-hidden="true"></span>Soft paper</button>
+            <button data-look="classic" role="radio"><span class="look-swatch classic" aria-hidden="true"></span>Classic</button>
+          </div>
+          <p class="sect-note">Soft paper is calmer: warm greys, hairlines and rounded corners. Classic is the original sharp, high-contrast look.</p>
+          <div class="pixel sect-sub">LIGHT OR DARK</div>
           <div class="seg" id="modeSeg" role="radiogroup" aria-label="Theme">
             <button data-mode="light" role="radio">Light</button>
             <button data-mode="dark" role="radio">Dark</button>
             <button data-mode="system" role="radio">System</button>
           </div>
+          <div class="pixel sect-sub">DENSITY</div>
+          <div class="seg seg-2" id="densitySeg" role="radiogroup" aria-label="Density">
+            <button data-density="comfortable" role="radio">Comfortable</button>
+            <button data-density="compact" role="radio">Compact</button>
+          </div>
+          <p class="sect-note">Compact makes the tab strip, toolbar, menus and text a little smaller, for small screens.</p>
         </div>
       </details>
       <details class="sect" name="settings">

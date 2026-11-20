@@ -268,7 +268,7 @@ function go(i = sel) {
   else B.tabs.navigate(s?.url || s?.text || q);
 }
 
-address.addEventListener('focus', () => { UI.editing = true; address.select(); });
+address.addEventListener('focus', () => { UI.editing = true; renderToolbar(); address.select(); });
 address.addEventListener('blur', () => {
   UI.editing = false;
   suggestions = [];

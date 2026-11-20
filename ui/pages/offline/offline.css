@@ -3,13 +3,13 @@ body { min-height: 100vh; }
 .dot { color: var(--accent-ink); }
 .off { max-width: 860px; margin: 0 auto; padding: 56px 28px 64px; display: flex; flex-direction: column; gap: 36px; }
 .kicker { color: var(--accent-ink); margin: 0 0 8px; }
-h1 { font-size: clamp(32px, 5vw, 54px); font-weight: 800; letter-spacing: -.04em; line-height: 1.02; margin: 0 0 14px; overflow-wrap: anywhere; }
+h1 { font-size: clamp(32px, 5vw, 54px); font-weight: var(--w-head); letter-spacing: -.04em; line-height: 1.02; margin: 0 0 14px; overflow-wrap: anywhere; }
 .lead { font-size: 18px; line-height: 1.55; margin: 0 0 18px; max-width: 620px; }
 .btns { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .btns[hidden] { display: none; }
 .btns button { padding: 8px 16px; border: 1px solid var(--fg); font-weight: 600; transition: background-color .12s, color .12s, transform .08s; }
 .btns button:hover { background: var(--hover); }
-.btns .primary { background: var(--fg); color: var(--bg); }
+.btns .primary { background: var(--btn-bg); color: var(--btn-fg); }
 .btns .primary:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .btns button:active { transform: scale(.96); }
 .status { color: var(--muted); font-size: 11px; margin-left: 6px; }

@@ -4,6 +4,21 @@
 (function (root) {
   const CHANGES = [
     {
+      version: '0.3.0',
+      title: 'A calmer look',
+      choose: 'look', // the popup shows a Soft paper / Classic picker
+      new: [
+        '“Soft paper”: warm greys, hairlines, rounded corners and softer colours, in light and dark. Prefer the old look? Pick Classic above or in Settings → Look.',
+        'Compact density for small screens (Settings → Look).',
+        'Closing tabs shows “Tab closed · Undo” instead of asking first; tidy-up and “close others” can be undone too.',
+        'The address bar shows the site clearly: a lock for secure sites, “Not secure” for others, the domain in full ink.',
+        'A thin loading bar under the toolbar; hover a tab to see its full title, site and what it’s doing.',
+        'Downloads, updates and warnings appear as small messages at the bottom left, whatever Mochi’s mood setting.',
+      ],
+      fixed: [],
+      thanks: [],
+    },
+    {
       version: '0.2.2',
       title: 'Full screen, fixed',
       new: [

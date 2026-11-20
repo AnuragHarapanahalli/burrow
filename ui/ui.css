@@ -23,7 +23,7 @@ body { overflow: hidden; user-select: none; }
 
 /* ---------- Row 1: tab strip (also the window's drag area) ---------- */
 .strip {
-  height: 40px; display: flex; align-items: stretch;
+  height: var(--strip-h); display: flex; align-items: stretch;
   border-bottom: var(--rule); -webkit-app-region: drag;
 }
 .brand {
@@ -32,7 +32,7 @@ body { overflow: hidden; user-select: none; }
   line-height: 1.1; border-right: var(--hair); text-align: left;
 }
 .brand:hover, .brand[aria-expanded="true"] { background: var(--hover); }
-.wordmark { font-weight: 800; font-size: 15px; letter-spacing: -0.3px; }
+.wordmark { font-weight: var(--w-head); font-size: 15px; letter-spacing: -0.3px; }
 .workspace { color: var(--muted); max-width: 108px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .tabs { display: flex; flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
@@ -59,7 +59,7 @@ body.side-tabs-on .tabs { display: none; }
 .tab .close svg { width: 13px; height: 13px; }
 .tab:hover .close, .tab.active .close { opacity: 1; }
 .close:hover { background: var(--accent); color: var(--on-accent); }
-.tab.active { background: var(--fg); color: var(--bg); }
+.tab.active { background: var(--sel-bg); color: var(--sel-fg); }
 .tab.active .num { color: var(--accent); }
 
 /* Loading: a small blinking pixel after the number. */
@@ -98,12 +98,12 @@ body.side-tabs-on .tabs { display: none; }
 @keyframes bob { 50% { transform: translateY(-2px); } }
 
 /* ---------- Row 2: toolbar ---------- */
-.toolbar { height: 40px; display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: var(--rule); }
+.toolbar { height: var(--bar-h); display: flex; align-items: center; gap: 2px; padding: 0 6px; border-bottom: var(--rule); }
 body.bmbar-on .toolbar { border-bottom: var(--hair); }
-.tool { height: 30px; min-width: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 7px; position: relative; }
+.tool { height: var(--tool-h); min-width: var(--tool-h); display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 7px; position: relative; }
 .tool:hover:not(:disabled) { background: var(--hover); }
 .tool:disabled { color: var(--muted); opacity: .45; cursor: default; }
-.tool[aria-expanded="true"] { background: var(--fg); color: var(--bg); }
+.tool[aria-expanded="true"] { background: var(--sel-bg); color: var(--sel-fg); }
 #back:hover:not(:disabled) svg { transform: translateX(-2px); }
 #forward:hover:not(:disabled) svg { transform: translateX(2px); }
 #back svg, #forward svg { transition: transform .15s var(--ease-out); }
@@ -136,6 +136,27 @@ body.bmbar-on .toolbar { border-bottom: var(--hair); }
 .star[aria-pressed="true"] svg { fill: currentColor; }
 .star[hidden] { display: none; }
 
+/* Honest address bar: the site icon and "Not secure" lead; the formatted address sits over the input. */
+.addr-field { position: relative; flex: 1; min-width: 0; height: 100%; display: flex; }
+.addr-view {
+  position: absolute; inset: 0; padding: 0 10px; display: flex; align-items: center; pointer-events: none;
+  white-space: nowrap; overflow: hidden; font-size: 13.5px; mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+.addr-view[hidden] { display: none; }
+.av-dim { color: var(--muted); }
+.av-host { color: var(--fg); }
+.address.has-view input { color: transparent; }
+.site-icon { flex: none; display: grid; place-items: center; width: 22px; margin-left: 6px; color: var(--muted); }
+.site-icon[hidden] { display: none; }
+.site-icon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; }
+.site-icon + .sec-chip:not([hidden]), .address > .sec-chip { margin-left: 6px; margin-right: 0; }
+
+/* Loading bar: a thin accent line along the bottom of the chrome. */
+.load-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; z-index: 3; background: var(--accent); opacity: 0; pointer-events: none; }
+.load-bar.on { opacity: 1; animation: load-crawl 8s cubic-bezier(.1, .7, .3, 1) forwards; }
+.load-bar.done { opacity: 0; width: 100%; transition: width .2s ease-out, opacity .25s .15s; }
+@keyframes load-crawl { 0% { width: 0; } 10% { width: 30%; } 100% { width: 88%; } }
+
 /* ---------- Row 3: bookmarks bar ---------- */
 .bmbar { height: 30px; display: flex; align-items: center; padding: 0 6px; border-bottom: var(--rule); }
 .bmbar[hidden] { display: none; }
@@ -148,7 +169,7 @@ body.bmbar-on .toolbar { border-bottom: var(--hair); }
 .bm:hover { background: var(--hover); }
 .bm span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .bm img { width: 14px; height: 14px; }
-.bm-dot { width: 14px; height: 14px; display: grid; place-items: center; background: var(--fg); color: var(--bg); font-size: 9px !important; line-height: 1; }
+.bm-dot { width: 14px; height: 14px; display: grid; place-items: center; background: var(--sel-bg); color: var(--sel-fg); font-size: 9px !important; line-height: 1; }
 .bm-empty { color: var(--muted); padding: 0 8px; font-size: 12.5px; }
 .bm-more { height: 24px; padding: 0 8px; font-size: 15px; }
 .bm-more:hover, .bm-more[aria-expanded="true"] { background: var(--hover); }
@@ -178,7 +199,7 @@ body.bmbar-on .toolbar { border-bottom: var(--hair); }
 /* ---------- Address-bar chips: zoom % and picture-in-picture ---------- */
 .addr-chip { height: 22px; min-width: 26px; padding: 0 6px; margin-right: 2px; display: grid; place-items: center; color: var(--muted); transition: background-color .12s, color .12s, transform .08s; }
 .addr-chip[hidden] { display: none; }
-.addr-chip:hover { background: var(--fg); color: var(--bg); }
+.addr-chip:hover { background: var(--sel-bg); color: var(--sel-fg); }
 .addr-chip:active { transform: scale(.92); }
 .addr-chip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square; }
 .addr-chip .pip-inner { fill: currentColor; }
@@ -194,7 +215,7 @@ body.bmbar-on .toolbar { border-bottom: var(--hair); }
 .find-count { min-width: 52px; color: var(--muted); text-align: center; }
 .findbar.no-match .find-count { color: var(--accent-ink); }
 .find-case { font-weight: 700; font-size: 12px; }
-.find-case[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.find-case[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
 #findClose { margin-left: auto; }
 .shake { animation: shake .3s; }
 @keyframes shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
@@ -209,7 +230,7 @@ body.private .caret { display: none; }
 /* ---------- Dragging tabs ---------- */
 .tab.dragging, .side-tab.dragging {
   position: relative; z-index: 5; cursor: grabbing;
-  box-shadow: 4px 4px 0 var(--fg); outline: 2px solid var(--fg); outline-offset: -2px;
+  box-shadow: var(--float-shadow); outline: 2px solid var(--fg); outline-offset: -2px;
 }
 .tab.shifting, .side-tab.shifting { transition: transform .16s var(--ease-out), background-color .15s; }
 body.tab-dragging, body.tab-dragging * { cursor: grabbing !important; }
@@ -218,7 +239,7 @@ body.tab-dragging .tab.active:not(.dragging) { background: var(--fg); }
 /* Lifted free: the tab floats like a card. The strip/sidebar must not clip it. */
 body.tab-tearing .tabs, body.tab-tearing .side-tabs, body.tab-tearing .sidebar { overflow: visible; }
 .tab-dragging .dragging { transition: none; }
-body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--fg); color: var(--bg); }
+body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--sel-bg); color: var(--sel-fg); }
 .tear-hint {
   position: fixed; z-index: 20; pointer-events: none; padding: 3px 7px;
   background: var(--accent); color: var(--on-accent); animation: pop-in .14s var(--ease-out);
@@ -229,12 +250,12 @@ body.tab-tearing .dragging { opacity: .95; max-width: 210px; background: var(--f
 .strip-mochi.walking { animation: mochi-walk-in .62s linear; }
 .strip-mochi.walking .strip-bubble { visibility: hidden; }
 @keyframes mochi-walk-in { from { transform: translateX(140px); } }
-#settingsBtn[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+#settingsBtn[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
 /* Sliders icon (Settings): solid knobs that punch through the lines, in the button's own colours */
 #settingsBtn svg .knob, .cc-settings svg .knob { fill: var(--bg); stroke: currentColor; stroke-width: 1.5; }
-#settingsBtn[aria-pressed="true"] svg .knob { fill: var(--fg); }
+#settingsBtn[aria-pressed="true"] svg .knob { fill: var(--sel-bg); }
 #settingsBtn:hover:not([aria-pressed="true"]) svg .knob { fill: var(--hover); }
-.cc-settings:hover svg .knob { fill: var(--fg); }
+.cc-settings:hover svg .knob { fill: var(--sel-bg); }
 
 /* ---------- Fullscreen, like Chrome: the exit note and the ✕ at the top centre ---------- */
 /* (In fullscreen the interface is only a small strip at the top centre, so everything else hides.) */

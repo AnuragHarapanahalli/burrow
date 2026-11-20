@@ -4,11 +4,13 @@ const path = require('path');
 const { BaseWindow, WebContentsView, session: Session } = require('electron');
 const { Tabs } = require('./tabs');
 const { Downloads } = require('./downloads');
+const { Toasts } = require('./toasts');
 const { NEWTAB } = require('./url');
 const AI = require('../shared/ai');
 
 const ROOT = path.join(__dirname, '..');
-const TITLEBAR_HEIGHT = 40;
+const TITLEBAR_HEIGHT = 40; // the tab strip's height (34 in Compact density; see stripHeight())
+const stripHeight = (tokens) => (tokens?.density === 'compact' ? 34 : TITLEBAR_HEIGHT);
 // In fullscreen, Burrow's interface shrinks to this strip at the top centre (the exit note and ✕).
 const FS_STRIP_W = 460, FS_STRIP_H = 76;
 const AI_HEAD = 36;          // the AI panel's header (drawn by Burrow's interface)
@@ -66,7 +68,7 @@ class BurrowWindow {
       show: false,
       backgroundColor: tokens.bg,
       titleBarStyle: 'hidden',
-      titleBarOverlay: { color: tokens.bg, symbolColor: tokens.fg, height: TITLEBAR_HEIGHT - 2 },
+      titleBarOverlay: { color: tokens.bg, symbolColor: tokens.fg, height: stripHeight(tokens) - 2 },
     });
 
     this.ui = new WebContentsView({
@@ -110,6 +112,14 @@ class BurrowWindow {
     this.tabs.onHtmlFullscreen = (tab, on) => this.setHtmlFullscreen(tab, on);
     this.tabs.onTopEdge = (atTop) => this.setFsExit(atTop);
     this.tabs.nightOn = () => !isPrivate && !!ctx.store.get('nightMode') && ctx.store.get('nightTint') !== false;
+    // System messages at the bottom left (main/toasts.js). They stay above the page whenever the page is raised.
+    this.toasts = new Toasts(this);
+    const raise = this.tabs.raiseActive.bind(this.tabs);
+    this.tabs.raiseActive = () => { raise(); this.toasts.raise(); };
+    // Closing tabs offers Undo instead of asking "are you sure?".
+    this.tabs.onClosed = (n, batch) => this.toasts.show({
+      text: n === 1 ? 'Tab closed' : `${n} tabs closed`, action: 'Undo', onAction: () => this.tabs.undoClose(batch),
+    });
     // The last tab closed (or dragged away): close this window.
     this.tabs.onEmpty = () => {
       this.closedEmpty = true;
@@ -158,10 +168,11 @@ class BurrowWindow {
   applyTheme() {
     const payload = this.ctx.themePayload(this.isPrivate);
     if (!this.win.isDestroyed() && process.platform !== 'darwin') {
-      this.win.setTitleBarOverlay({ color: payload.tokens.bg, symbolColor: payload.tokens.fg, height: TITLEBAR_HEIGHT - 2 });
+      this.win.setTitleBarOverlay({ color: payload.tokens.bg, symbolColor: payload.tokens.fg, height: stripHeight(payload.tokens) - 2 });
       this.win.setBackgroundColor(payload.tokens.bg);
     }
     this.send('theme', payload);
+    this.toasts?.sendTheme(payload);
     this.tabs.burrowPages().forEach((wc) => wc.send('theme', this.pagePayload(wc, payload)));
   }
 
@@ -193,6 +204,7 @@ class BurrowWindow {
       this.tabs.setBounds({ x: 0, y: 0, width: w, height: h });
       if (this.aiView) this.aiView.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       if (big || mini) this.win.contentView.addChildView(this.ui);
+      this.toasts?.place();
       return;
     }
     this.ui.setBounds({ x: 0, y: 0, width: w, height: h });
@@ -203,6 +215,7 @@ class BurrowWindow {
     if (this.aiOpen && this.aiView) {
       this.aiView.setBounds({ x: w - aiW + 2, y: l.top + AI_HEAD, width: Math.max(0, aiW - 2), height: Math.max(0, h - l.top - AI_HEAD) });
     }
+    this.toasts?.place();
   }
 
   setLayout(l) {
@@ -346,7 +359,7 @@ class BurrowWindow {
   }
 
   setAI(open) {
-    if (this.isPrivate) { this.send('mochi-say', 'The AI panel is off in private windows'); return; }
+    if (this.isPrivate) { this.toasts.show({ text: 'The AI panel is off in private windows' }); return; }
     open = open === undefined ? !this.aiOpen : !!open;
     if (open === this.aiOpen) return;
     this.aiOpen = open;
@@ -391,7 +404,7 @@ class BurrowWindow {
     if (copy) {
       require('electron').clipboard.writeText(q);
       const name = AI.PROVIDERS[this.ctx.store.get('aiProvider')]?.name || 'the AI';
-      this.send('mochi-say', `Question copied. Press Ctrl+V in ${name}`);
+      this.toasts.show({ text: `Question copied. Press Ctrl+V in ${name}`, ms: 7000 });
     }
     // With the AI panel open, questions go to the panel instead of a tab.
     if (this.aiOpen && !pageWc) { this.loadAI(copy ? undefined : url); return; }
@@ -513,6 +526,7 @@ class BurrowWindow {
   }
 
   onClosed() {
+    this.toasts?.destroy();
     if (this.aiView) { try { this.aiView.webContents.close(); } catch { /* gone */ } }
     if (this.isPrivate && this.session) {
       // Belt and braces: wipe everything this private session stored.

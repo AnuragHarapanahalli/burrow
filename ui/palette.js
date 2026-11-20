@@ -51,6 +51,10 @@ function palActions() {
     A('Switch to light theme', () => B.theme.set({ mode: 'light' }), '', 'mode'),
     A('Switch to dark theme', () => B.theme.set({ mode: 'dark' }), '', 'mode night'),
     A('Follow system theme', () => B.theme.set({ mode: 'system' }), '', 'mode auto'),
+    A('Soft paper look', () => B.theme.set({ look: 'soft' }), '', 'look style calm theme design'),
+    A('Classic look', () => B.theme.set({ look: 'classic' }), '', 'look style sharp theme design old'),
+    A('Compact density', () => B.theme.set({ density: 'compact' }), '', 'small dense size'),
+    A('Comfortable density', () => B.theme.set({ density: 'comfortable' }), '', 'big size spacing'),
     A('Welcome tour', () => B.tabs.navigate('burrow://welcome/'), '', 'help shortcuts keys tutorial guide onboarding'),
     A('Report a bug', () => B.tabs.navigate('burrow://newtab/#report-bug'), '', 'issue problem feedback'),
   ];

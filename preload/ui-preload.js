@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('burrow', {
   ready: send('ui:ready'),
   setLayout: (top, right, left) => ipcRenderer.send('ui:layout', { top, right, left }),
   setOverlay: (open) => ipcRenderer.send('ui:overlay', !!open),
+  toast: (t) => ipcRenderer.invoke('toast:show', t),
+  onToastAction: listen('toast-action'),
   setPrefs: send('prefs:set'),
   openPrivate: send('window:private'),
   openWindow: send('window:new'),

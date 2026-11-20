@@ -71,8 +71,7 @@ function updateTab(el, t, i) {
   el.setAttribute('aria-selected', String(active));
   el.querySelector('.num').textContent = pad(i + 1);
   el.querySelector('.title').textContent = t.title;
-  const note = t.asleep ? '  · asleep, click to wake' : t.keepAwake ? '  · kept awake' : '';
-  el.title = (i < 8 ? `${t.title}  (Ctrl+${i + 1})` : t.title) + note;
+  el.title = tabTooltip(t, i);
   el.querySelector('.close').setAttribute('aria-label', `Close ${t.title}`);
   // Speaker when the tab makes sound; click it to mute/unmute.
   const snd = el.querySelector('.snd');
@@ -86,6 +85,19 @@ function updateTab(el, t, i) {
     slot.dataset.src = fav;
     slot.innerHTML = fav ? `<img src="${esc(fav)}" alt="">` : '';
   }
+}
+
+// The tab's hover tooltip: the full title, the site, and what it's doing (playing, muted, asleep…).
+function tabTooltip(t, i) {
+  let host = '';
+  try { const u = new URL(t.url); host = /^https?:$/.test(u.protocol) ? u.hostname.replace(/^www\./, '') : ''; } catch { /* burrow:// page */ }
+  const state = [
+    t.loading && !t.asleep ? 'Loading…' : '',
+    t.audible && !t.muted ? 'Playing sound' : '', t.muted ? 'Muted' : '',
+    t.asleep ? 'Asleep — click to wake' : '', t.keepAwake ? 'Kept awake' : '',
+    t.insecure ? 'Not secure' : '',
+  ].filter(Boolean).join(' · ');
+  return [t.title, host, state, i < 8 ? `Ctrl+${i + 1}` : ''].filter(Boolean).join('\n');
 }
 
 function renderTabs() {
@@ -157,6 +169,8 @@ function renderToolbar() {
   $('reload').setAttribute('aria-label', t?.loading ? 'Stop' : 'Reload');
   if (!UI.editing) address.value = t?.url || '';
   $('secChip').hidden = !t?.insecure;
+  renderAddrView(t);
+  renderLoadBar(t);
   const rc = $('readChip');
   rc.hidden = !(t?.readMin >= 2) || UI.editing;
   rc.textContent = t?.readMin >= 2 ? `${t.readMin} MIN READ` : '';
@@ -179,6 +193,38 @@ function renderToolbar() {
   UI.lastStarTab = t?.id;
   document.title = t ? `${t.title} - Burrow` : 'Burrow';
 }
+// Honest address bar: when you're not typing, the address is shown with the site's domain in full ink
+// and the rest muted (https:// hidden, like Chrome), a lock for HTTPS, "Not secure" for plain HTTP.
+function renderAddrView(t) {
+  const view = $('addrView');
+  let u = null;
+  try { u = t?.url ? new URL(t.url) : null; } catch { u = null; }
+  const web = !!u && /^https?:$/.test(u.protocol) && !UI.editing;
+  view.hidden = !web;
+  $('addressForm').classList.toggle('has-view', web);
+  $('siteIcon').hidden = !(web && u.protocol === 'https:');
+  if (!web) { view.textContent = ''; return; }
+  const host = u.hostname;
+  const www = host.startsWith('www.') ? 'www.' : '';
+  const rest = (u.port ? ':' + u.port : '') + (u.pathname === '/' && !u.search && !u.hash ? '' : u.pathname + u.search + u.hash);
+  view.innerHTML = (u.protocol === 'http:' ? '<span class="av-dim">http://</span>' : '')
+    + (www ? '<span class="av-dim">www.</span>' : '') + `<span class="av-host">${esc(host.slice(www.length))}</span>`
+    + (rest ? `<span class="av-dim">${esc(rest)}</span>` : '');
+}
+
+// A thin bar along the bottom of the toolbar while the page loads.
+let loadDone = 0;
+function renderLoadBar(t) {
+  const bar = $('loadBar');
+  const loading = !!t?.loading && !t?.asleep;
+  if (loading) { clearTimeout(loadDone); bar.classList.remove('done'); bar.classList.add('on'); }
+  else if (bar.classList.contains('on')) {
+    bar.classList.replace('on', 'done');
+    clearTimeout(loadDone);
+    loadDone = setTimeout(() => bar.classList.remove('done'), 400);
+  }
+}
+
 $('back').onclick = () => B.nav.back();
 $('forward').onclick = () => B.nav.forward();
 $('reload').onclick = () => {
@@ -190,7 +236,7 @@ $('star').onclick = () => B.library.toggleBookmark();
 $('zoomBtn').onclick = () => B.zoom(0);
 async function popOut() {
   const r = await B.tabs.pip();
-  if (r === 'none') { UI.stripClickOpens = null; stripMochi('No video to pop out on this page', 3500, 'oops'); }
+  if (r === 'none') toast('No video to pop out on this page');
 }
 window.popOut = popOut;
 $('pipBtn').onclick = popOut;
@@ -252,6 +298,18 @@ function mochiSay(text, { pose = 'happy', essential = false, ms = 5000, opens = 
   return true;
 }
 window.mochiSay = mochiSay;
+// ---------- Toasts: system messages at the bottom left (main/toasts.js) ----------
+// Mochi is the friendly voice; downloads, errors, undo and updates are toasts, so they show whatever
+// Mochi's setting. toast('Saved x', { kind: 'success', action: 'Show', onAction: () => … })
+const toastActions = new Map();
+async function toast(text, { kind = 'info', action = null, onAction = null, ms = 0 } = {}) {
+  const id = await B.toast({ text, kind, action, ms });
+  if (id && onAction) { toastActions.set(id, onAction); setTimeout(() => toastActions.delete(id), 60000); }
+  return id;
+}
+window.toast = toast;
+B.onToastAction((id) => { const fn = toastActions.get(id); toastActions.delete(id); fn?.(); });
+
 // Older calls: important messages (downloads, "couldn't find an article", …).
 function stripMochi(text, ms = 5000, pose = 'happy') {
   return mochiSay(text, { essential: true, ms, pose, opens: UI.stripClickOpens || null });
