@@ -173,6 +173,7 @@ ui/     index.html ui.css ui.js theme.js palette.js (Ctrl+K) split.js notes.js r
    - g) **Endless-scroll nudge**: on any site, when Mochi notices a long unbroken stretch of endless scrolling (the page keeps growing as you scroll, for 10+ minutes), Mochi suggests a pause — once per stretch, never on reading pages. Respects Mochi's Lively / Quiet / Off.
    - h) **Focus schedule**: focus sessions that start by themselves at times you set (e.g. weekdays 9–12), with the days, times and blocked sites chosen in Settings → Focus; a 1-minute heads-up before it starts; you can still end one early.
    - Self-test for f–h uses the test clock (no real waiting).
+- **Google sign-in (v0.3.1, 2026-11-20):** stop pretending to be Firefox; window.chrome pieces on every page + Electron's honest identity on Google's sign-in pages, switchable in Ctrl+K, with an offer of the next method when Google refuses. If none of the methods works for you: sign-in through the system browser for "Sign in with Google" buttons on other sites, or (much bigger) moving Burrow to a real Chromium build.
 19. Later: **password manager** (encrypted with Windows' own protection, autofill on login forms, "save password?" prompt, revealing a password asks for your Windows PIN) **+ password import** from other browsers.
 20. Later (parked): **Mochi answers** inside Burrow using your own AI API key (optional, costs per question).
 

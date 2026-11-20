@@ -47,7 +47,9 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'burrow', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
-// Remove "Electron/xx" from the user agent so websites treat Burrow like Chrome.
+// Remove "Electron/xx" from the user agent so websites treat Burrow like Chrome. (Electron's own user
+// agent is kept for Google's sign-in pages: see signin.js.)
+const ELECTRON_UA = app.userAgentFallback;
 app.userAgentFallback = app.userAgentFallback.replace(/\s(Electron|burrow)\/\S+/gi, '');
 
 // Developer self-test uses a throwaway profile so it never touches your real settings.
@@ -596,6 +598,10 @@ function registerIpc() {
   on('ai:ask', (w, text, newTab) => w.ask(String(text || ''), { newTab: !!newTab }));
   handle('palette:tabs', (w) => w.allTabs());
   on('tab:reopen', (w) => w.tabs.reopenClosed());
+  // Google sign-in method (Ctrl+K): both | chrome | electron. See signin.js.
+  handle('signin:method', (_w, m) => { if (m) SignIn.setMethod(m); return { method: SignIn.method(), names: SignIn.METHOD_NAMES }; });
+  // A tab's preload asks, before the page's own scripts run, what identity to give the page.
+  ipcMain.on('signin:identity', (e) => { e.returnValue = SignIn.identityFor(e.senderFrame?.url || e.sender.getURL()); });
   on('tab:move', (w, id, to) => w.tabs.move(Number(id), Number(to)));
   // A tab dragged out of the strip: drop it on another window's tabs, or open it in a new window.
   on('tab:detach', async (w, id, sx, sy) => {
@@ -928,6 +934,7 @@ app.on('second-instance', (_e, argv) => {
 
 app.whenReady().then(() => {
   store = new Store();
+  SignIn.init({ store, selftest: !!SELFTEST, electronUA: ELECTRON_UA });
   // Until you pick a search engine, use Google (earlier versions defaulted to DuckDuckGo).
   if (!store.get('searchChosen')) store.set('searchEngine', 'google');
   library = new Library({

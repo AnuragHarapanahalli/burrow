@@ -1876,11 +1876,10 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     tabs.close(sa.id); tabs.close(sb.id);
     await wait(300);
 
-    // --- Google sign-in: Firefox's identity on accounts.google.com only ---
+    // --- Google sign-in: which pages count as Google's sign-in (the methods themselves are tested in v031) ---
     const SignIn = require('./signin');
-    check(SignIn.isSignIn('https://accounts.google.com/v3/signin/identifier') && !SignIn.isSignIn('https://www.google.com/') && !SignIn.isSignIn('https://mail.google.com/'), 'only Google\'s sign-in pages get the Firefox identity');
-    const hdr = SignIn.signInHeaders({ 'User-Agent': 'x Chrome/1', 'sec-ch-ua': '"Chromium"', 'Sec-CH-UA-Platform': '"Windows"', Accept: '*/*' });
-    check(/Firefox\/\d+/.test(hdr['User-Agent']) && !Object.keys(hdr).some((k) => /^sec-ch-ua/i.test(k)) && hdr.Accept === '*/*', 'there, requests say Firefox and carry no Chromium brand hints');
+    check(SignIn.isSignIn('https://accounts.google.com/v3/signin/identifier') && SignIn.isSignIn('https://accounts.youtube.com/x') && !SignIn.isSignIn('https://www.google.com/') && !SignIn.isSignIn('https://mail.google.com/'), 'only Google\'s sign-in pages get the sign-in identity');
+    check(SignIn.isRejected('https://accounts.google.com/v3/signin/rejected?x=1') && !SignIn.isRejected('https://accounts.google.com/v3/signin/identifier'), 'Burrow recognises Google\'s "Couldn\'t sign you in" page');
     const plain = tabs.create(base14 + '/plain');
     await ready(plain);
     check(/Chrome\/\d+/.test(await plain.view.webContents.executeJavaScript('navigator.userAgent')) && !plain.signInUA, 'every other site still sees Chrome');
@@ -2224,6 +2223,60 @@ async function run({ app, ui, tabs, library, downloads, setTheme, setPrefs, stor
     setTheme({ look: 'soft', mode: 'light' });
     await wait(300);
     srv30.close();
+    }
+
+    if (section('v031')) {
+    // ================= v0.3.1: Google sign-in methods (a local stand-in for accounts.google.com) =================
+    const SignIn = require('./signin');
+    const http31 = require('http');
+    const srv31 = http31.createServer((req, res) => {
+      if (req.url.startsWith('/go-signin')) { res.writeHead(302, { location: '/__burrow_signin_test/start?via=redirect' }); res.end(); return; }
+      const hints = Object.keys(req.headers).some((k) => /^sec-ch-ua/.test(k)) ? 'hints' : 'none';
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>Page</title><p id=ua>' + String(req.headers['user-agent']).replace(/</g, '') + '</p><p id=ch>' + hints + '</p>');
+    });
+    await new Promise((r) => srv31.listen(0, '127.0.0.1', r));
+    const base31 = 'http://127.0.0.1:' + srv31.address().port;
+    const look31 = () => tabs.active.view.webContents.executeJavaScript("({ ua: navigator.userAgent, header: document.getElementById('ua')?.textContent || '', ch: document.getElementById('ch')?.textContent || '', uad: !!navigator.userAgentData, app: !!(window.chrome && window.chrome.app), csi: typeof (window.chrome && window.chrome.csi) === 'function' ? typeof window.chrome.csi() : 'none', lt: typeof (window.chrome && window.chrome.loadTimes) === 'function' ? typeof window.chrome.loadTimes().requestTime : 'none' })");
+    const go31 = async (p, part) => { tabs.navigate(base31 + p); await ready(tabs.active, part || p.split('?')[0]); return look31(); };
+    const t31 = tabs.create(base31 + '/plain');
+    await ready(t31);
+
+    check(SignIn.method() === 'both', 'the default method is "Chrome pieces + Electron identity"');
+    let l = await look31();
+    check(l.app && l.csi === 'object' && l.lt === 'number' && !l.ua.includes('Electron'), 'every web page has the window.chrome pieces real Chrome has (app, csi, loadTimes), and still looks like Chrome (' + l.ua.slice(-40) + ')');
+    for (const [how, p] of [['opened directly', '/__burrow_signin_test/start'], ['reached by a redirect (like Gmail → sign in)', '/go-signin']]) {
+      l = await go31(p, '/__burrow_signin_test');
+      // (Client hints aren't sent to this plain-HTTP stand-in at all; on Google's HTTPS pages Burrow leaves Chromium's own.)
+      check(l.ua.includes('Electron/') && l.header.includes('Electron/') && l.uad && l.app, 'Google sign-in ' + how + ': the page and its requests both say Electron (one consistent identity)');
+    }
+    l = await go31('/plain');
+    check(!l.ua.includes('Electron') && !l.header.includes('Electron'), 'other sites never see Electron');
+
+    // Ctrl+K switches the method.
+    await js("void openPalette()");
+    await wait(250);
+    await js("(() => { const p = document.getElementById('palInput'); p.value = 'google sign-in method'; p.dispatchEvent(new Event('input')); })()");
+    check(await until(() => js("[...document.querySelectorAll('#palList .pal-row')].filter((r) => /Google sign-in method/.test(r.textContent)).length === 3")), 'Ctrl+K offers the three Google sign-in methods');
+    await js('hideOverlay()');
+    await ui.webContents.executeJavaScript("B.signInMethod('chrome').then(() => 1)");
+    l = await go31('/__burrow_signin_test/start');
+    check(SignIn.method() === 'chrome' && !l.header.includes('Electron') && !l.ua.includes('Electron') && l.app, '"Chrome pieces" only: the sign-in page sees Chrome, with the pieces');
+    await ui.webContents.executeJavaScript("B.signInMethod('electron').then(() => 1)");
+    l = await go31('/__burrow_signin_test/start');
+    check(l.ua.includes('Electron/') && !l.app, '"Electron identity" only: Electron on the sign-in page, no added pieces');
+    l = await go31('/plain');
+    check(!l.app && !l.ua.includes('Electron'), 'and other pages are left exactly as Electron makes them');
+
+    // Google says "Couldn't sign you in" → offer the next method.
+    await go31('/__burrow_signin_test/v3/signin/rejected?continue=https%3A%2F%2Fmail.google.com', '/rejected');
+    const offer = () => mainWin.toasts.list().find((t) => /Google refused the sign-in/.test(t.text));
+    check(await until(() => offer() && offer().action === 'Try it'), 'when Google refuses, a message offers the next method (' + (offer()?.text || '') + ')');
+    mainWin.toasts.act(offer().id);
+    check(await until(() => SignIn.method() === 'both' && tabs.active.url.includes('/__burrow_signin_test/start')), '"Try it" switches method and goes back to the sign-in page');
+    SignIn.setMethod('both');
+    tabs.close(t31.id);
+    srv31.close();
     }
 
     if (section('windows')) {

@@ -50,10 +50,56 @@ if (location.protocol === 'http:') {
   }, true);
 }
 
-// Google's sign-in pages: Burrow presents itself as Firefox there (see main/signin.js), and Firefox
-// has no navigator.userAgentData, so it's hidden on those pages so the identity is consistent.
-if (location.protocol === 'https:' && location.hostname === 'accounts.google.com') {
+// Google sign-in (see main/signin.js), set up before the page's own scripts run:
+//  • on every web page, fill in the window.chrome pieces real Chrome has (app, csi, loadTimes);
+//  • on Google's sign-in pages, the page sees the same user agent its requests send.
+if (/^https?:$/.test(location.protocol)) {
   try {
-    contextBridge.executeInMainWorld({ func: () => { Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true }); } });
-  } catch { /* older Electron: the request headers alone usually suffice */ }
+    const id = ipcRenderer.sendSync('signin:identity');
+    if (id && (id.chromePieces || id.ua)) {
+      contextBridge.executeInMainWorld({
+        args: [!!id.chromePieces, id.ua || ''],
+        func: (pieces, ua) => {
+          if (ua) {
+            const appVersion = ua.replace(/^Mozilla\//, '');
+            Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => ua, configurable: true, enumerable: true });
+            Object.defineProperty(Navigator.prototype, 'appVersion', { get: () => appVersion, configurable: true, enumerable: true });
+          }
+          if (!pieces) return;
+          if (!window.chrome) Object.defineProperty(window, 'chrome', { value: {}, writable: true, configurable: true });
+          const c = window.chrome;
+          const nav = () => performance.getEntriesByType('navigation')[0] || {};
+          const sec = (ms) => (performance.timeOrigin + (ms || 0)) / 1000;
+          if (!c.app) {
+            c.app = {
+              isInstalled: false,
+              InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+              RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+              getDetails: () => null,
+              getIsInstalled: () => false,
+              installState: (cb) => { if (typeof cb === 'function') cb('not_installed'); },
+              runningState: () => 'cannot_run',
+            };
+          }
+          if (!c.csi) {
+            c.csi = () => ({ startE: Math.round(performance.timeOrigin), onloadT: Math.round(performance.timeOrigin + (nav().domContentLoadedEventEnd || 0)), pageT: performance.now(), tran: 15 });
+          }
+          if (!c.loadTimes) {
+            c.loadTimes = () => {
+              const n = nav();
+              const paint = performance.getEntriesByName('first-paint')[0];
+              const proto = n.nextHopProtocol || 'http/1.1';
+              return {
+                requestTime: sec(n.requestStart), startLoadTime: sec(n.startTime), commitLoadTime: sec(n.responseStart),
+                finishDocumentLoadTime: sec(n.domContentLoadedEventEnd), finishLoadTime: sec(n.loadEventEnd),
+                firstPaintTime: paint ? sec(paint.startTime) : 0, firstPaintAfterLoadTime: 0, navigationType: 'Other',
+                wasFetchedViaSpdy: /^h[23]/.test(proto), wasNpnNegotiated: /^h[23]/.test(proto), npnNegotiatedProtocol: /^h[23]/.test(proto) ? proto : 'unknown',
+                wasAlternateProtocolAvailable: false, connectionInfo: proto,
+              };
+            };
+          }
+        },
+      });
+    }
+  } catch { /* the page still works, just without these */ }
 }

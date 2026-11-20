@@ -116,6 +116,18 @@ class BurrowWindow {
     this.toasts = new Toasts(this);
     const raise = this.tabs.raiseActive.bind(this.tabs);
     this.tabs.raiseActive = () => { raise(); this.toasts.raise(); };
+    // Google said "Couldn't sign you in": offer the next sign-in method (main/signin.js).
+    this.tabs.onSignInRejected = (tab, url) => {
+      if (tab.rejectedShown === url) return;
+      tab.rejectedShown = url;
+      const SignIn = require('./signin');
+      const next = SignIn.nextMethod();
+      this.toasts.show({
+        text: `Google refused the sign-in (method: ${SignIn.METHOD_NAMES[SignIn.method()]}). Try "${SignIn.METHOD_NAMES[next]}"?`,
+        kind: 'warning', action: 'Try it', ms: 20000,
+        onAction: () => { SignIn.setMethod(next); tab.rejectedShown = null; tab.view?.webContents.loadURL(SignIn.retryUrl(url)).catch(() => {}); },
+      });
+    };
     // Closing tabs offers Undo instead of asking "are you sure?".
     this.tabs.onClosed = (n, batch) => this.toasts.show({
       text: n === 1 ? 'Tab closed' : `${n} tabs closed`, action: 'Undo', onAction: () => this.tabs.undoClose(batch),

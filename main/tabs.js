@@ -102,6 +102,7 @@ class Tabs {
     wc.on('did-start-loading', () => update({ loading: true }));
     wc.on('did-stop-loading', () => { update({ loading: false }); T().checkReader(tab); });
     wc.on('did-navigate', (_e, u) => {
+      if (SignIn.isRejected(u)) T().onSignInRejected?.(tab, u);
       T().applyZoom(tab, u);
       update({ url: u, favicon: null, media: false, readerable: false });
       T().onVisit(u, wc.getTitle());
@@ -129,6 +130,7 @@ class Tabs {
     wc.on('zoom-changed', (_e, dir) => T().stepZoom(dir === 'in' ? 1 : -1, tab));
     wc.on('found-in-page', (_e, r) => { if (tab.id === T().activeId) T().onFind?.(r); });
     wc.on('did-navigate-in-page', (_e, u, isMain) => {
+      if (isMain && SignIn.isRejected(u)) T().onSignInRejected?.(tab, u);
       if (!isMain) return;
       update({ url: u });
       T().onVisit(u, wc.getTitle());
@@ -153,16 +155,18 @@ class Tabs {
     };
     wc.on('will-navigate', (e) => toGate(e, e.url));
     wc.on('will-redirect', (e) => { if (e.isMainFrame !== false) toGate(e, e.url); });
+    // Google's sign-in pages may get their own user agent (signin.js). (Not changed mid-redirect, e.g.
+    // Gmail → accounts.google.com: that crashes Electron. There the request headers and the preload give
+    // the page the same identity anyway.)
+    const useSignInUA = (url) => {
+      const ua = SignIn.uaFor(url);
+      if (ua !== (tab.signInUA || '')) { tab.signInUA = ua; wc.setUserAgent(ua || require('electron').app.userAgentFallback); }
+    };
     wc.on('did-start-navigation', (e, legacyUrl, _inPlace, legacyMain) => {
       const url = typeof legacyUrl === 'string' ? legacyUrl : e.url;
       const isMain = typeof legacyMain === 'boolean' ? legacyMain : e.isMainFrame;
       if (!isMain || e.isSameDocument) return;
-      // On Google's sign-in pages the page sees Firefox's identity too (matching the request headers).
-      const signIn = SignIn.isSignIn(url);
-      if (signIn !== !!tab.signInUA) {
-        tab.signInUA = signIn;
-        wc.setUserAgent(signIn ? SignIn.firefoxUA() : require('electron').app.userAgentFallback);
-      }
+      useSignInUA(url);
       const g = T().gate(url);
       if (g) setImmediate(() => { if (!wc.isDestroyed()) { wc.stop(); wc.loadURL(g).catch(() => {}); } });
     });

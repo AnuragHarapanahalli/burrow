@@ -4,6 +4,17 @@
 (function (root) {
   const CHANGES = [
     {
+      version: '0.3.1',
+      title: 'Google sign-in, a new approach',
+      new: [
+        'If Google says “Couldn’t sign you in”, Burrow offers another way to sign in, right there. You can also pick one in Ctrl+K → “Google sign-in method”.',
+      ],
+      fixed: [
+        'Google sign-in: Burrow no longer pretends to be Firefox (Google could tell, and refused). It now looks like Chrome, with the small built-in pieces real Chrome has, and says honestly what it is on Google’s sign-in page.',
+      ],
+      thanks: [],
+    },
+    {
       version: '0.3.0',
       title: 'A calmer look',
       choose: 'look', // the popup shows a Soft paper / Classic picker
